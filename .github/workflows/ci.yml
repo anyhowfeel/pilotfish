@@ -25,6 +25,10 @@ jobs:
           # Let the tests capture on the loopback interface.
           sudo chmod 755 "$(command -v dumpcap)"
           sudo setcap cap_net_raw,cap_net_admin+eip "$(command -v dumpcap)"
+          # Unload AppArmor profiles that block tshark/dumpcap from reading workspace fixtures.
+          for p in $(grep -lE 'tshark|dumpcap|capinfos|editcap|mergecap' /etc/apparmor.d/* 2>/dev/null || true); do
+            sudo apparmor_parser -R "$p" || true
+          done
       - name: Rust toolchain
         run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
       - uses: Swatinem/rust-cache@v2
