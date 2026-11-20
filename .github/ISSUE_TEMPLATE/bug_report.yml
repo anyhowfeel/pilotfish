@@ -1,0 +1,50 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a capture or start a live capture on ...
+        2. Go to the ... page
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: wirelens version or commit
+      description: Output of `wirelens --version`, or the commit you built.
+    validations:
+      required: true
+  - type: input
+    id: tshark
+    attributes:
+      label: tshark version
+      description: First line of `tshark --version`.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and display server
+      placeholder: Arch Linux, Wayland
+    validations:
+      required: true
+  - type: textarea
+    id: capture
+    attributes:
+      label: Capture file or logs
+      description: |
+        If the problem depends on a capture, attach a small one. Captures contain real traffic:
+        anonymize it first (for example with `tcprewrite`) or trim it with `editcap`, and never
+        attach one that holds credentials.
