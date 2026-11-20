@@ -179,7 +179,7 @@ fn controller_serves_real_exchanges_and_detail() {
         c.poll();
         c.poll_web()
     })
-    .expect("web scan result");
+    .unwrap_or_else(|| panic!("web scan result (err={:?})", c.error()));
     assert_eq!((ex.len(), tls.len()), (6, 0));
     c.request_http_detail(&ex[0]);
     let d = wait_for(|| {
