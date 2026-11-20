@@ -1,5 +1,11 @@
 # wirelens
 
+[![CI](https://github.com/anyhowfeel/wirelens/actions/workflows/ci.yml/badge.svg)](https://github.com/anyhowfeel/wirelens/actions/workflows/ci.yml)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
+[![Rust 2024 edition](https://img.shields.io/badge/rust-2024%20edition-orange?logo=rust)](https://www.rust-lang.org)
+![Status: prototype](https://img.shields.io/badge/status-prototype-lightgrey)
+![Tested on Linux](https://img.shields.io/badge/tested%20on-Linux-informational)
+
 A small desktop packet viewer written in Rust with [egui](https://github.com/emilk/egui).
 It does no dissection of its own: captures are read and filtered by `tshark` / `dumpcap`
 (Wireshark's command-line tools), and wirelens turns the output into tables, charts and a
@@ -114,6 +120,10 @@ Tests that need `tshark` or loopback capture rights skip themselves when those a
 - HTTP/2 and QUIC handling is best effort. Chunked bodies without a `Content-Length` are
   only partly accounted for.
 - Windows and macOS have not been tried.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Security problems: see [SECURITY.md](SECURITY.md).
 
 ## License
 
