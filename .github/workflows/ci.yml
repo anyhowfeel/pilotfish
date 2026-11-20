@@ -26,7 +26,7 @@ jobs:
           sudo chmod 755 "$(command -v dumpcap)"
           sudo setcap cap_net_raw,cap_net_admin+eip "$(command -v dumpcap)"
       - name: Rust toolchain
-        run: rustup toolchain install stable --profile minimal --component rustfmt clippy
+        run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
