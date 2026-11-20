@@ -14,18 +14,18 @@ use crate::tsv_pass::{Pass, opt, run_pass};
 const FIELDS: [&str; 14] = [
     "frame.number",
     "frame.time_relative",
-    "_ws.col.Source",
-    "_ws.col.Destination",
+    "_ws.col.def_src",
+    "_ws.col.def_dst",
     "tcp.srcport",
     "udp.srcport",
     "tcp.dstport",
     "udp.dstport",
-    "_ws.col.Protocol",
+    "_ws.col.protocol",
     "tcp.flags",
     "tcp.seq",
     "tcp.ack",
     "tcp.len",
-    "_ws.col.Info",
+    "_ws.col.info",
 ];
 
 fn parse(line: &str, interner: &mut Interner) -> Option<FlowEvent> {

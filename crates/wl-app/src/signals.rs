@@ -1,10 +1,12 @@
 //! SIGTERM / SIGINT / SIGHUP: reap capture children before dying so none is orphaned.
-use signal_hook::consts::{SIGHUP, SIGINT, SIGTERM};
-use signal_hook::iterator::Signals;
 
 /// Spawns a watcher thread; on a termination signal it kills every tshark/dumpcap child and
 /// exits with the conventional `128 + signo` status. Failure to install is non-fatal.
+#[cfg(unix)]
 pub fn install() {
+    use signal_hook::consts::{SIGHUP, SIGINT, SIGTERM};
+    use signal_hook::iterator::Signals;
+
     let Ok(mut signals) = Signals::new([SIGTERM, SIGINT, SIGHUP]) else {
         return;
     };
@@ -18,3 +20,6 @@ pub fn install() {
         });
     drop(spawned);
 }
+
+#[cfg(not(unix))]
+pub fn install() {}

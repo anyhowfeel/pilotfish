@@ -32,7 +32,6 @@ impl Pass<'_> {
             a.extend(["-Y".into(), self.filter.into()]);
         }
         a.extend(["-E".into(), format!("occurrence={occurrence}")]);
-        a.extend(["-Y".into(), self.filter.into()]);
         for f in self.fields {
             a.extend(["-e".into(), (*f).into()]);
         }
@@ -119,5 +118,26 @@ mod tests {
     fn columns_pad_and_truncate() {
         assert_eq!(columns::<3>("a\t\tc\td"), ["a", "", "c"]);
         assert_eq!(columns::<3>("a"), ["a", "", ""]);
+    }
+
+    #[test]
+    fn pass_args_emits_filter_at_most_once() {
+        let with_filter = Pass {
+            file: Path::new("a.pcap"),
+            filter: "http || http2",
+            fields: &["frame.number"],
+            opts: &[],
+        }
+        .args("f");
+        assert_eq!(with_filter.iter().filter(|s| s.as_str() == "-Y").count(), 1);
+
+        let no_filter = Pass {
+            file: Path::new("a.pcap"),
+            filter: "",
+            fields: &["frame.number"],
+            opts: &[],
+        }
+        .args("f");
+        assert_eq!(no_filter.iter().filter(|s| s.as_str() == "-Y").count(), 0);
     }
 }

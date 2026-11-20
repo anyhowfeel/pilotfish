@@ -149,7 +149,13 @@ fn sample_stats_filter_detail_and_errors() {
     let Some(mut c) = controller() else { return };
     c.start(CaptureSource::File(sample()), None);
     let rows = run_to_end(&mut c);
-    assert!(rows.len() > 250 && c.status().state == RunState::Finished);
+    assert!(
+        rows.len() > 250 && c.status().state == RunState::Finished,
+        "rows={}, state={:?}, err={:?}",
+        rows.len(),
+        c.status().state,
+        c.error()
+    );
     assert_eq!(c.snapshot().total_packets, rows.len() as u64);
     assert!(
         c.snapshot()

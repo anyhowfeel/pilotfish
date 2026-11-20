@@ -13,8 +13,8 @@ use crate::tsv_pass::{Pass, opt, run_pass};
 const FIELDS: [&str; 13] = [
     "frame.number",
     "frame.time_relative",
-    "_ws.col.Source",
-    "_ws.col.Destination",
+    "_ws.col.def_src",
+    "_ws.col.def_dst",
     "tcp.srcport",
     "tcp.dstport",
     "tcp.flags",
@@ -23,7 +23,7 @@ const FIELDS: [&str; 13] = [
     "tcp.len",
     "tcp.window_size",
     "tcp.analysis.ack_rtt",
-    "_ws.col.Info",
+    "_ws.col.info",
 ];
 
 fn parse(line: &str, out: &mut TcpSamples) -> Option<()> {
