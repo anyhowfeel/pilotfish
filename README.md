@@ -1,0 +1,120 @@
+# wirelens
+
+A small desktop packet viewer written in Rust with [egui](https://github.com/emilk/egui).
+It does no dissection of its own: captures are read and filtered by `tshark` / `dumpcap`
+(Wireshark's command-line tools), and wirelens turns the output into tables, charts and a
+host graph.
+
+This is a prototype built to explore what a Wireshark front end could look like. It is not
+meant to replace Wireshark or Sniffnet, and it covers only a small part of what they do.
+
+## Requirements
+
+- A recent stable Rust toolchain (edition 2024).
+- Wireshark's command-line tools on `PATH`: `tshark`, `dumpcap`, and optionally `editcap`,
+  `mergecap` and `capinfos` (export, large selections and file properties use them).
+- For live capture, permission to capture without root (on Linux, being in the `wireshark`
+  group is usually enough).
+
+Developed and tested on Linux only (Wayland and X11).
+
+## Build and run
+
+```sh
+cargo run --release -- capture.pcapng      # open a file
+cargo run --release -- --live eth0         # capture live on an interface
+cargo run --release                        # start on the Capture page
+```
+
+The binary is called `wirelens`.
+
+## Command line
+
+```
+wirelens [OPTIONS] [FILE]
+```
+
+| Option | Description |
+| --- | --- |
+| `FILE` | Capture file (`.pcap`, `.pcapng`, `.pcap.gz`) to open. |
+| `--live <IFACE>` | Start a live capture on this interface. |
+| `--filter <EXPR>` | Display filter applied to the opened file, as if typed in the filter bar. |
+| `--page <NAME>` | Page to open: `capture`, `overview`, `graphs`, `packets`, `hosts`, `map`, `conversations`, `flows`, `web`, `insights`. |
+| `--detach <PAGE>` | Open a page in its own window (repeatable). |
+| `--decode-as <RULE>` | Decode-as rule applied at startup, e.g. `tcp.port==8080,http` (repeatable). |
+| `--scale <F>` | UI scale factor, e.g. `1.25`. |
+| `--size <WxH>` | Initial window size, e.g. `1440x900`. |
+| `--light` | Start in the light theme. |
+| `-h`, `--help` / `-V`, `--version` | Help and version. |
+
+A few hidden options exist for development (`--screenshot`, `--bench-frames`, `--demo-map`,
+...); they are not part of the supported interface.
+
+Environment variables:
+
+| Variable | Description |
+| --- | --- |
+| `SSLKEYLOGFILE` | TLS key log passed to `tshark`, so HTTPS traffic can be decrypted. |
+| `WIRELENS_CONFIG_DIR` | Directory for the preferences file (defaults to the user config directory). |
+
+## What it does
+
+- **Capture**: interface list grouped by type with live rates, capture options (filter,
+  promiscuous, snap length, ring buffer, auto-stop), recent files.
+- **Packets**: virtualized packet list that stays responsive with about a million rows, display
+  filter bar with field completion and quick-filter chips, find (string, regex, hex),
+  dissection tree with click-to-filter, hex view, custom columns, time formats, bookmarks,
+  stream following, export (pcap subsets, CSV, JSON, HTML report).
+- **Overview, Hosts, Conversations**: totals, throughput, protocol mix, top talkers, with an
+  optional time-window selection on the throughput chart.
+- **Graphs**: I/O graph with several display-filter series.
+- **Map**: force-directed graph of host-to-host traffic, link width by volume, optional highlight
+  of encrypted flows.
+- **Flows**: sequence diagram of a conversation, plus TCP time-sequence, throughput, RTT and
+  window-size graphs.
+- **Web**: HTTP requests paired with responses (headers, body preview, `curl` export) and TLS
+  sessions (SNI, version, cipher, ALPN) for HTTPS; extracted objects.
+- **Insights**: plain-language findings, expert info, protocol hierarchy, DNS log.
+- Command palette (`Ctrl+K`), settings (`Ctrl+,`), dark and light themes.
+
+Shift+click on a sidebar entry opens that page in a separate window.
+
+## Releases
+
+Tagging `vX.Y.Z` makes the CI build and publish binaries for Linux (x86_64 and aarch64, plus
+a build made on Arch Linux), macOS (Apple silicon and Intel) and Windows (x86_64). Those
+builds are not tested beyond compiling; `tshark` still has to be installed separately.
+
+## Layout of the repository
+
+| Crate | Role |
+| --- | --- |
+| `wl-model` | Plain data types and the `CaptureBackend` trait. No I/O. |
+| `wl-tshark` | `CaptureBackend` implementation on top of `tshark`, `dumpcap` and friends. |
+| `wl-stats` | Incremental statistics over the packet stream. |
+| `wl-kit` | Theme, widgets and charts shared by the UI. |
+| `wl-panels` | The pages (packets, overview, map, flows, web, settings, ...). |
+| `wl-app` | The `wirelens` binary: window, state, background jobs. |
+
+`tests/fixtures/` holds the small capture files the tests read.
+
+## Tests
+
+```sh
+cargo test --workspace
+```
+
+Tests that need `tshark` or loopback capture rights skip themselves when those are missing.
+
+## Known limits
+
+- Everything depends on the installed Wireshark version; field names follow `tshark` 4.x.
+- Files over a few hundred thousand packets load quickly but `tshark` itself uses a lot of
+  memory on them.
+- HTTP/2 and QUIC handling is best effort. Chunked bodies without a `Content-Length` are
+  only partly accounted for.
+- Windows and macOS have not been tried.
+
+## License
+
+GPL-3.0-or-later, see `LICENSE`.
