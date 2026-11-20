@@ -1,0 +1,16 @@
+[package]
+name = "wl-kit"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+wl-model.workspace = true
+eframe.workspace = true
+egui_extras.workspace = true
+egui_plot = "0.38"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }
