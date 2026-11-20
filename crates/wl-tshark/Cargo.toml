@@ -1,0 +1,15 @@
+[package]
+name = "wl-tshark"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+wl-model.workspace = true
+crossbeam-channel.workspace = true
+quick-xml = "0.42"
+tempfile = "3"
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
