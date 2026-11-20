@@ -1,0 +1,27 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+
+[workspace.dependencies]
+wl-model = { path = "crates/wl-model" }
+rayon = "1"
+wl-tshark = { path = "crates/wl-tshark" }
+wl-stats = { path = "crates/wl-stats" }
+wl-kit = { path = "crates/wl-kit" }
+wl-panels = { path = "crates/wl-panels" }
+thiserror = "2"
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+crossbeam-channel = "0.5"
+eframe = { version = "0.37", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+egui_extras = { version = "0.37", default-features = false }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
