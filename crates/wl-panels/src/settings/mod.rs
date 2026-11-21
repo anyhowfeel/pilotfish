@@ -3,6 +3,7 @@
 mod category;
 #[cfg(test)]
 mod dialog_tests;
+mod geo_page;
 mod layout;
 mod model;
 mod pages;
@@ -10,6 +11,7 @@ mod pages_more;
 mod shell;
 
 pub use category::Category;
+pub use geo_page::{GeoAction, GeoDbInfo, GeoDbRow, GeoDbState};
 pub use layout::{Geometry, geometry};
 pub use model::{Density, PillLook, Settings, ThemeChoice, TimeFormat};
 pub use pages_more::AboutInfo;
@@ -27,6 +29,8 @@ pub enum SettingsAction {
     /// Close and revert to the settings that were active when the dialog opened.
     Cancel(Settings),
     OpenConfigDir,
+    /// A button of the Locations page (download, remove, add a file, open the folder).
+    Geo(GeoAction),
 }
 
 #[derive(Default)]
@@ -37,6 +41,7 @@ pub struct SettingsDialog {
     sent: Settings,
     cat: Category,
     about: AboutInfo,
+    geo: GeoDbInfo,
 }
 
 impl SettingsDialog {
@@ -54,6 +59,11 @@ impl SettingsDialog {
     /// Refresh the About facts (tool probe may finish after the dialog opened).
     pub fn set_about(&mut self, about: AboutInfo) {
         self.about = about;
+    }
+
+    /// Refreshes the database list of the Locations page (downloads finish while it is open).
+    pub fn set_geo(&mut self, geo: GeoDbInfo) {
+        self.geo = geo;
     }
 
     pub fn is_open(&self) -> bool {
@@ -76,7 +86,14 @@ impl SettingsDialog {
             self.sent.ui_scale = live;
         }
         let geo = geometry(ctx.content_rect());
-        let mut out = shell::show(ctx, &geo, &mut self.draft, &mut self.cat, &self.about);
+        let mut out = shell::show(
+            ctx,
+            &geo,
+            &mut self.draft,
+            &mut self.cat,
+            &self.about,
+            &self.geo,
+        );
         if ctx.input(|i| i.key_pressed(Key::Escape)) {
             out.cancel = true;
         }
@@ -90,6 +107,9 @@ impl SettingsDialog {
         }
         if out.reset {
             self.draft = Settings::default();
+        }
+        if let Some(a) = out.geo.take() {
+            return Some(SettingsAction::Geo(a));
         }
         match out.about {
             AboutAction::OpenConfigDir => return Some(SettingsAction::OpenConfigDir),
