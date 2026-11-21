@@ -132,7 +132,7 @@ impl GeoStore {
             });
         }
         GeoDbInfo {
-            dir: self.dir.display().to_string(),
+            dir: tilde(&self.dir),
             rows,
             error: self.error.clone(),
         }
@@ -212,6 +212,15 @@ impl GeoStore {
             }
         }
         changed
+    }
+}
+
+/// `path` for display, with the home folder written as `~`.
+fn tilde(path: &Path) -> String {
+    match dirs::home_dir().and_then(|h| path.strip_prefix(h).ok().map(Path::to_path_buf)) {
+        Some(rest) if rest.as_os_str().is_empty() => "~".to_owned(),
+        Some(rest) => format!("~/{}", rest.display()),
+        None => path.display().to_string(),
     }
 }
 
