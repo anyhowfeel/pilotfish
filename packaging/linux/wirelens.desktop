@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=wirelens
+GenericName=Packet viewer
+Comment=Prototype packet viewer on top of tshark
+Exec=wirelens %f
+Terminal=false
+Categories=Network;Monitor;
+MimeType=application/vnd.tcpdump.pcap;application/x-pcapng;
+Keywords=pcap;wireshark;tshark;network;packets;

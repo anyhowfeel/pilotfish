@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Release builds are stripped and use thin LTO.
+- Debian packages (`.deb`), a Windows installer, macOS `.dmg` images and an Arch `PKGBUILD`.
+- `SHA256SUMS` published with each release.
+
+### Fixed
+- The Windows build no longer opens a console window.
+
 ## [0.1.0] - 2026-11-20
 
 Initial public prototype release of `wirelens`, a desktop packet viewer built in Rust with `egui` on top of `tshark` and `dumpcap`.

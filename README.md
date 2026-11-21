@@ -41,6 +41,21 @@ burst), so you can open the same file and compare: `wirelens tests/fixtures/demo
 
 </details>
 
+## Install
+
+Each [release](https://github.com/anyhowfeel/wirelens/releases) contains, next to a `SHA256SUMS` file:
+
+| Platform | File | Notes |
+| --- | --- | --- |
+| Debian, Ubuntu | `wirelens_<version>_amd64.deb` / `_arm64.deb` | `sudo apt install ./wirelens_*.deb` pulls in `tshark`. |
+| Arch Linux | `wirelens-<tag>-linux-x86_64-arch.tar.gz`, or `packaging/arch/PKGBUILD` | `cd packaging/arch && makepkg -si` builds it from the tagged source. |
+| Other Linux | `wirelens-<tag>-linux-x86_64.tar.gz`, `-linux-aarch64.tar.gz` | Unpack and run `./wirelens`. |
+| Windows | `wirelens-<version>-windows-x86_64-setup.exe` | Installer; a `.zip` with the bare executable is also provided. |
+| macOS | `wirelens-<version>-macos-arm64.dmg`, `-macos-x86_64.dmg` | Drag `wirelens` to `Applications`. The app is not signed: on first launch use right-click, Open. |
+
+Wireshark's command-line tools (`tshark`, `dumpcap`) must be installed separately on Windows and
+macOS. These packages are built by CI and have not been tested on every platform.
+
 ## Requirements
 
 - A recent stable Rust toolchain (edition 2024).
@@ -115,8 +130,10 @@ Shift+click on a sidebar entry opens that page in a separate window.
 ## Releases
 
 Tagging `vX.Y.Z` makes the CI build and publish binaries for Linux (x86_64 and aarch64, plus
-a build made on Arch Linux), macOS (Apple silicon and Intel) and Windows (x86_64). Those
-builds are not tested beyond compiling; `tshark` still has to be installed separately.
+a build made on Arch Linux), macOS (Apple silicon and Intel) and Windows (x86_64), together
+with a `.deb` package for each Linux architecture, a Windows installer, macOS disk images and
+a `SHA256SUMS` file. Those builds are not tested beyond compiling; `tshark` still has to be
+installed separately on Windows and macOS.
 
 ## Layout of the repository
 
