@@ -139,9 +139,11 @@ Shift+click on a sidebar entry opens that page in a separate window.
 
 ### Country and network of hosts
 
-Put a MaxMind-format database (GeoLite2 or DB-IP Lite, country and/or ASN `.mmdb`) in
-`~/.local/share/wirelens/geo`, or point `WIRELENS_GEO_DIR` at a folder that holds them. Lookups are
-offline; nothing is downloaded by wirelens.
+Open Settings > Locations to download the free DB-IP Country and ASN databases (about 4 and 5 MB),
+or to add your own MaxMind-format `.mmdb` files (GeoLite2, DB-IP Lite). They are kept in
+`~/.local/share/wirelens/geo`; wirelens also reads the qBittorrent `GeoDB` folder, `/usr/share/GeoIP`
+and the folder named by `WIRELENS_GEO_DIR`. Lookups are offline. The only thing wirelens downloads is
+the file you ask for with the Download button.
 
 ## Releases
 

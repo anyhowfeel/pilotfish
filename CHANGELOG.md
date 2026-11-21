@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-21
+
+### Added
+- Settings: a **Locations** page for the country and network databases. It proposes the DB-IP
+  Country Lite and ASN Lite databases with a Download button (and Update once installed), lets you
+  add your own `.mmdb` files and remove them, and opens their folder. A download is checked to be a
+  valid database before it replaces the old one, and Hosts and Map pick it up without a restart.
+- Filter boxes suggest the hosts and the service ports of the capture after a comparison operator
+  (`ip.addr == 10.`, `tcp.port == `), instead of field names.
+- Web: HTML responses can be read as text (a Preview with headings, lists and link targets, or the
+  Source). The Pretty / Raw switch for JSON stays.
+
+### Changed
+- Filter autocomplete uses the real cursor position to find the token being edited, and long field
+  names no longer run into their description.
+- The Hosts hint tells where to add a location database (Settings > Locations).
+
+### Fixed
+- After accepting a suggestion the cursor was left in the middle of the text; it now moves to the
+  end of the inserted text.
+
 ## [0.3.0] - 2026-11-21
 
 ### Added

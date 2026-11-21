@@ -15,7 +15,7 @@ use super::rows::{self, RowCtx, RowEdit, WindowSel};
 use super::series::{MAX_SERIES, Preset, SeriesDef, free_color, next_color};
 use super::toolbar::{ToolbarState, toolbar};
 use super::window_row::{WINDOW_ROW_H, window_row};
-use crate::features::{FieldCatalog, FilterAutocomplete};
+use crate::features::{FieldCatalog, FilterAutocomplete, ValueIndex};
 
 const CHART_MIN_H: f32 = 150.0;
 
@@ -82,6 +82,10 @@ impl GraphsPanel {
 
     pub fn set_selection(&mut self, s: Option<TimeSelection>) {
         self.selection = s;
+    }
+
+    pub fn set_values(&mut self, values: Arc<ValueIndex>) {
+        self.autocomplete.set_values(values);
     }
 
     pub fn set_catalog(&mut self, catalog: Arc<FieldCatalog>) {
