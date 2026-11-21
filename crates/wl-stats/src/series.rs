@@ -1,15 +1,20 @@
-//! 1-second throughput buckets in a capped ring, gap-filled with zeros.
+//! Throughput buckets whose width adapts to the capture: 1 ms at first, doubled whenever the
+//! series would exceed its bucket budget, so short captures keep fine detail and long ones stay
+//! bounded.
 
 use std::collections::VecDeque;
 
 use wl_model::RatePoint;
 
-pub const DEFAULT_CAP: usize = 3600;
+pub const DEFAULT_CAP: usize = 2048;
+/// Finest bucket width in seconds.
+const MIN_STEP: f64 = 0.001;
 
 #[derive(Debug, Clone)]
 pub struct TimeSeries {
     cap: usize,
-    /// Bucket index (whole seconds of `rel`) of the front element.
+    step: f64,
+    /// Bucket index (`rel / step`) of the front element.
     base: u64,
     buckets: VecDeque<(u32, u64)>,
 }
@@ -23,7 +28,8 @@ impl Default for TimeSeries {
 impl TimeSeries {
     pub fn with_capacity(cap: usize) -> Self {
         Self {
-            cap: cap.max(1),
+            cap: cap.max(2),
+            step: MIN_STEP,
             base: 0,
             buckets: VecDeque::new(),
         }
@@ -32,6 +38,7 @@ impl TimeSeries {
     pub fn clear(&mut self) {
         self.buckets.clear();
         self.base = 0;
+        self.step = MIN_STEP;
     }
 
     pub fn len(&self) -> usize {
@@ -42,47 +49,58 @@ impl TimeSeries {
         self.buckets.is_empty()
     }
 
-    pub fn add(&mut self, rel: f64, bytes: u64) {
-        let idx = if rel.is_finite() && rel > 0.0 {
-            rel as u64
+    fn index(&self, rel: f64) -> u64 {
+        if rel.is_finite() && rel > 0.0 {
+            (rel / self.step) as u64
         } else {
             0
-        };
-        let Some(end) = self.base.checked_add(self.buckets.len() as u64) else {
-            return;
-        };
-        if self.buckets.is_empty() {
-            self.base = idx;
-            self.buckets.push_back((0, 0));
-        } else if idx >= end {
-            if idx - end >= self.cap as u64 {
-                // Huge jump: restart rather than materialise a giant gap.
+        }
+    }
+
+    /// Doubles the bucket width, merging neighbours.
+    fn coarsen(&mut self) {
+        if self.base % 2 == 1 {
+            self.buckets.push_front((0, 0));
+            self.base -= 1;
+        }
+        let merged: VecDeque<(u32, u64)> = self
+            .buckets
+            .make_contiguous()
+            .chunks(2)
+            .map(|c| {
+                c.iter()
+                    .fold((0u32, 0u64), |(n, b), &(p, y)| (n.saturating_add(p), b + y))
+            })
+            .collect();
+        self.buckets = merged;
+        self.base /= 2;
+        self.step *= 2.0;
+    }
+
+    pub fn add(&mut self, rel: f64, bytes: u64) {
+        loop {
+            let idx = self.index(rel);
+            if self.buckets.is_empty() {
                 self.base = idx;
-                self.buckets.clear();
                 self.buckets.push_back((0, 0));
-            } else {
-                for _ in end..=idx {
-                    self.buckets.push_back((0, 0));
-                }
+                break;
             }
-        } else if idx < self.base {
-            // Out-of-order older packet: prepend zeros if it still fits.
-            let missing = (self.base - idx) as usize;
-            if self.buckets.len() + missing > self.cap {
-                return;
+            let end = self.base + self.buckets.len() as u64;
+            let (lo, hi) = (idx.min(self.base), idx.max(end - 1));
+            if (hi - lo) as usize >= self.cap {
+                self.coarsen();
+                continue;
             }
-            for _ in 0..missing {
+            for _ in end..=idx {
+                self.buckets.push_back((0, 0));
+            }
+            for _ in idx..self.base {
                 self.buckets.push_front((0, 0));
             }
-            self.base = idx;
+            self.base = self.base.min(idx);
+            break;
         }
-        while self.buckets.len() > self.cap {
-            self.buckets.pop_front();
-            self.base += 1;
-        }
-        if idx < self.base {
-            return;
-        }
+        let idx = self.index(rel);
         let b = &mut self.buckets[(idx - self.base) as usize];
         b.0 = b.0.saturating_add(1);
         b.1 += bytes;
@@ -93,7 +111,8 @@ impl TimeSeries {
             .iter()
             .enumerate()
             .map(|(i, &(packets, bytes))| RatePoint {
-                t: (self.base + i as u64) as f64,
+                t: (self.base + i as u64) as f64 * self.step,
+                dt: self.step,
                 packets,
                 bytes,
             })
@@ -105,77 +124,64 @@ impl TimeSeries {
 mod tests {
     use super::*;
 
+    fn total(s: &TimeSeries) -> (u64, u64) {
+        s.points()
+            .iter()
+            .fold((0, 0), |(n, b), p| (n + u64::from(p.packets), b + p.bytes))
+    }
+
     #[test]
-    fn accumulates_in_bucket() {
+    fn starts_at_one_millisecond() {
         let mut s = TimeSeries::default();
-        s.add(0.1, 10);
-        s.add(0.9, 20);
+        s.add(0.0101, 10);
+        s.add(0.0109, 20);
+        s.add(0.0121, 5);
         let p = s.points();
-        assert_eq!(
-            p,
-            vec![RatePoint {
-                t: 0.0,
-                packets: 2,
-                bytes: 30
-            }]
-        );
+        assert_eq!(p.len(), 1 + 2);
+        assert_eq!((p[0].dt, p[0].packets, p[0].bytes), (0.001, 2, 30));
+        assert!((p[0].t - 0.010).abs() < 1e-9);
     }
 
     #[test]
     fn fills_gaps_with_zeros() {
         let mut s = TimeSeries::default();
         s.add(0.0, 1);
-        s.add(4.5, 2);
+        s.add(0.0045, 2);
         let p = s.points();
         assert_eq!(p.len(), 5);
-        assert_eq!(
-            p[1],
-            RatePoint {
-                t: 1.0,
-                packets: 0,
-                bytes: 0
-            }
-        );
+        assert_eq!(p[1].packets, 0);
         assert_eq!(p[4].bytes, 2);
-        assert!(p.windows(2).all(|w| w[1].t - w[0].t == 1.0));
     }
 
     #[test]
-    fn caps_ring_and_advances_base() {
-        let mut s = TimeSeries::with_capacity(3);
-        for i in 0..10 {
-            s.add(i as f64, 1);
+    fn coarsens_instead_of_growing_and_keeps_totals() {
+        let mut s = TimeSeries::with_capacity(100);
+        for i in 0..1000 {
+            s.add(f64::from(i) * 0.001, 1);
         }
+        assert!(s.len() <= 100);
         let p = s.points();
-        assert_eq!(p.len(), 3);
-        assert_eq!(p[0].t, 7.0);
-        assert_eq!(p[2].t, 9.0);
+        assert!(p[0].dt >= 0.01 - 1e-12);
+        assert_eq!(total(&s), (1000, 1000));
     }
 
     #[test]
-    fn huge_jump_restarts() {
-        let mut s = TimeSeries::with_capacity(10);
+    fn huge_jump_coarsens_without_losing_packets() {
+        let mut s = TimeSeries::with_capacity(64);
         s.add(0.0, 1);
-        s.add(1e9, 5);
-        assert_eq!(s.len(), 1);
-        assert_eq!(s.points()[0].t, 1e9);
+        s.add(1e6, 5);
+        assert!(s.len() <= 64);
+        assert_eq!(total(&s), (2, 6));
     }
 
     #[test]
     fn out_of_order_older_packet() {
         let mut s = TimeSeries::default();
-        s.add(5.0, 1);
-        s.add(3.2, 7);
+        s.add(0.005, 1);
+        s.add(0.0032, 7);
         let p = s.points();
         assert_eq!(p.len(), 3);
-        assert_eq!(
-            p[0],
-            RatePoint {
-                t: 3.0,
-                packets: 1,
-                bytes: 7
-            }
-        );
+        assert_eq!((p[0].packets, p[0].bytes), (1, 7));
     }
 
     #[test]
@@ -183,13 +189,7 @@ mod tests {
         let mut s = TimeSeries::default();
         s.add(f64::NAN, 1);
         s.add(-3.0, 1);
-        assert_eq!(
-            s.points(),
-            vec![RatePoint {
-                t: 0.0,
-                packets: 2,
-                bytes: 2
-            }]
-        );
+        let p = s.points();
+        assert_eq!((p.len(), p[0].t, p[0].packets, p[0].bytes), (1, 0.0, 2, 2));
     }
 }

@@ -36,4 +36,6 @@ pub struct TcpSamples {
     pub b_port: Option<u16>,
     pub samples: Vec<TcpSample>,
     pub truncated: bool,
+    /// Other connections that reuse the same addresses and ports (only the first is plotted).
+    pub other_streams: u32,
 }

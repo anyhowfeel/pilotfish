@@ -32,21 +32,99 @@ pub fn is_truncated(msg: &HttpMessage) -> bool {
         .is_some_and(|p| msg.body_len > p.len() as u64)
 }
 
+const IMAGE_MAX_H: f32 = 360.0;
+
+fn decode_image(bytes: &[u8]) -> Option<egui::ColorImage> {
+    let img = image::load_from_memory(bytes).ok()?.to_rgba8();
+    let size = [img.width() as usize, img.height() as usize];
+    Some(egui::ColorImage::from_rgba_unmultiplied(size, img.as_raw()))
+}
+
+/// Decoded image shown at its natural size, shrunk to the available width and `IMAGE_MAX_H`.
+fn image_view(ui: &mut Ui, bytes: &[u8], salt: &str) {
+    let id = ui.scope_id().with(("web_body_image", salt, bytes.len()));
+    let tex = ui
+        .data(|d| d.get_temp::<egui::TextureHandle>(id))
+        .or_else(|| {
+            let tex = ui.ctx().load_texture(
+                format!("web_body_{salt}"),
+                decode_image(bytes)?,
+                Default::default(),
+            );
+            ui.data_mut(|d| d.insert_temp(id, tex.clone()));
+            Some(tex)
+        });
+    let Some(tex) = tex else {
+        muted(ui, "Image could not be decoded");
+        return;
+    };
+    let size = tex.size_vec2();
+    let scale = (ui.available_width() / size.x)
+        .min(IMAGE_MAX_H / size.y)
+        .min(1.0);
+    ui.add(egui::Image::new(&tex).fit_to_exact_size(size * scale));
+    muted(
+        ui,
+        &format!(
+            "{} x {} px, {}",
+            size.x,
+            size.y,
+            format::bytes(bytes.len() as u64)
+        ),
+    );
+}
+
+/// "Pretty | Raw" switch; true when raw is selected.
+fn raw_toggle(ui: &mut Ui, id: egui::Id) -> bool {
+    let mut raw = ui.data(|d| d.get_temp::<bool>(id)).unwrap_or(false);
+    ui.horizontal(|ui| {
+        ui.selectable_value(&mut raw, false, RichText::new("Pretty").small());
+        ui.selectable_value(&mut raw, true, RichText::new("Raw").small());
+    });
+    ui.data_mut(|d| d.insert_temp(id, raw));
+    raw
+}
+
+fn no_text_note(msg: &HttpMessage) -> String {
+    if msg.body_len == 0 {
+        "No body".to_owned()
+    } else {
+        format!(
+            "{} body, no text preview (binary or compressed)",
+            format::bytes(msg.body_len)
+        )
+    }
+}
+
 /// Body section of a message card. `shown` is the cached `display_text` of the preview.
 pub fn body_view(ui: &mut Ui, msg: &HttpMessage, shown: Option<&str>, salt: &str) {
-    let Some(text) = shown.filter(|t| !t.is_empty()) else {
-        let note = if msg.body_len == 0 {
-            "No body".to_owned()
-        } else {
-            format!(
-                "{} body, no text preview (binary or compressed)",
-                format::bytes(msg.body_len)
-            )
-        };
-        muted(ui, &note);
+    if let Some(bytes) = &msg.body_image {
+        image_view(ui, bytes, salt);
+        return;
+    }
+    let (Some(pretty), Some(raw)) = (shown.filter(|t| !t.is_empty()), msg.body_preview.as_deref())
+    else {
+        muted(ui, &no_text_note(msg));
         return;
     };
     let id = ui.scope_id().with(("web_body_open", salt));
+    let text = if pretty != raw && !raw_toggle(ui, id.with("raw")) {
+        pretty
+    } else {
+        raw
+    };
+    text_box(ui, text, id, salt);
+    if is_truncated(msg) {
+        let n = format!(
+            "Preview truncated: {} of {}",
+            format::bytes(raw.len() as u64),
+            format::bytes(msg.body_len)
+        );
+        ui.label(RichText::new(n).small().color(Palette::warn()));
+    }
+}
+
+fn text_box(ui: &mut Ui, text: &str, id: egui::Id, salt: &str) {
     let open = ui.data(|d| d.get_temp::<bool>(id)).unwrap_or(false);
     let lines: Vec<&str> = text.lines().collect();
     let long = lines.len() > PREVIEW_LINES;
@@ -74,11 +152,10 @@ pub fn body_view(ui: &mut Ui, msg: &HttpMessage, shown: Option<&str>, salt: &str
                 });
         });
     if long {
-        let more = lines.len() - PREVIEW_LINES;
         let label = if open {
             "Show less".to_owned()
         } else {
-            format!("Show {more} more lines")
+            format!("Show {} more lines", lines.len() - PREVIEW_LINES)
         };
         let link = egui::Label::new(RichText::new(label).small().color(Palette::accent()))
             .sense(egui::Sense::click());
@@ -89,14 +166,6 @@ pub fn body_view(ui: &mut Ui, msg: &HttpMessage, shown: Option<&str>, salt: &str
         {
             ui.data_mut(|d| d.insert_temp(id, !open));
         }
-    }
-    if is_truncated(msg) {
-        let n = format!(
-            "Preview truncated: {} of {}",
-            format::bytes(text.len() as u64),
-            format::bytes(msg.body_len)
-        );
-        ui.label(RichText::new(n).small().color(Palette::warn()));
     }
 }
 

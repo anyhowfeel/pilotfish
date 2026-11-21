@@ -4,13 +4,14 @@
 use std::ops::ControlFlow;
 use std::path::Path;
 
+use rustc_hash::FxHashSet;
 use wl_model::{CaptureError, MAX_TCP_SAMPLES, TcpSample, TcpSamples};
 
 use crate::flow_flags::{analysis_flags, tcp_flags};
 use crate::process::Tools;
 use crate::tsv_pass::{Pass, opt, run_pass};
 
-const FIELDS: [&str; 13] = [
+const FIELDS: [&str; 14] = [
     "frame.number",
     "frame.time_relative",
     "_ws.col.def_src",
@@ -24,6 +25,7 @@ const FIELDS: [&str; 13] = [
     "tcp.window_size",
     "tcp.analysis.ack_rtt",
     "_ws.col.info",
+    "tcp.stream",
 ];
 
 fn parse(line: &str, out: &mut TcpSamples) -> Option<()> {
@@ -71,7 +73,13 @@ pub fn tcp_samples(
         opts: &all,
     };
     let mut out = TcpSamples::default();
+    let (mut first, mut others) = (None::<String>, FxHashSet::default());
     run_pass(tools, &pass, |line| {
+        let stream = line.rsplit('\t').next().unwrap_or("");
+        if first.get_or_insert_with(|| stream.to_owned()) != stream {
+            others.insert(stream.to_owned());
+            return ControlFlow::Continue(());
+        }
         if out.samples.len() >= MAX_TCP_SAMPLES {
             out.truncated = true;
             return ControlFlow::Break(());
@@ -79,6 +87,7 @@ pub fn tcp_samples(
         parse(line, &mut out);
         ControlFlow::Continue(())
     })?;
+    out.other_streams = others.len() as u32;
     Ok(out)
 }
 

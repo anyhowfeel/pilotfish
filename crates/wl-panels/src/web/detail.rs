@@ -80,6 +80,11 @@ fn tls_rows(t: &TlsSession) -> Vec<(String, String)> {
     if let Some(s) = &t.cert_subject {
         rows.push(r("Certificate", cert_cn(s).to_owned()));
     }
+    for (label, fp) in [("JA3", &t.ja3), ("JA4", &t.ja4), ("JA3S", &t.ja3s)] {
+        if let Some(v) = fp {
+            rows.push(r(label, v.to_string()));
+        }
+    }
     rows.push(r("Connection", format!("{} to {}", t.src, t.dst)));
     rows.push(r("Bytes", format::bytes(t.bytes)));
     rows.push(r("First frame", format!("#{}", t.first_frame)));

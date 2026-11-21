@@ -15,7 +15,9 @@ pub use logic::{HealthState, findings, group, health_state};
 use wl_kit::egui::{self, Align, Key, Layout, Rect, RichText, ScrollArea, Ui, vec2};
 use wl_kit::theme::{Palette, spacing};
 use wl_kit::widgets::{chip, empty_state, segmented_w};
-use wl_model::{ExpertReport, ExpertSeverity, InsightSeverity, ProtocolHierarchy, StatsSnapshot};
+use wl_model::{
+    BehaviorData, ExpertReport, ExpertSeverity, InsightSeverity, ProtocolHierarchy, StatsSnapshot,
+};
 
 use crate::dns::{DnsAction, DnsPanel};
 use crate::features::synthesize_insights;
@@ -60,9 +62,10 @@ impl InsightsPanel {
         stats: &StatsSnapshot,
         expert: Option<&ExpertReport>,
         phs: Option<&ProtocolHierarchy>,
+        behavior: Option<&BehaviorData>,
     ) -> Vec<InsightsAction> {
         let mut actions = Vec::new();
-        let all = synthesize_insights(expert, phs, stats);
+        let all = synthesize_insights(expert, phs, behavior, stats);
         let found = findings(&all);
         let total = stats.total_packets;
         centered(ui, |ui| {

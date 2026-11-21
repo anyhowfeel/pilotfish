@@ -6,13 +6,13 @@ use wl_kit::charts::{
 use wl_kit::egui::{self, Rect, ScrollArea, Sense, Ui, UiBuilder, vec2};
 use wl_kit::theme::{Mode, Palette, Theme, mode, spacing, theme};
 use wl_kit::widgets::{empty_state, stat_card_h};
-use wl_model::StatsSnapshot;
+use wl_model::{StatsSnapshot, rebin};
 
 use super::actions::OverviewAction;
 use super::cards::{card, content_height};
 use super::dashboard_data::{Derived, derive};
 use super::grid::{Card, place};
-use super::window_scope::{WINDOW_ROW_H, WindowScope, window_row};
+use super::window_scope::{RateStep, WINDOW_ROW_H, WindowScope, window_row};
 
 #[derive(Default)]
 pub struct Dashboard {
@@ -21,6 +21,7 @@ pub struct Dashboard {
     selection: Option<TimeSelection>,
     /// Scope of the Protocols / Talkers / Services cards and the window's statistics.
     window: WindowScope,
+    step: RateStep,
     key: Option<(u64, u64, usize, usize, Mode, Theme)>,
 }
 
@@ -135,10 +136,11 @@ impl Dashboard {
             }
             Card::Throughput => {
                 let (selection, scope) = (&mut self.selection, &mut self.window.scope);
+                let rate = rebin(&stats.rate, self.step.secs());
                 card(ui, rect, "Live throughput", |ui| {
-                    window_row(ui, selection, scope, &stats.rate, actions);
+                    window_row(ui, selection, scope, &mut self.step, &rate, actions);
                     let h = content_height(rect) - WINDOW_ROW_H - spacing::SM;
-                    throughput_chart_select(ui, &stats.rate, h, selection);
+                    throughput_chart_select(ui, &rate, h, selection);
                 });
             }
             Card::Protocols => {

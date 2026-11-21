@@ -5,7 +5,9 @@ use std::sync::{Arc, Mutex};
 
 use crossbeam_channel::{Receiver, Sender, bounded};
 use eframe::egui;
-use wl_panels::overview::NameResolver;
+use wl_panels::overview::{GeoInfo, NameResolver};
+
+use crate::geo::GeoDb;
 
 const MAX_CACHE: usize = 4096;
 const QUEUE_CAP: usize = 256;
@@ -24,6 +26,7 @@ pub struct AsyncResolver {
     done_rx: Receiver<()>,
     /// Settings > Names > "Resolve DNS names": off = no lookups (cached names still show).
     enabled: Arc<std::sync::atomic::AtomicBool>,
+    geo: Option<Arc<GeoDb>>,
 }
 
 impl AsyncResolver {
@@ -50,6 +53,7 @@ impl AsyncResolver {
             req_tx,
             done_rx,
             enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            geo: GeoDb::discover(),
         }
     }
 
@@ -68,6 +72,19 @@ impl AsyncResolver {
 }
 
 impl NameResolver for AsyncResolver {
+    fn geo(&self, addr: &str) -> Option<GeoInfo> {
+        self.geo.as_ref()?.lookup(addr)
+    }
+
+    fn geo_hint(&self) -> Option<String> {
+        self.geo.is_none().then(|| {
+            format!(
+                "Country / AS: put a GeoLite2 or DB-IP .mmdb file in {}",
+                GeoDb::primary_dir().display()
+            )
+        })
+    }
+
     fn name(&self, addr: &str) -> Option<Arc<str>> {
         let mut guard = self.cache.lock().ok()?;
         if let Some(entry) = guard.resolved.get(addr) {
@@ -90,5 +107,6 @@ fn resolve_ip(addr: &str) -> Option<Arc<str>> {
     if ip.is_loopback() {
         return Some(Arc::from("localhost"));
     }
-    None
+    let name = dns_lookup::lookup_addr(&ip).ok()?;
+    (name != addr).then(|| Arc::from(name))
 }

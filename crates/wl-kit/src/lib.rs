@@ -4,6 +4,7 @@ pub mod charts;
 pub mod format;
 pub mod scale;
 pub mod table;
+pub mod text;
 pub mod theme;
 pub mod widgets;
 

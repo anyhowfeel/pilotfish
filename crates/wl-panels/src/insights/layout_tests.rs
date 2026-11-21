@@ -72,7 +72,7 @@ fn page_stays_inside_its_area_at_all_widths_and_scales() {
             for scale in [1.0_f32, 1.5] {
                 run(width, 700.0, scale, mode, |ui| {
                     let area = ui.max_rect();
-                    panel.ui(ui, &st, Some(&rep), phs.as_ref());
+                    panel.ui(ui, &st, Some(&rep), phs.as_ref(), None);
                     assert!(
                         area.expand(1.0).contains_rect(ui.min_rect()),
                         "{mode:?} {width}@{scale}: {:?} outside {area:?}",
@@ -88,7 +88,7 @@ fn page_stays_inside_its_area_at_all_widths_and_scales() {
 fn empty_and_healthy_states_render() {
     let mut panel = InsightsPanel::default();
     run(1000.0, 640.0, 1.0, Mode::Dark, |ui| {
-        panel.ui(ui, &StatsSnapshot::default(), None, None);
-        panel.ui(ui, &stats(), Some(&ExpertReport::default()), None);
+        panel.ui(ui, &StatsSnapshot::default(), None, None, None);
+        panel.ui(ui, &stats(), Some(&ExpertReport::default()), None, None);
     });
 }

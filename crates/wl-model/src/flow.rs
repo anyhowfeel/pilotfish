@@ -112,10 +112,27 @@ impl FlowSel {
                 s
             }
             FlowSel::Hosts(h) => {
-                let set = h.iter().map(|a| &**a).collect::<Vec<_>>().join(", ");
-                let first = h.first().map_or("", |a| &**a);
-                let (s, d) = (addr_field(first, "src"), addr_field(first, "dst"));
-                format!("{s} in {{{set}}} && {d} in {{{set}}}")
+                let (v6, v4): (Vec<&Arc<str>>, Vec<&Arc<str>>) =
+                    h.iter().partition(|a| a.contains(':'));
+                let clause = |set: &[&Arc<str>]| {
+                    let list = set.iter().map(|a| &***a).collect::<Vec<_>>().join(", ");
+                    let first = set.first().map_or("", |a| &***a);
+                    let (s, d) = (addr_field(first, "src"), addr_field(first, "dst"));
+                    format!("{s} in {{{list}}} && {d} in {{{list}}}")
+                };
+                let clauses: Vec<String> = [v4, v6]
+                    .iter()
+                    .filter(|set| !set.is_empty())
+                    .map(|set| clause(set))
+                    .collect();
+                match clauses.as_slice() {
+                    [one] => one.clone(),
+                    many => many
+                        .iter()
+                        .map(|c| format!("({c})"))
+                        .collect::<Vec<_>>()
+                        .join(" || "),
+                }
             }
         }
     }
@@ -182,6 +199,15 @@ mod tests {
         assert_eq!(
             h.filter(),
             "ip.src in {10.0.0.1, 10.0.0.2, 10.0.0.3} && ip.dst in {10.0.0.1, 10.0.0.2, 10.0.0.3}"
+        );
+    }
+
+    #[test]
+    fn mixed_families_get_one_clause_each() {
+        let h = FlowSel::parse("127.0.0.1,::1").unwrap();
+        assert_eq!(
+            h.filter(),
+            "(ip.src in {127.0.0.1} && ip.dst in {127.0.0.1}) || (ipv6.src in {::1} && ipv6.dst in {::1})"
         );
     }
 

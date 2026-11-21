@@ -8,6 +8,7 @@ fn series() -> Vec<RatePoint> {
     (0..120)
         .map(|t| RatePoint {
             t: f64::from(t),
+            dt: 1.0,
             packets: 3,
             bytes: 1500,
         })
@@ -58,8 +59,11 @@ fn dragging_selects_a_window_and_a_click_clears_it() {
         s.duration() > 5.0,
         "a 300 px drag spans several seconds: {s:?}"
     );
-    assert_eq!(s.from.fract(), 0.0);
-    assert_eq!(s.to.fract(), 0.0);
+    let on_ms = |t: f64| (t * 1000.0).round() / 1000.0 == t;
+    assert!(
+        on_ms(s.from) && on_ms(s.to),
+        "selection is rounded to the ms: {s:?}"
+    );
 
     // a plain click (press + release on the same spot) clears it
     frame(&ctx, &mut sel, vec![press(a, true)]);

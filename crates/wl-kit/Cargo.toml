@@ -8,6 +8,7 @@ wl-model.workspace = true
 eframe.workspace = true
 egui_extras.workspace = true
 egui_plot = "0.38"
+memchr = "2.8.3"
 
 [lints]
 workspace = true

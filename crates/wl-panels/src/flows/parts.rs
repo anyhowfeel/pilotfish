@@ -35,10 +35,17 @@ pub fn tcp_summary(t: &TcpSamples) -> String {
         (Some(a), Some(b)) => format::duration(b.rel - a.rel),
         _ => String::new(),
     };
-    format!(
+    let mut s = format!(
         "{} TCP segments  \u{b7}  {span}",
         format::count(t.samples.len() as u64)
-    )
+    );
+    if t.other_streams > 0 {
+        s.push_str(&format!(
+            "  \u{b7}  first of {} connections on these ports",
+            t.other_streams + 1
+        ));
+    }
+    s
 }
 
 pub fn loading_or_error(ui: &mut Ui, error: Option<&str>, what: &str) {

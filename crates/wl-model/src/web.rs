@@ -74,6 +74,10 @@ pub struct TlsSession {
     /// Negotiated ALPN protocol ("h2", "http/1.1", "h3"), if any.
     pub alpn: Option<Arc<str>>,
     pub cert_subject: Option<Arc<str>>,
+    /// Client / server TLS fingerprints (JA3 MD5, JA4, JA3S), when tshark computes them.
+    pub ja3: Option<Arc<str>>,
+    pub ja4: Option<Arc<str>>,
+    pub ja3s: Option<Arc<str>>,
     pub src: Arc<str>,
     pub dst: Arc<str>,
     pub bytes: u64,
@@ -89,6 +93,8 @@ pub struct HttpMessage {
     /// First bytes of the body decoded as text when it looks like text (capped by the backend).
     pub body_preview: Option<String>,
     pub body_len: u64,
+    /// Decoded body of a PNG / JPEG / GIF response, when small enough to display.
+    pub body_image: Option<Vec<u8>>,
 }
 
 /// Full detail of an exchange: request and response messages.

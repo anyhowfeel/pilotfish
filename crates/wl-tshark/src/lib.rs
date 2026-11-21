@@ -3,6 +3,7 @@
 
 pub mod analysis;
 mod backend_core;
+mod behavior_scan;
 mod capinfos;
 mod capture_args;
 mod control;
@@ -59,9 +60,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use tempfile::TempDir;
 use wl_model::{
-    CaptureBackend, CaptureError, CaptureOptions, CaptureProperties, CaptureSource, DecodeAs,
-    DnsQuery, FlowEvents, FrameDetail, FrameFields, HttpDetail, HttpExchange, Interface, IoGraph,
-    IoSpec, ObjectSet, Session, TcpSamples, TlsSession,
+    CaptureBackend, CaptureError, CaptureOptions, CaptureProperties, CaptureSource, Channel,
+    DecodeAs, DnsQuery, FlowEvents, FrameDetail, FrameFields, HttpDetail, HttpExchange, Interface,
+    IoGraph, IoSpec, ObjectSet, Session, TcpSamples, TlsSession,
 };
 
 use process::Tools;
@@ -202,6 +203,10 @@ impl CaptureBackend for TsharkBackend {
         objects::export(&req, || {
             http_scan::http_exchanges(&self.tools, file, &opts).unwrap_or_default()
         })
+    }
+
+    fn behavior_channels(&self, file: &Path) -> Result<Vec<Channel>, CaptureError> {
+        behavior_scan::behavior_channels(&self.tools, file, &self.dissect_opts())
     }
 
     fn dns_queries(&self, file: &Path) -> Result<Vec<DnsQuery>, CaptureError> {

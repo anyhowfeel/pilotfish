@@ -15,6 +15,7 @@ use super::dashboard_data::{Derived, derive};
 /// Fixed height of the window summary row (always reserved: the chart never jumps).
 pub const WINDOW_ROW_H: f32 = 28.0;
 const SCOPE_W: f32 = 132.0;
+const STEP_W: f32 = 270.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Scope {
@@ -30,9 +31,10 @@ pub struct WindowStats {
     pub derived: Derived,
 }
 
-/// Whole-second bounds of a selection (selections are snapped to whole seconds).
+/// Millisecond bounds of a selection.
 pub fn bounds(sel: &TimeSelection) -> (u32, u32) {
-    (sel.from.max(0.0) as u32, sel.to.max(0.0) as u32)
+    let ms = |t: f64| (t.max(0.0) * 1000.0).round() as u32;
+    (ms(sel.from), ms(sel.to))
 }
 
 #[derive(Default)]
@@ -91,11 +93,83 @@ fn muted_note(ui: &mut Ui, text: &str) {
     ui.label(RichText::new(text).color(Palette::muted()));
 }
 
-/// Hint, or the selected window with its totals and the actions that use it.
+/// Bucket width of the throughput chart: the native (finest) one, or a coarser one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RateStep {
+    #[default]
+    Auto,
+    Ms10,
+    Ms100,
+    S1,
+    S10,
+}
+
+impl RateStep {
+    const OPTIONS: [(RateStep, &'static str); 5] = [
+        (RateStep::Auto, "Auto"),
+        (RateStep::Ms10, "10 ms"),
+        (RateStep::Ms100, "100 ms"),
+        (RateStep::S1, "1 s"),
+        (RateStep::S10, "10 s"),
+    ];
+
+    /// Bucket width in seconds; 0 keeps the native resolution.
+    pub fn secs(self) -> f64 {
+        match self {
+            RateStep::Auto => 0.0,
+            RateStep::Ms10 => 0.01,
+            RateStep::Ms100 => 0.1,
+            RateStep::S1 => 1.0,
+            RateStep::S10 => 10.0,
+        }
+    }
+}
+
+fn selection_summary(ui: &mut Ui, sel: &TimeSelection, rate: &[RatePoint]) {
+    let (packets, bytes) = sel.totals(rate);
+    let text = format!(
+        "{} \u{2013} {}   {} packets \u{00b7} {}",
+        format::clock_precise(sel.from),
+        format::clock_precise(sel.to),
+        format::count(packets),
+        format::bytes(bytes)
+    );
+    ui.label(RichText::new(text).color(Palette::text()));
+}
+
+fn selection_actions(
+    ui: &mut Ui,
+    sel: TimeSelection,
+    selection: &mut Option<TimeSelection>,
+    scope: &mut Scope,
+    actions: &mut Vec<OverviewAction>,
+) {
+    if ui.button("Clear").clicked() {
+        *selection = None;
+    }
+    let show = egui::Button::new(
+        RichText::new("Show packets")
+            .strong()
+            .color(Palette::on_accent()),
+    )
+    .fill(Palette::accent());
+    if ui
+        .add(show)
+        .on_hover_text("Open these packets in the Packets page")
+        .clicked()
+    {
+        actions.push(OverviewAction::ApplyFilter(sel.filter_expr()));
+    }
+    let opts = [(Scope::All, "All"), (Scope::Window, "Window")];
+    segmented_w(ui, scope, &opts, SCOPE_W);
+}
+
+/// Hint or the selected window with its totals and actions, plus the chart's step selector.
 pub fn window_row(
     ui: &mut Ui,
     selection: &mut Option<TimeSelection>,
     scope: &mut Scope,
+    step: &mut RateStep,
     rate: &[RatePoint],
     actions: &mut Vec<OverviewAction>,
 ) {
@@ -103,38 +177,16 @@ pub fn window_row(
         vec2(ui.available_width(), WINDOW_ROW_H),
         Layout::left_to_right(Align::Center),
         |ui| {
-            let Some(sel) = *selection else {
-                muted_note(ui, "Drag on the chart to select a time window");
-                return;
-            };
-            let (packets, bytes) = sel.totals(rate);
-            let text = format!(
-                "{} \u{2013} {}   {} packets \u{00b7} {}",
-                format::clock(sel.from),
-                format::clock(sel.to),
-                format::count(packets),
-                format::bytes(bytes)
-            );
-            ui.label(RichText::new(text).color(Palette::text()));
+            match *selection {
+                Some(sel) => selection_summary(ui, &sel, rate),
+                None => muted_note(ui, "Drag on the chart to select a time window"),
+            }
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                if ui.button("Clear").clicked() {
-                    *selection = None;
+                segmented_w(ui, step, &RateStep::OPTIONS, STEP_W);
+                ui.label(RichText::new("Step").small().color(Palette::muted()));
+                if let Some(sel) = *selection {
+                    selection_actions(ui, sel, selection, scope, actions);
                 }
-                let show = egui::Button::new(
-                    RichText::new("Show packets")
-                        .strong()
-                        .color(Palette::on_accent()),
-                )
-                .fill(Palette::accent());
-                if ui
-                    .add(show)
-                    .on_hover_text("Open these packets in the Packets page")
-                    .clicked()
-                {
-                    actions.push(OverviewAction::ApplyFilter(sel.filter_expr()));
-                }
-                let opts = [(Scope::All, "All"), (Scope::Window, "Window")];
-                segmented_w(ui, scope, &opts, SCOPE_W);
             });
         },
     );
@@ -157,7 +209,13 @@ mod tests {
         w.scope = Scope::Window;
         w.sync(Some(&sel(2.0, 9.0)), &mut acts);
         w.sync(Some(&sel(2.0, 9.0)), &mut acts);
-        assert_eq!(acts, vec![OverviewAction::WindowStats { from: 2, to: 9 }]);
+        assert_eq!(
+            acts,
+            vec![OverviewAction::WindowStats {
+                from: 2000,
+                to: 9000
+            }]
+        );
         w.sync(Some(&sel(3.0, 9.0)), &mut acts);
         assert_eq!(acts.len(), 2);
     }
@@ -175,7 +233,7 @@ mod tests {
     #[test]
     fn results_only_count_for_their_own_window() {
         let mut w = WindowScope::default();
-        w.set_stats(2, 9, &StatsSnapshot::default());
+        w.set_stats(2000, 9000, &StatsSnapshot::default());
         assert!(w.ready(Some(&sel(2.0, 9.0))).is_some());
         assert!(w.ready(Some(&sel(2.0, 10.0))).is_none());
         assert!(w.ready(None).is_none());

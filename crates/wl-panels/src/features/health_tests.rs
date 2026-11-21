@@ -42,7 +42,7 @@ fn flags_retransmissions_dns_errors_and_dominant_talker() {
         }],
         ..Default::default()
     };
-    let insights = synthesize_insights(Some(&rep), None, &stats);
+    let insights = synthesize_insights(Some(&rep), None, None, &stats);
     assert!(
         insights
             .iter()
@@ -61,7 +61,7 @@ fn healthy_capture_produces_all_clear_card() {
         total_bytes: 2048,
         ..Default::default()
     };
-    let insights = synthesize_insights(Some(&ExpertReport::default()), None, &stats);
+    let insights = synthesize_insights(Some(&ExpertReport::default()), None, None, &stats);
     assert_eq!(insights.len(), 1);
     assert!(insights[0].title.contains("healthy"));
 }

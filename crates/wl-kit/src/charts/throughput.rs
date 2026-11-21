@@ -33,7 +33,10 @@ pub fn throughput_chart_select(
         });
         return;
     }
-    let pts: PlotPoints<'_> = points.iter().map(|p| [p.t, p.bytes as f64]).collect();
+    let pts: PlotPoints<'_> = points
+        .iter()
+        .map(|p| [p.t + p.dt / 2.0, p.bytes_per_sec()])
+        .collect();
     let c = Palette::accent();
     let out = Plot::new("wl_kit_throughput")
         .height(height)

@@ -6,6 +6,7 @@ use wl_kit::egui::{
     CornerRadius, CursorIcon, ScrollArea, Sense, Stroke, StrokeKind, Ui, pos2, vec2,
 };
 use wl_kit::format;
+use wl_kit::text::contains_ci;
 use wl_kit::theme::{Palette, protocol_color, spacing};
 use wl_kit::widgets::text::elided_galley;
 use wl_kit::widgets::{empty_state, segmented_w};
@@ -72,7 +73,7 @@ fn item(ui: &mut Ui, selected: bool, title: &str, sub: &str, dot: wl_kit::egui::
 pub fn host_rows(hosts: &[HostStat], needle: &str) -> Vec<usize> {
     let n = needle.to_lowercase();
     let mut idx: Vec<usize> = (0..hosts.len())
-        .filter(|&i| n.is_empty() || hosts[i].addr.to_lowercase().contains(&n))
+        .filter(|&i| n.is_empty() || contains_ci(&hosts[i].addr, &n))
         .collect();
     let bytes = |i: usize| hosts[i].bytes_in + hosts[i].bytes_out;
     idx.sort_by(|&a, &b| bytes(b).cmp(&bytes(a)).then(a.cmp(&b)));

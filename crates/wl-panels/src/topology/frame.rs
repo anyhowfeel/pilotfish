@@ -70,7 +70,7 @@ impl TopologyView {
         self.project(rect);
         let hover = self.hover(&resp, rect);
         self.input(ui, &resp, rect, hover);
-        tooltip::show(&resp, &self.graph, hover);
+        tooltip::show(&resp, &self.graph, hover, &*self.resolver);
         search::matches(&self.graph, &self.search, &mut self.buf.matches);
         self.place_labels(&painter, sel, hover);
         let animate = self.live && ctx.global_style().animation_time > 0.0;

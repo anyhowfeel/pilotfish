@@ -43,6 +43,9 @@ pub fn session(frame: u64, sni: &str) -> TlsSession {
         cipher: Some("TLS_AES_128_GCM_SHA256".into()),
         alpn: Some("h2".into()),
         cert_subject: Some(format!("CN={sni}, O=Example Inc, C=US").into()),
+        ja3: Some("e7d705a3286e19ea42f587b344ee6865".into()),
+        ja4: Some("t13d1516h2_8daaf6152771_02713d6af862".into()),
+        ja3s: Some("eb1d94daa7e0344597e756a1fb6e7054".into()),
         src: "192.168.1.20".into(),
         dst: "93.184.216.34".into(),
         bytes: 48_000 + frame * 1300,
@@ -167,6 +170,7 @@ pub fn demo_detail(e: &HttpExchange) -> HttpDetail {
         ],
         body_preview: (e.method.as_ref() != "GET").then(|| r#"{"item":7,"qty":2}"#.to_owned()),
         body_len: if e.method.as_ref() == "GET" { 0 } else { 18 },
+        body_image: None,
     };
     let response = HttpMessage {
         start_line: format!(
@@ -191,6 +195,7 @@ pub fn demo_detail(e: &HttpExchange) -> HttpDetail {
         ],
         body_preview: Some(body.to_owned()),
         body_len: e.resp_bytes,
+        body_image: None,
     };
     HttpDetail {
         request: Some(request),

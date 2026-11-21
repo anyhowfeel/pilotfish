@@ -2,7 +2,8 @@
 
 use wl_kit::format;
 use wl_model::{
-    ExpertReport, ExpertSeverity, HealthInsight, InsightSeverity, ProtocolHierarchy, StatsSnapshot,
+    BehaviorData, ExpertReport, ExpertSeverity, HealthInsight, InsightSeverity, ProtocolHierarchy,
+    StatsSnapshot,
 };
 
 fn has_any(s: &str, needles: &[&str]) -> bool {
@@ -23,7 +24,7 @@ fn sum_matching(report: &ExpertReport, pred: impl Fn(&str, &str) -> bool) -> u64
         .sum()
 }
 
-fn push_card(
+pub(super) fn push_card(
     out: &mut Vec<HealthInsight>,
     severity: InsightSeverity,
     title: impl Into<String>,
@@ -157,6 +158,7 @@ fn analyze_expert(rep: &ExpertReport, total_packets: u64, out: &mut Vec<HealthIn
 pub fn synthesize_insights(
     expert: Option<&ExpertReport>,
     phs: Option<&ProtocolHierarchy>,
+    behavior: Option<&BehaviorData>,
     stats: &StatsSnapshot,
 ) -> Vec<HealthInsight> {
     let mut out = Vec::new();
@@ -198,6 +200,10 @@ pub fn synthesize_insights(
                 format!("{share:.0}% of bytes"),
             );
         }
+    }
+
+    if let Some(data) = behavior {
+        super::behavior::detect(data, &mut out);
     }
 
     if out.is_empty() && total_packets > 0 {
