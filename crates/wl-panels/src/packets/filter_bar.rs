@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use eframe::egui::{self, CursorIcon, Key, RichText, Sense, Ui, Vec2};
 
-use crate::features::{FieldCatalog, FilterAutocomplete};
+use crate::features::{FieldCatalog, FilterAutocomplete, ValueIndex};
 use crate::packets::actions::PacketsAction;
 use crate::packets::filter_history::History;
 use crate::packets::kit::{Palette, danger, ok, spacing, warn};
@@ -43,6 +43,9 @@ impl Default for FilterBar {
 }
 
 impl FilterBar {
+    pub fn set_values(&mut self, values: Arc<ValueIndex>) {
+        self.autocomplete.set_values(values);
+    }
     pub fn set_catalog(&mut self, catalog: Arc<FieldCatalog>) {
         self.autocomplete.set_catalog(catalog);
     }

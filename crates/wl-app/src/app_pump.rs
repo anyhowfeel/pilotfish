@@ -47,6 +47,19 @@ impl App {
         }
     }
 
+    /// Feeds the filter boxes with the hosts and ports of the capture, when they changed.
+    fn refresh_filter_values(&mut self) {
+        let stats = self.ctrl.snapshot();
+        let key = (stats.hosts.len(), stats.conversations.len());
+        if self.values_key == Some(key) {
+            return;
+        }
+        self.values_key = Some(key);
+        let values = std::sync::Arc::new(wl_panels::features::ValueIndex::from_stats(stats));
+        self.gh.panel.set_values(values.clone());
+        self.packets.set_filter_values(values);
+    }
+
     pub(crate) fn pump(&mut self, ctx: &egui::Context) {
         if self.flows_link.poll() {
             ctx.request_repaint();
@@ -71,6 +84,7 @@ impl App {
             self.gh.panel.set_catalog(f.clone());
             self.packets.set_filter_catalog(f);
         }
+        self.refresh_filter_values();
         if self.resolver.take_updated() {
             self.hosts.invalidate();
             self.map.invalidate();

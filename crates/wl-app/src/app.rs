@@ -43,6 +43,8 @@ pub struct App {
     pub(crate) convs: ConversationsPanel,
     pub(crate) map: TopologyView,
     pub(crate) demo_map: Option<wl_model::StatsSnapshot>,
+    /// Size of the stats the filter value suggestions were last built from.
+    pub(crate) values_key: Option<(usize, usize)>,
     pub(crate) web: WebPanel,
     pub(crate) web_link: WebLink,
     pub(crate) flows: FlowsPanel,
@@ -123,6 +125,7 @@ impl App {
             convs: ConversationsPanel::default(),
             map,
             demo_map: cli.demo_map.then(|| demo_snapshot(40, 120)),
+            values_key: None,
             web: WebPanel::default(),
             web_link: WebLink::new(cli.demo_web),
             flows: FlowsPanel::default(),
