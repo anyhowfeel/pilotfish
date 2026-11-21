@@ -2,6 +2,7 @@
 name = "wl-app"
 version.workspace = true
 edition.workspace = true
+description = "Prototype desktop packet viewer on top of tshark"
 
 [[bin]]
 name = "wirelens"
