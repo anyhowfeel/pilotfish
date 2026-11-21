@@ -130,8 +130,10 @@ Shift+click on a sidebar entry opens that page in a separate window.
 ## Releases
 
 Tagging `vX.Y.Z` makes the CI build and publish binaries for Linux (x86_64 and aarch64, plus
-a build made on Arch Linux), macOS (Apple silicon and Intel) and Windows (x86_64). Those
-builds are not tested beyond compiling; `tshark` still has to be installed separately.
+a build made on Arch Linux), macOS (Apple silicon and Intel) and Windows (x86_64), together
+with a `.deb` package for each Linux architecture, a Windows installer, macOS disk images and
+a `SHA256SUMS` file. Those builds are not tested beyond compiling; `tshark` still has to be
+installed separately on Windows and macOS.
 
 ## Layout of the repository
 
