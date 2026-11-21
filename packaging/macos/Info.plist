@@ -6,6 +6,7 @@
   <key>CFBundleDisplayName</key><string>wirelens</string>
   <key>CFBundleIdentifier</key><string>io.github.anyhowfeel.wirelens</string>
   <key>CFBundleExecutable</key><string>wirelens</string>
+  <key>CFBundleIconFile</key><string>wirelens</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>@VERSION@</string>
   <key>CFBundleVersion</key><string>@VERSION@</string>

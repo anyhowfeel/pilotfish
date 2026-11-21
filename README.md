@@ -1,4 +1,11 @@
-# wirelens
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo/wirelens-dark.svg">
+    <img src="assets/logo/wirelens.svg" alt="wirelens logo" width="120">
+  </picture>
+</p>
+
+<h1 align="center">wirelens</h1>
 
 [![CI](https://github.com/anyhowfeel/wirelens/actions/workflows/ci.yml/badge.svg)](https://github.com/anyhowfeel/wirelens/actions/workflows/ci.yml)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
@@ -146,7 +153,9 @@ installed separately on Windows and macOS.
 | `wl-panels` | The pages (packets, overview, map, flows, web, settings, ...). |
 | `wl-app` | The `wirelens` binary: window, state, background jobs. |
 
-`tests/fixtures/` holds the small capture files the tests read.
+`tests/fixtures/` holds the small capture files the tests read, `assets/screenshots/` the README
+images, and `assets/logo/` the logo (SVG sources in a blue and a dark version, PNG, `.ico` and
+`.icns` exports, and the GitHub social preview image).
 
 ## Tests
 

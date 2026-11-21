@@ -4,6 +4,7 @@ mod app;
 mod app_banner;
 mod app_cmd;
 mod app_demo;
+mod app_icon;
 mod app_panes;
 mod app_pump;
 mod app_settings;
@@ -60,11 +61,14 @@ fn main() -> eframe::Result {
     let cli = cli::Cli::parse();
     let prefs = prefs::Prefs::load();
     let [w, h] = cli.size().unwrap_or([1280.0, 800.0]);
-    let viewport = egui::ViewportBuilder::default()
+    let mut viewport = egui::ViewportBuilder::default()
         .with_title("wirelens")
         .with_app_id("wirelens")
         .with_inner_size([w, h])
         .with_min_inner_size([1000.0, 640.0]);
+    if let Some(icon) = app_icon::window_icon() {
+        viewport = viewport.with_icon(icon);
+    }
     let options = eframe::NativeOptions {
         viewport,
         ..Default::default()
