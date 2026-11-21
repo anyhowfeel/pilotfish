@@ -24,8 +24,8 @@ Taken on a small synthetic capture: a laptop, a TV, a phone and a NAS on an inve
 talking to well-known public services over DNS, TLS, plain HTTP and SMB-style transfers, with a
 retransmission burst and three made-up behaviours for Insights (a visitor scanning the NAS, a phone
 calling a documentation address at a steady rhythm, and very long DNS names). Nothing in it comes from a
-real network. `tests/fixtures/demo.pcap` is the same network without those three behaviours, so you can
-open it and compare most pages: `pilotfish tests/fixtures/demo.pcap`.
+real network. `tests/fixtures/gen_demo_capture.py` writes it, so you can open the same file and compare:
+`pilotfish tests/fixtures/demo.pcap`.
 
 | Overview | Packets | Hosts |
 | :---: | :---: | :---: |
