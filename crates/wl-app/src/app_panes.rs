@@ -14,11 +14,14 @@ impl App {
         let main = self.page;
         for page in self.detached.clone() {
             let id = egui::ViewportId::from_hash_of(("wl_detached", page.label()));
-            let builder = egui::ViewportBuilder::default()
+            let mut builder = egui::ViewportBuilder::default()
                 .with_app_id("wirelens")
                 .with_title(format!("wirelens \u{2013} {}", page.label()))
                 .with_inner_size([980.0, 660.0])
                 .with_min_inner_size([520.0, 360.0]);
+            if let Some(icon) = crate::app_icon::window_icon() {
+                builder = builder.with_icon(icon);
+            }
             ctx.show_viewport_immediate(id, builder, |ctx, _class| {
                 if ctx.input(|i| i.viewport().close_requested()) {
                     closed.push(page);

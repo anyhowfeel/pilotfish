@@ -4,6 +4,7 @@ Name=wirelens
 GenericName=Packet viewer
 Comment=Prototype packet viewer on top of tshark
 Exec=wirelens %f
+Icon=wirelens
 Terminal=false
 Categories=Network;Monitor;
 MimeType=application/vnd.tcpdump.pcap;application/x-pcapng;

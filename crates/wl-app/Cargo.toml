@@ -26,6 +26,9 @@ signal-hook = "0.4"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif"] }
 mimalloc = "0.1.52"
 
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"
+
 [dev-dependencies]
 tempfile = "3"
 
@@ -44,6 +47,8 @@ extended-description = "Prototype desktop packet viewer written in Rust with egu
 assets = [
     ["target/release/wirelens", "usr/bin/", "755"],
     ["../../packaging/linux/wirelens.desktop", "usr/share/applications/", "644"],
+    ["../../assets/logo/wirelens.svg", "usr/share/icons/hicolor/scalable/apps/wirelens.svg", "644"],
+    ["../../assets/logo/wirelens-256.png", "usr/share/icons/hicolor/256x256/apps/wirelens.png", "644"],
     ["../../README.md", "usr/share/doc/wirelens/README.md", "644"],
     ["../../CHANGELOG.md", "usr/share/doc/wirelens/CHANGELOG.md", "644"],
 ]

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- A new application icon (a split W on a rounded tile), in a blue and a dark version, used as the
+  window icon, in the `.deb` and Arch packages, in the macOS `.app` and on the Windows installer
+  and executable. Sources and PNG, `.ico` and `.icns` exports are in `assets/logo`.
+
 ## [0.2.0] - 2026-11-21
 
 ### Added

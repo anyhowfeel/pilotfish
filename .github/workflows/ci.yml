@@ -157,7 +157,8 @@ jobs:
         run: |
           ver=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
           app=dmg/wirelens.app
-          mkdir -p "$app/Contents/MacOS"
+          mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+          cp assets/logo/wirelens.icns "$app/Contents/Resources/wirelens.icns"
           cp "target/${{ matrix.target }}/release/wirelens" "$app/Contents/MacOS/"
           sed "s/@VERSION@/$ver/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
           ln -s /Applications dmg/Applications

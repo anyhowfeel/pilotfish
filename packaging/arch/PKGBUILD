@@ -34,10 +34,13 @@ Name=wirelens
 GenericName=Packet viewer
 Comment=Prototype packet viewer on top of tshark
 Exec=wirelens %f
+Icon=wirelens
 Terminal=false
 Categories=Network;Monitor;
 MimeType=application/vnd.tcpdump.pcap;application/x-pcapng;
 DESKTOP
+  install -Dm644 assets/logo/wirelens.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/wirelens.svg"
+  install -Dm644 assets/logo/wirelens-256.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/wirelens.png"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
 }
