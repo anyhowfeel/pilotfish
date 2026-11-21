@@ -30,3 +30,19 @@ tempfile = "3"
 
 [lints]
 workspace = true
+
+[package.metadata.deb]
+name = "wirelens"
+maintainer = "anyhowfeel <346877873+anyhowfeel@users.noreply.github.com>"
+copyright = "wirelens contributors"
+license-file = ["../../LICENSE", "0"]
+section = "net"
+priority = "optional"
+depends = "$auto, tshark"
+extended-description = "Prototype desktop packet viewer written in Rust with egui. Captures are read and filtered by tshark and dumpcap; wirelens shows them as tables, charts and a host graph."
+assets = [
+    ["target/release/wirelens", "usr/bin/", "755"],
+    ["../../packaging/linux/wirelens.desktop", "usr/share/applications/", "644"],
+    ["../../README.md", "usr/share/doc/wirelens/README.md", "644"],
+    ["../../CHANGELOG.md", "usr/share/doc/wirelens/CHANGELOG.md", "644"],
+]
