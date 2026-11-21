@@ -8,6 +8,7 @@ url="https://github.com/anyhowfeel/wirelens"
 license=('GPL-3.0-or-later')
 depends=('wireshark-cli' 'libxkbcommon' 'wayland' 'libx11' 'libxcursor' 'libxrandr' 'libxi' 'mesa')
 makedepends=('cargo')
+options=('!lto')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('SKIP')
 
