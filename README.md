@@ -48,7 +48,7 @@ Each [release](https://github.com/anyhowfeel/wirelens/releases) contains, next t
 | Platform | File | Notes |
 | --- | --- | --- |
 | Debian, Ubuntu | `wirelens_<version>_amd64.deb` / `_arm64.deb` | `sudo apt install ./wirelens_*.deb` pulls in `tshark`. |
-| Arch Linux | `wirelens-<tag>-linux-x86_64-arch.tar.gz`, or `packaging/arch/PKGBUILD` | `cd packaging/arch && makepkg -si` builds it from the tagged source. |
+| Arch Linux | `wirelens-<version>-1-x86_64.pkg.tar.zst`, or `packaging/arch/PKGBUILD` | `sudo pacman -U wirelens-*.pkg.tar.zst` (the package is not signed), or `cd packaging/arch && makepkg -si` to build it from the tagged source. |
 | Other Linux | `wirelens-<tag>-linux-x86_64.tar.gz`, `-linux-aarch64.tar.gz` | Unpack and run `./wirelens`. |
 | Windows | `wirelens-<version>-windows-x86_64-setup.exe` | Installer; a `.zip` with the bare executable is also provided. |
 | macOS | `wirelens-<version>-macos-arm64.dmg`, `-macos-x86_64.dmg` | Drag `wirelens` to `Applications`. The app is not signed: on first launch use right-click, Open. |
