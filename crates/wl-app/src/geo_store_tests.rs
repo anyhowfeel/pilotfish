@@ -58,6 +58,17 @@ fn the_tiny_database_is_accepted_by_the_reader() {
 }
 
 #[test]
+fn the_home_folder_is_shown_as_a_tilde() {
+    let home = dirs::home_dir().expect("a home folder");
+    assert_eq!(
+        tilde(&home.join(".local/share/wirelens/geo")),
+        "~/.local/share/wirelens/geo"
+    );
+    assert_eq!(tilde(&home), "~");
+    assert_eq!(tilde(Path::new("/srv/geo")), "/srv/geo");
+}
+
+#[test]
 fn month_urls_cover_this_month_and_the_previous_one() {
     assert_eq!(latest_months(2026, 11), [(2026, 11), (2026, 10)]);
     assert_eq!(latest_months(2027, 1), [(2027, 1), (2026, 12)]);
