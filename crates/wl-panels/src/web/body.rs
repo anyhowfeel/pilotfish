@@ -192,6 +192,14 @@ mod tests {
     }
 
     #[test]
+    fn pretty_json_keeps_the_original_key_order() {
+        let p = pretty_json(r#"{"name":"x","version":1,"items":[1],"a":{"z":1,"b":2}}"#).unwrap();
+        let at = |k: &str| p.find(k).unwrap();
+        assert!(at("\"name\"") < at("\"version\"") && at("\"version\"") < at("\"items\""));
+        assert!(at("\"items\"") < at("\"a\"") && at("\"z\"") < at("\"b\""));
+    }
+
+    #[test]
     fn truncation_detected() {
         let m = HttpMessage {
             body_preview: Some("abc".into()),
