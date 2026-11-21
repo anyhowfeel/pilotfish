@@ -90,6 +90,10 @@ impl PacketsView {
         self.filter_bar.set_history(items);
     }
 
+    pub fn set_filter_values(&mut self, values: std::sync::Arc<crate::features::ValueIndex>) {
+        self.filter_bar.set_values(values);
+    }
+
     pub fn set_filter_catalog(&mut self, catalog: std::sync::Arc<crate::features::FieldCatalog>) {
         self.filter_bar.set_catalog(catalog);
     }

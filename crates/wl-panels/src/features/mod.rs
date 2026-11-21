@@ -8,6 +8,10 @@
 
 pub mod autocomplete;
 mod autocomplete_catalog;
+mod autocomplete_context;
+#[cfg(test)]
+mod autocomplete_tests;
+mod autocomplete_values;
 mod behavior;
 pub mod bookmarks;
 mod bookmarks_json;
@@ -21,7 +25,7 @@ mod stream_text;
 pub mod stream_view;
 
 pub use crate::insights::{InsightsAction, InsightsPanel};
-pub use autocomplete::{FieldCatalog, FilterAutocomplete};
+pub use autocomplete::{FieldCatalog, FilterAutocomplete, ValueIndex};
 pub use bookmarks::{BookmarkBarAction, BookmarkStore, bookmark_toolbar_ui};
 pub use command_palette::{CommandPalette, PaletteAction, PalettePage};
 pub use detail_filter::{

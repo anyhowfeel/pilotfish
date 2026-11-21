@@ -6,6 +6,7 @@ use wl_kit::theme::{Palette, RADIUS, spacing};
 use wl_model::HttpMessage;
 
 use super::card::muted;
+use super::html_text;
 
 /// Lines shown before "Show more": enough to read a typical response without scrolling.
 const PREVIEW_LINES: usize = 24;
@@ -20,8 +21,11 @@ pub fn pretty_json(text: &str) -> Option<String> {
     serde_json::to_string_pretty(&v).ok()
 }
 
-/// Text to show for a body preview (pretty JSON or the raw text).
+/// Text to show for a body preview: pretty JSON, readable text of an HTML page, or the raw text.
 pub fn display_text(preview: &str) -> String {
+    if html_text::is_html(preview) {
+        return html_text::to_text(preview);
+    }
     pretty_json(preview).unwrap_or_else(|| preview.to_owned())
 }
 
@@ -74,12 +78,17 @@ fn image_view(ui: &mut Ui, bytes: &[u8], salt: &str) {
     );
 }
 
-/// "Pretty | Raw" switch; true when raw is selected.
-fn raw_toggle(ui: &mut Ui, id: egui::Id) -> bool {
+/// "Preview | Source" (HTML) or "Pretty | Raw" switch; true when the raw text is selected.
+fn raw_toggle(ui: &mut Ui, id: egui::Id, html: bool) -> bool {
+    let (nice, plain) = if html {
+        ("Preview", "Source")
+    } else {
+        ("Pretty", "Raw")
+    };
     let mut raw = ui.data(|d| d.get_temp::<bool>(id)).unwrap_or(false);
     ui.horizontal(|ui| {
-        ui.selectable_value(&mut raw, false, RichText::new("Pretty").small());
-        ui.selectable_value(&mut raw, true, RichText::new("Raw").small());
+        ui.selectable_value(&mut raw, false, RichText::new(nice).small());
+        ui.selectable_value(&mut raw, true, RichText::new(plain).small());
     });
     ui.data_mut(|d| d.insert_temp(id, raw));
     raw
@@ -108,7 +117,7 @@ pub fn body_view(ui: &mut Ui, msg: &HttpMessage, shown: Option<&str>, salt: &str
         return;
     };
     let id = ui.scope_id().with(("web_body_open", salt));
-    let text = if pretty != raw && !raw_toggle(ui, id.with("raw")) {
+    let text = if pretty != raw && !raw_toggle(ui, id.with("raw"), html_text::is_html(raw)) {
         pretty
     } else {
         raw

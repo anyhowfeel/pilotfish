@@ -13,6 +13,7 @@ mod detail;
 mod detail_header;
 mod dock;
 mod headers;
+mod html_text;
 #[cfg(test)]
 mod layout_tests;
 mod message_card;
