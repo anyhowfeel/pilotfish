@@ -197,6 +197,18 @@ jobs:
           cp target/release/wirelens README.md LICENSE CHANGELOG.md "dist/$name/"
           tar -C dist -czf "dist/$name.tar.gz" "$name"
           rm -rf "dist/$name"
+      - name: Arch package
+        run: |
+          ver=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          git config --global --add safe.directory "$PWD"
+          mkdir /build
+          git archive --prefix="wirelens-$ver/" -o "/build/wirelens-$ver.tar.gz" HEAD
+          cp packaging/arch/PKGBUILD /build/
+          useradd -m builder
+          chown -R builder /build
+          # makepkg finds the tarball next to the PKGBUILD and skips the download.
+          su builder -c 'cd /build && makepkg -f --nodeps --noconfirm'
+          cp /build/*.pkg.tar.zst dist/
       - uses: actions/upload-artifact@v4
         with:
           name: wirelens-linux-x86_64-arch

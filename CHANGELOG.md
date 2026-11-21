@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Release builds are stripped and use thin LTO.
 - Debian packages (`.deb`), a Windows installer, macOS `.dmg` images and an Arch `PKGBUILD`.
+- A `.pkg.tar.zst` for Arch Linux, built with `makepkg` in CI and attached to each release.
 - `SHA256SUMS` published with each release.
 
 ### Fixed
