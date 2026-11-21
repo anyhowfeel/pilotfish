@@ -33,6 +33,7 @@ fn main() -> eframe::Result {
             let t = f64::from(i);
             RatePoint {
                 t,
+                dt: 1.0,
                 packets: 10,
                 bytes: (40_000.0 + 30_000.0 * (t / 7.0).sin() + (t * 900.0)) as u64,
             }

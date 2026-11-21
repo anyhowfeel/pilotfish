@@ -6,7 +6,7 @@ mod web_support;
 
 use std::path::{Path, PathBuf};
 
-use wl_model::{CaptureBackend, HttpExchange, StatusClass};
+use wl_model::{CaptureBackend, ChannelKind, HttpExchange, Proto, StatusClass};
 use wl_tshark::TsharkBackend;
 
 fn fixture(name: &str) -> PathBuf {
@@ -169,4 +169,56 @@ fn tls_sessions_and_keylog_decryption() {
         t13.iter()
             .all(|s| s.cert_subject.as_deref() == Some("wirelens.test"))
     );
+}
+
+#[test]
+fn tls_sessions_carry_fingerprints() {
+    let Ok(b) = TsharkBackend::new() else { return };
+    let tls = b
+        .tls_sessions(&fixture("web-tls.pcapng"))
+        .expect("tls_sessions");
+    assert!(!tls.is_empty());
+    for s in &tls {
+        assert_eq!(s.ja3.as_deref().map(str::len), Some(32), "{s:?}");
+        assert!(
+            s.ja4.as_deref().is_some_and(|j| j.starts_with('t')),
+            "{s:?}"
+        );
+        assert!(s.ja3s.is_some(), "{s:?}");
+    }
+}
+
+#[test]
+fn behavior_channels_summarise_syns_and_streams() {
+    let Ok(b) = TsharkBackend::new() else { return };
+    let ch = b
+        .behavior_channels(&fixture("web-tls.pcapng"))
+        .expect("behavior_channels");
+    assert!(
+        ch.iter()
+            .any(|c| c.kind == ChannelKind::NewFlows && c.dport > 0)
+    );
+    assert!(ch.iter().all(|c| !c.src.is_empty() && c.count > 0));
+}
+
+#[test]
+fn behavior_channels_expose_scan_beacon_and_sweep_shapes() {
+    let Ok(b) = TsharkBackend::new() else { return };
+    let ch = b
+        .behavior_channels(&fixture("behavior.pcap"))
+        .expect("behavior_channels");
+    let from = |src: &str| {
+        ch.iter()
+            .filter(move |c| &*c.src == src)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(from("10.0.0.9").len(), 40, "one channel per scanned port");
+    let beacon = from("10.0.0.5");
+    assert_eq!(
+        (beacon.len(), beacon[0].count, beacon[0].gap_mean),
+        (1, 10, 30.0)
+    );
+    assert!(beacon[0].gap_jitter < 1e-9);
+    assert!(from("10.0.0.7").iter().all(|c| c.proto == Proto::Icmp));
+    assert_eq!(from("10.0.0.7").len(), 25);
 }

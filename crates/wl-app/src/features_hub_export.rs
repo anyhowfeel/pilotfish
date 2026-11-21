@@ -31,7 +31,7 @@ impl FeaturesHub {
     }
 
     pub fn export_json(&self, stats: Arc<StatsSnapshot>, ctx: egui::Context) {
-        let insights = synthesize_insights(self.expert.as_ref(), self.phs.as_ref(), &stats);
+        let insights = self.insights_for(&stats);
         self.spawn_save("stats.json", "json", ctx, move |p| {
             write_stats_json(p, &stats, &insights)
                 .map(|()| format!("Exported JSON to {}", p.display()))
@@ -40,7 +40,7 @@ impl FeaturesHub {
     }
 
     pub fn export_html(&self, title: String, stats: Arc<StatsSnapshot>, ctx: egui::Context) {
-        let insights = synthesize_insights(self.expert.as_ref(), self.phs.as_ref(), &stats);
+        let insights = self.insights_for(&stats);
         let (phs, expert, bms) = (self.phs.clone(), self.expert.clone(), self.bookmarks.all());
         self.spawn_save("report.html", "html", ctx, move |p| {
             write_html_report(

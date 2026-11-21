@@ -3,6 +3,7 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
+use wl_kit::text::contains_ci;
 use wl_model::{DnsQuery, Rcode};
 
 use crate::overview::SortState;
@@ -48,7 +49,7 @@ impl Default for Filter {
 }
 
 fn matches(q: &DnsQuery, needle: &str) -> bool {
-    let has = |s: &str| s.to_ascii_lowercase().contains(needle);
+    let has = |s: &str| contains_ci(s, needle);
     has(&q.name)
         || has(&q.client)
         || has(&q.server)

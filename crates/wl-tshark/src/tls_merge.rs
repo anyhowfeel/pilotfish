@@ -10,7 +10,7 @@ use crate::interner::Interner;
 use crate::tls_names::{cipher_label, version_label};
 use crate::tsv_pass::{columns, opt};
 
-pub const FIELDS: [&str; 14] = [
+pub const FIELDS: [&str; 17] = [
     "frame.number",
     "frame.time_relative",
     "tcp.stream",
@@ -25,7 +25,14 @@ pub const FIELDS: [&str; 14] = [
     "tls.handshake.ciphersuite",
     "tls.handshake.extensions_server_name",
     "tls.handshake.extensions_alpn_str",
+    "tls.handshake.ja3",
+    "tls.handshake.ja4",
+    "tls.handshake.ja3s",
 ];
+const JA3: usize = 14;
+const JA4: usize = 15;
+const JA3S: usize = 16;
+const CERT: usize = 17;
 /// Leaf certificate subject alternative name (first DNS name) — the best cheap "subject".
 pub const CERT_FIELD: &str = "x509ce.dNSName";
 
@@ -82,6 +89,9 @@ impl Merger {
                     cipher: None,
                     alpn: None,
                     cert_subject: None,
+                    ja3: None,
+                    ja4: None,
+                    ja3s: None,
                     src: e.clone(),
                     dst: e,
                     bytes: 0,
@@ -125,7 +135,16 @@ impl Merger {
                 en.s.dst = it.intern(src.unwrap_or(""));
             }
         }
-        if let Some(c) = opt(f[14]) {
+        for (slot, col) in [
+            (&mut en.s.ja3, JA3),
+            (&mut en.s.ja4, JA4),
+            (&mut en.s.ja3s, JA3S),
+        ] {
+            if let Some(v) = opt(f[col]) {
+                slot.get_or_insert_with(|| it.intern(v));
+            }
+        }
+        if let Some(c) = opt(f[CERT]) {
             en.s.cert_subject.get_or_insert_with(|| it.intern(c));
         }
     }
@@ -175,6 +194,8 @@ mod tests {
                 (8, "1"),
                 (9, "0x0303"),
                 (12, "a.test"),
+                (JA3, "c3"),
+                (JA4, "c4"),
             ],
         ));
         m.push_line(&row(
@@ -187,7 +208,8 @@ mod tests {
                 (9, "0x0303"),
                 (11, "0xc030"),
                 (13, "h2"),
-                (14, "a.test"),
+                (CERT, "a.test"),
+                (JA3S, "s3"),
             ],
         ));
         m.push_line(&row(21, "1", &[(8, "1"), (12, "b.test")]));
@@ -210,6 +232,10 @@ mod tests {
             (Some("h2"), Some("a.test"))
         );
         assert_eq!((&*a.src, &*a.dst), ("10.0.0.1", "10.0.0.2"));
+        assert_eq!(
+            (a.ja3.as_deref(), a.ja4.as_deref(), a.ja3s.as_deref()),
+            (Some("c3"), Some("c4"), Some("s3"))
+        );
         let b = &v[1];
         assert_eq!((&*b.version, b.cert_subject.as_deref()), ("TLS 1.3", None));
     }

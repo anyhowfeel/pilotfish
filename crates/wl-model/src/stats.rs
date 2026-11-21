@@ -50,12 +50,48 @@ pub struct HostEdge {
     pub encrypted: bool,
 }
 
-/// One point of the throughput time series (1 s buckets).
+/// One bucket of the throughput time series: `[t, t + dt)` seconds since the first packet.
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 pub struct RatePoint {
     pub t: f64,
+    pub dt: f64,
     pub packets: u32,
     pub bytes: u64,
+}
+
+impl RatePoint {
+    pub fn bytes_per_sec(&self) -> f64 {
+        self.bytes as f64 / self.dt.max(f64::EPSILON)
+    }
+
+    pub fn packets_per_sec(&self) -> f64 {
+        f64::from(self.packets) / self.dt.max(f64::EPSILON)
+    }
+}
+
+/// Merges buckets into wider ones of `step` seconds aligned on multiples of `step`; series that
+/// are already at least that coarse are returned unchanged.
+pub fn rebin(points: &[RatePoint], step: f64) -> Vec<RatePoint> {
+    if step <= 0.0 || points.iter().all(|p| p.dt >= step) {
+        return points.to_vec();
+    }
+    let mut out: Vec<RatePoint> = Vec::new();
+    for p in points {
+        let t = (p.t / step).floor() * step;
+        match out.last_mut() {
+            Some(last) if (last.t - t).abs() < step * 1e-9 => {
+                last.packets = last.packets.saturating_add(p.packets);
+                last.bytes += p.bytes;
+            }
+            _ => out.push(RatePoint {
+                t,
+                dt: step,
+                packets: p.packets,
+                bytes: p.bytes,
+            }),
+        }
+    }
+    out
 }
 
 /// Immutable view handed to the UI; produced by the stats engine, sorted desc by bytes.

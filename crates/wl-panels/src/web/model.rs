@@ -95,7 +95,9 @@ impl Filter {
         q.is_empty()
             || ci_contains(&t.server_name, &q)
             || ci_contains(&t.version, &q)
-            || t.alpn.as_deref().is_some_and(|a| ci_contains(a, &q))
+            || [&t.alpn, &t.ja3, &t.ja4, &t.ja3s]
+                .into_iter()
+                .any(|f| f.as_deref().is_some_and(|v| ci_contains(v, &q)))
             || "tls https".contains(&q)
     }
 }

@@ -148,7 +148,10 @@ fn filter_field(
     ui.scope_builder(UiBuilder::new().max_rect(rect), |ui| {
         ui.add_enabled_ui(def.visible, |ui| {
             let hint = RichText::new("all packets").color(Palette::muted());
-            let resp = ui.add_sized(rect.size(), text_field(&mut def.filter).hint_text(hint));
+            let field = text_field(&mut def.filter)
+                .hint_text(hint)
+                .lock_focus(auto.is_open());
+            let resp = ui.add_sized(rect.size(), field);
             auto.ui(ui, &mut def.filter, &resp);
             if error {
                 ui.painter().rect_stroke(

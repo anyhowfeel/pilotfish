@@ -17,6 +17,7 @@ pub type DetailCache = LruCache<HttpDetail>;
 fn msg_weight(m: &HttpMessage) -> usize {
     m.start_line.len()
         + m.body_preview.as_ref().map_or(0, String::len)
+        + m.body_image.as_ref().map_or(0, Vec::len)
         + m.headers
             .iter()
             .map(|(n, v)| 48 + n.len() + v.len())

@@ -126,7 +126,7 @@ fn rate_series_fills_gaps() {
     let mut e = StatsEngine::new();
     e.ingest(&row("10.0.0.1", 1, "10.0.0.2", 2, "TCP", 10, 0.2));
     e.ingest(&row("10.0.0.1", 1, "10.0.0.2", 2, "TCP", 20, 3.7));
-    let r = e.snapshot(1).rate;
+    let r = wl_model::rebin(&e.snapshot(1).rate, 1.0);
     assert_eq!(r.len(), 4);
     assert_eq!((r[0].packets, r[0].bytes), (1, 10));
     assert_eq!((r[1].packets, r[2].packets), (0, 0));

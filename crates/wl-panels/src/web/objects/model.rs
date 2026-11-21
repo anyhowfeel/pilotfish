@@ -2,6 +2,7 @@
 
 use std::cmp::Ordering;
 
+use wl_kit::text::contains_ci;
 use wl_model::ExportObject;
 
 use crate::overview::SortState;
@@ -82,7 +83,7 @@ pub fn build(all: &[ExportObject], query: &str, sort: SortState<SortCol>) -> Vec
             q.is_empty()
                 || [&o.name, &o.host, &o.content_type]
                     .iter()
-                    .any(|s| s.to_ascii_lowercase().contains(&q))
+                    .any(|s| contains_ci(s, &q))
         })
         .collect();
     idx.sort_by(|&a, &b| {

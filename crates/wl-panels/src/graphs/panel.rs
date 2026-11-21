@@ -7,7 +7,7 @@ use wl_kit::charts::{ChartConfig, DrawMode, PlotSeries, TimeSelection, io_chart}
 use wl_kit::egui::{ScrollArea, Ui, vec2};
 use wl_kit::theme::{Palette, spacing};
 use wl_kit::widgets::empty_state;
-use wl_model::{FilterField, IoSeries, IoSpec};
+use wl_model::{IoSeries, IoSpec};
 
 use super::interval::Interval;
 use super::metric::Metric;
@@ -15,7 +15,7 @@ use super::rows::{self, RowCtx, RowEdit, WindowSel};
 use super::series::{MAX_SERIES, Preset, SeriesDef, free_color, next_color};
 use super::toolbar::{ToolbarState, toolbar};
 use super::window_row::{WINDOW_ROW_H, window_row};
-use crate::features::FilterAutocomplete;
+use crate::features::{FieldCatalog, FilterAutocomplete};
 
 const CHART_MIN_H: f32 = 150.0;
 
@@ -84,8 +84,8 @@ impl GraphsPanel {
         self.selection = s;
     }
 
-    pub fn set_fields(&mut self, fields: Vec<FilterField>) {
-        self.autocomplete.set_fields(fields);
+    pub fn set_catalog(&mut self, catalog: Arc<FieldCatalog>) {
+        self.autocomplete.set_catalog(catalog);
     }
 
     pub fn load_preset(&mut self, p: Preset) {

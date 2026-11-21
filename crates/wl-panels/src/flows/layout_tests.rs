@@ -89,6 +89,7 @@ fn tcp(n: usize) -> TcpSamples {
         b_port: Some(80),
         samples,
         truncated: false,
+        other_streams: 0,
     }
 }
 

@@ -62,10 +62,7 @@ pub fn latency(ms: f64) -> String {
     }
 }
 
-/// Case-insensitive substring test where `needle_lower` is already lowercase.
-pub fn ci_contains(hay: &str, needle_lower: &str) -> bool {
-    needle_lower.is_empty() || hay.to_lowercase().contains(needle_lower)
-}
+pub use wl_kit::text::contains_ci as ci_contains;
 
 #[cfg(test)]
 mod tests {

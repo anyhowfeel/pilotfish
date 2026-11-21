@@ -7,10 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-21
+
 ### Added
 - A new application icon (a split W on a rounded tile), in a blue and a dark version, used as the
-  window icon, in the `.deb` and Arch packages, in the macOS `.app` and on the Windows installer
-  and executable. Sources and PNG, `.ico` and `.icns` exports are in `assets/logo`.
+  window icon, in the sidebar, in the `.deb` and Arch packages, in the macOS `.app` and on the
+  Windows installer and executable. Sources and PNG, `.ico` and `.icns` exports are in
+  `assets/logo`.
+- Hosts: a **Location** column (country and, with an ASN database, the network operator) and the
+  same details in the Map tooltips. It reads local MaxMind-format `.mmdb` files (GeoLite2, DB-IP
+  Lite...) from `~/.local/share/wirelens/geo`, the qBittorrent `GeoDB` folder, `/usr/share/GeoIP`
+  or the folder named by `WIRELENS_GEO_DIR`. The column is hidden when no database is found.
+- Reverse DNS names for public hosts (they were limited to `localhost`).
+- Web: JA3, JA4 and JA3S TLS fingerprints in the session details, searchable.
+- Web: response bodies can be switched between pretty and raw text (JSON is formatted), the text
+  preview grew from 4 KiB to 256 KiB, and PNG, JPEG and GIF bodies are shown as images.
+- Insights: behavioural findings for TCP and UDP port scans, ping and host sweeps, regular
+  connections or packets (beaconing) and unusually long DNS names. They are computed in one
+  streamed pass whose memory follows the number of channels, not packets.
+- Overview: the throughput chart has a step selector (Auto, 10 ms, 100 ms, 1 s, 10 s).
+
+### Changed
+- The throughput series now starts at 1 ms buckets and widens itself as the capture grows, and a
+  selected time window is kept to the millisecond instead of whole seconds.
+- Filter autocomplete loads every field known to tshark (it stopped at 25,000, so fields such as
+  `ip.addr` were missing) and ranks the exact match, then common fields, then the shortest
+  prefix. Enter accepts the suggestion and Tab / Shift+Tab move through the list.
+- Case-insensitive searches in the filter boxes no longer allocate for each row.
+- Insights results are delivered as soon as each analysis finishes.
+
+### Fixed
+- Flows: selecting hosts of both address families produced an invalid display filter.
+- Flows: a TCP graph for ports reused by several connections plotted them all as one, with time
+  running backwards. It now shows the first connection and says how many share the ports.
 
 ## [0.2.0] - 2026-11-21
 

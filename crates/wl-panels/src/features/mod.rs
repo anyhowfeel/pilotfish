@@ -8,6 +8,7 @@
 
 pub mod autocomplete;
 mod autocomplete_catalog;
+mod behavior;
 pub mod bookmarks;
 mod bookmarks_json;
 pub mod command_palette;

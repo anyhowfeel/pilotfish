@@ -1,11 +1,15 @@
 //! Pure display-filter field catalog, token extraction, and completion replacement.
 
+use std::collections::HashSet;
+
+use wl_kit::text::contains_ci;
 use wl_model::FilterField;
 
-/// Fast in-memory catalog supporting O(log N) prefix and substring lookup.
+/// In-memory catalog: sorted for binary-searched prefix lookup, with curated fields ranked first.
 #[derive(Debug, Clone)]
 pub struct FieldCatalog {
     fields: Vec<FilterField>,
+    common: HashSet<String>,
 }
 
 impl Default for FieldCatalog {
@@ -18,7 +22,11 @@ impl FieldCatalog {
     pub fn from_fields(mut fields: Vec<FilterField>) -> Self {
         fields.sort_by(|a, b| a.abbrev.cmp(&b.abbrev));
         fields.dedup_by(|a, b| a.abbrev == b.abbrev);
-        Self { fields }
+        let common = default_builtin_fields()
+            .into_iter()
+            .map(|f| f.abbrev)
+            .collect();
+        Self { fields, common }
     }
 
     pub fn len(&self) -> usize {
@@ -29,36 +37,35 @@ impl FieldCatalog {
         self.fields.is_empty()
     }
 
-    /// Returns up to `max` matches: exact prefix matches first, then substring matches.
+    /// Up to `max` matches: prefix matches first (exact, then curated, then shortest), then
+    /// substring matches in the field name or abbreviation.
     pub fn suggest(&self, query: &str, max: usize) -> Vec<&FilterField> {
         let q = query.trim().to_ascii_lowercase();
         if q.is_empty() || max == 0 {
             return Vec::new();
         }
-        let mut results: Vec<&FilterField> = Vec::with_capacity(max);
         let start = self
             .fields
             .partition_point(|f| f.abbrev.as_str() < q.as_str());
-        for f in &self.fields[start..] {
-            if !f.abbrev.starts_with(&q) {
-                break;
-            }
-            results.push(f);
-            if results.len() >= max {
-                return results;
-            }
+        let mut prefixed: Vec<&FilterField> = self.fields[start..]
+            .iter()
+            .take_while(|f| f.abbrev.starts_with(&q))
+            .collect();
+        prefixed.sort_by_key(|f| {
+            (
+                f.abbrev != q,
+                !self.common.contains(&f.abbrev),
+                f.abbrev.len(),
+            )
+        });
+        prefixed.truncate(max);
+        if prefixed.len() < max {
+            let rest = self.fields.iter().filter(|f| {
+                !f.abbrev.starts_with(&q) && (f.abbrev.contains(&q) || contains_ci(&f.name, &q))
+            });
+            prefixed.extend(rest.take(max - prefixed.len()));
         }
-        for f in &self.fields {
-            if results.len() >= max {
-                break;
-            }
-            if !f.abbrev.starts_with(&q)
-                && (f.abbrev.contains(&q) || f.name.to_ascii_lowercase().contains(&q))
-            {
-                results.push(f);
-            }
-        }
-        results
+        prefixed
     }
 }
 
@@ -108,6 +115,8 @@ fn default_builtin_fields() -> Vec<FilterField> {
         ("http.response.code", "HTTP Status Code", "FT_UINT16"),
         ("icmp.type", "ICMP Type", "FT_UINT8"),
         ("ip.addr", "IPv4 Address", "FT_IPv4"),
+        ("ip.proto", "IPv4 Protocol", "FT_UINT8"),
+        ("ip.ttl", "IPv4 Time to Live", "FT_UINT8"),
         ("ip.dst", "IPv4 Destination", "FT_IPv4"),
         ("ip.src", "IPv4 Source", "FT_IPv4"),
         ("ipv6.addr", "IPv6 Address", "FT_IPv6"),
@@ -155,6 +164,38 @@ mod tests {
             apply_completion(expr, expr.chars().count(), "tcp.analysis.retransmission");
         assert_eq!(next, "ip.src == 10.0.0.1 && tcp.analysis.retransmission");
         assert_eq!(cur, next.chars().count());
+    }
+
+    fn field(abbrev: &str) -> FilterField {
+        FilterField {
+            abbrev: abbrev.into(),
+            name: abbrev.into(),
+            field_type: "FT_STRING".into(),
+        }
+    }
+
+    #[test]
+    fn exact_then_curated_then_shortest_prefix() {
+        let cat = FieldCatalog::from_fields(
+            [
+                "ip.addr",
+                "ip.addr.extra.long",
+                "ip.dst",
+                "ip.dsfield",
+                "ip.dsthost",
+                "ipv6.addr",
+            ]
+            .map(field)
+            .to_vec(),
+        );
+        let order = |q| {
+            cat.suggest(q, 10)
+                .iter()
+                .map(|f| f.abbrev.clone())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(order("ip.addr")[..2], ["ip.addr", "ip.addr.extra.long"]);
+        assert_eq!(order("ip.d"), ["ip.dst", "ip.dsfield", "ip.dsthost"]);
     }
 
     #[test]

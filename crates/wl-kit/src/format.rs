@@ -69,6 +69,21 @@ pub fn duration(secs: f64) -> String {
 }
 
 /// Elapsed time as a clock for chart axes: "0:05", "1:25", "1:02:05".
+/// Like `clock`, with milliseconds when the time is not a whole second (`0:01.566`).
+pub fn clock_precise(secs: f64) -> String {
+    let ms = if secs.is_finite() && secs > 0.0 {
+        (secs * 1000.0).round() as u64
+    } else {
+        0
+    };
+    let base = clock((ms / 1000) as f64);
+    if ms % 1000 == 0 {
+        base
+    } else {
+        format!("{base}.{:03}", ms % 1000)
+    }
+}
+
 pub fn clock(secs: f64) -> String {
     let t = if secs.is_finite() && secs > 0.0 {
         secs.round() as u64

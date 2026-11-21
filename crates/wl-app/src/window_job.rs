@@ -33,10 +33,13 @@ pub struct WindowJob {
     latest: Mutex<Option<Window>>,
 }
 
-/// The display filter selecting the capture seconds `[from, to)`, i.e. exactly the 1 s buckets the
-/// throughput chart totals are made of.
-pub fn window_filter(from: u32, to: u32) -> String {
-    format!("frame.time_relative >= {from} && frame.time_relative < {to}")
+/// The display filter selecting the capture window between `from_ms` and `to_ms` (milliseconds).
+pub fn window_filter(from_ms: u32, to_ms: u32) -> String {
+    format!(
+        "frame.time_relative >= {:.3} && frame.time_relative <= {:.3}",
+        f64::from(from_ms) / 1000.0,
+        f64::from(to_ms) / 1000.0
+    )
 }
 
 impl WindowJob {
@@ -114,10 +117,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn filter_selects_the_half_open_second_range() {
+    fn filter_selects_the_closed_millisecond_range() {
         assert_eq!(
-            window_filter(3, 13),
-            "frame.time_relative >= 3 && frame.time_relative < 13"
+            window_filter(3000, 13_000),
+            "frame.time_relative >= 3.000 && frame.time_relative <= 13.000"
+        );
+        assert_eq!(
+            window_filter(1566, 1570),
+            "frame.time_relative >= 1.566 && frame.time_relative <= 1.570"
         );
     }
 }

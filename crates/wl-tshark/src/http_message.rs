@@ -6,7 +6,9 @@ use wl_model::HttpMessage;
 use crate::json_ordered::Ordered;
 
 /// Body preview cap in bytes.
-pub const PREVIEW_MAX: usize = 4096;
+pub const PREVIEW_MAX: usize = 256 * 1024;
+/// Largest image kept for display.
+const IMAGE_MAX: usize = 4 * 1024 * 1024;
 
 /// Removes real and escaped (`\r\n` spelled out by tshark) line endings at both ends.
 fn strip_crlf(s: &str) -> &str {
@@ -78,11 +80,13 @@ pub fn preview(body: &[u8]) -> Option<String> {
     if !is_text(text) {
         return None;
     }
-    let mut out = text.to_string();
-    if body.len() > cut.len() {
-        out.push_str(&format!("\n... [truncated, {} bytes total]", body.len()));
-    }
-    Some(out)
+    Some(text.to_string())
+}
+
+fn is_image(body: &[u8]) -> bool {
+    body.starts_with(b"\x89PNG\r\n\x1a\n")
+        || body.starts_with(b"\xff\xd8\xff")
+        || body.starts_with(b"GIF8")
 }
 
 fn header_content_length(h: &[(String, String)]) -> Option<u64> {
@@ -103,6 +107,7 @@ pub fn message(layer: &Ordered) -> HttpMessage {
         headers,
         body_preview: body.as_deref().and_then(preview),
         body_len,
+        body_image: body.filter(|b| b.len() <= IMAGE_MAX && is_image(b)),
     }
 }
 
@@ -155,7 +160,7 @@ mod tests {
     fn preview_caps_and_rejects_binary() {
         let big = vec![b'a'; PREVIEW_MAX + 10];
         let p = preview(&big).expect("text");
-        assert!(p.contains("truncated") && p.len() < PREVIEW_MAX + 60);
+        assert_eq!(p.len(), PREVIEW_MAX);
         assert!(preview(&[0, 1, 2, 3]).is_none());
         let split = "é".repeat(PREVIEW_MAX); // 2 bytes each: cap lands mid-char only if odd
         assert!(preview(split.as_bytes()).is_some());

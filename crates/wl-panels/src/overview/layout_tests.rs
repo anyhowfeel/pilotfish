@@ -60,6 +60,7 @@ fn snapshot() -> StatsSnapshot {
     let rate = (0..60)
         .map(|t| RatePoint {
             t: f64::from(t),
+            dt: 1.0,
             packets: 50 + t as u32,
             bytes: 4000 * (t as u64 + 1),
         })

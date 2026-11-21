@@ -90,8 +90,8 @@ impl PacketsView {
         self.filter_bar.set_history(items);
     }
 
-    pub fn set_filter_fields(&mut self, fields: Vec<wl_model::FilterField>) {
-        self.filter_bar.set_fields(fields);
+    pub fn set_filter_catalog(&mut self, catalog: std::sync::Arc<crate::features::FieldCatalog>) {
+        self.filter_bar.set_catalog(catalog);
     }
 
     /// Screenshot helper (`--packets-demo`): pre-sets filter text / open menus / find query.

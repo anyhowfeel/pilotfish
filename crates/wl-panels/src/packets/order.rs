@@ -4,22 +4,13 @@
 use std::cmp::Ordering;
 
 use rayon::prelude::*;
+use wl_kit::text::contains_ci;
 use wl_model::PacketRow;
 
 use crate::packets::columns::Col;
 
 /// Below this many rows the sequential path wins (thread hand-off costs more than the work).
 const PAR_MIN: usize = 20_000;
-
-/// Case-insensitive substring test; `needle` must already be lowercase.
-pub fn contains_ci(hay: &str, needle: &str) -> bool {
-    if needle.is_ascii() {
-        let (h, n) = (hay.as_bytes(), needle.as_bytes());
-        h.len() >= n.len() && h.windows(n.len()).any(|w| w.eq_ignore_ascii_case(n))
-    } else {
-        hay.to_lowercase().contains(needle)
-    }
-}
 
 pub fn matches(r: &PacketRow, quick: &str) -> bool {
     quick.is_empty()

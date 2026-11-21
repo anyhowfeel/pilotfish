@@ -3,10 +3,10 @@
 use wl_model::RatePoint;
 
 /// Smallest selectable window in seconds; a shorter drag is treated as a click (clears).
-pub const MIN_WINDOW: f64 = 0.5;
+pub const MIN_WINDOW: f64 = 0.001;
 
-/// A window of the capture, in seconds since its first packet (`from <= to`, whole seconds since
-/// the series has 1 s buckets).
+/// A window of the capture, in seconds since its first packet (`from <= to`, millisecond
+/// precision).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TimeSelection {
     pub from: f64,
@@ -14,28 +14,28 @@ pub struct TimeSelection {
 }
 
 impl TimeSelection {
-    /// Window between two drag positions (any order), snapped outwards to whole seconds so it
-    /// matches the 1 s buckets; `None` when the drag was too short to be a selection.
+    /// Window between two drag positions (any order), rounded to the millisecond; `None` when the
+    /// drag was too short to be a selection.
     pub fn from_drag(a: f64, b: f64) -> Option<Self> {
         if !a.is_finite() || !b.is_finite() || (a - b).abs() < MIN_WINDOW {
             return None;
         }
         let (lo, hi) = if a <= b { (a, b) } else { (b, a) };
-        Some(Self {
-            from: lo.floor().max(0.0),
-            to: hi.ceil(),
-        })
+        let ms = |t: f64| (t * 1000.0).round() / 1000.0;
+        let (from, to) = (ms(lo.max(0.0)), ms(hi));
+        (to - from >= MIN_WINDOW).then_some(Self { from, to })
     }
 
     pub fn duration(&self) -> f64 {
         self.to - self.from
     }
 
-    /// Packets and bytes of the buckets overlapping the window.
+    /// Packets and bytes of the buckets overlapping the window (whole buckets, so the figures are
+    /// approximate when the buckets are wider than the window).
     pub fn totals(&self, points: &[RatePoint]) -> (u64, u64) {
         points
             .iter()
-            .filter(|p| p.t + 1.0 > self.from && p.t < self.to)
+            .filter(|p| p.t + p.dt > self.from && p.t < self.to)
             .fold((0, 0), |(n, b), p| (n + u64::from(p.packets), b + p.bytes))
     }
 
@@ -53,15 +53,21 @@ mod tests {
     use super::*;
 
     fn pt(t: f64, packets: u32, bytes: u64) -> RatePoint {
-        RatePoint { t, packets, bytes }
+        RatePoint {
+            t,
+            dt: 1.0,
+            packets,
+            bytes,
+        }
     }
 
     #[test]
-    fn drag_is_ordered_snapped_and_short_drags_are_ignored() {
-        let s = TimeSelection::from_drag(12.7, 3.2).unwrap();
-        assert_eq!((s.from, s.to), (3.0, 13.0));
-        assert_eq!(s.duration(), 10.0);
-        assert!(TimeSelection::from_drag(5.0, 5.3).is_none());
+    fn drag_is_ordered_rounded_to_ms_and_tiny_drags_are_ignored() {
+        let s = TimeSelection::from_drag(12.7004, 3.2).unwrap();
+        assert_eq!((s.from, s.to), (3.2, 12.7));
+        let fine = TimeSelection::from_drag(1.5662, 1.5701).unwrap();
+        assert_eq!((fine.from, fine.to), (1.566, 1.570));
+        assert!(TimeSelection::from_drag(5.0, 5.0004).is_none());
         assert!(TimeSelection::from_drag(f64::NAN, 5.0).is_none());
         assert_eq!(TimeSelection::from_drag(-4.0, 2.0).unwrap().from, 0.0);
     }

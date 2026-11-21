@@ -68,8 +68,8 @@ impl App {
         self.pump_extras();
         let (fields, hub_changed) = self.hub.poll();
         if let Some(f) = fields {
-            self.gh.panel.set_fields(f.clone());
-            self.packets.set_filter_fields(f);
+            self.gh.panel.set_catalog(f.clone());
+            self.packets.set_filter_catalog(f);
         }
         if self.resolver.take_updated() {
             self.hosts.invalidate();

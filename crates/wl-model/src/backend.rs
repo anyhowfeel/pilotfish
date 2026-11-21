@@ -4,8 +4,9 @@ use crossbeam_channel::Receiver;
 use thiserror::Error;
 
 use crate::{
-    CaptureOptions, CaptureProperties, DecodeAs, DnsQuery, FlowEvents, FrameDetail, HttpDetail,
-    HttpExchange, IoGraph, IoSpec, ObjectSet, PacketRow, SysInfo, TcpSamples, TlsSession,
+    CaptureOptions, CaptureProperties, Channel, DecodeAs, DnsQuery, FlowEvents, FrameDetail,
+    HttpDetail, HttpExchange, IoGraph, IoSpec, ObjectSet, PacketRow, SysInfo, TcpSamples,
+    TlsSession,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -143,6 +144,10 @@ pub trait CaptureBackend: Send + Sync {
     /// backend-owned temporary directory (`tshark --export-objects`).
     fn export_objects(&self, _file: &Path, _protocol: &str) -> Result<ObjectSet, CaptureError> {
         Ok(ObjectSet::default())
+    }
+    /// Timing summary of connection attempts and TCP streams found in a backing file.
+    fn behavior_channels(&self, _file: &Path) -> Result<Vec<Channel>, CaptureError> {
+        Ok(Vec::new())
     }
     /// One entry per DNS transaction (query + response) found in a backing file.
     fn dns_queries(&self, _file: &Path) -> Result<Vec<DnsQuery>, CaptureError> {

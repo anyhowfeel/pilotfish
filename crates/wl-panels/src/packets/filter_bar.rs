@@ -1,8 +1,10 @@
 //! Display-filter input with debounced validation, status dot, history and quick chips.
 
+use std::sync::Arc;
+
 use eframe::egui::{self, CursorIcon, Key, RichText, Sense, Ui, Vec2};
 
-use crate::features::FilterAutocomplete;
+use crate::features::{FieldCatalog, FilterAutocomplete};
 use crate::packets::actions::PacketsAction;
 use crate::packets::filter_history::History;
 use crate::packets::kit::{Palette, danger, ok, spacing, warn};
@@ -41,8 +43,8 @@ impl Default for FilterBar {
 }
 
 impl FilterBar {
-    pub fn set_fields(&mut self, fields: Vec<wl_model::FilterField>) {
-        self.autocomplete.set_fields(fields);
+    pub fn set_catalog(&mut self, catalog: Arc<FieldCatalog>) {
+        self.autocomplete.set_catalog(catalog);
     }
     pub fn text(&self) -> &str {
         &self.text
@@ -144,6 +146,7 @@ impl FilterBar {
                     wl_kit::widgets::text_field(&mut self.text)
                         .hint_text("Display filter, e.g. tcp.port == 443 && ip.addr == 10.0.0.1")
                         .font(egui::TextStyle::Monospace)
+                        .lock_focus(self.autocomplete.is_open())
                         .desired_width(ui.available_width().max(80.0)),
                 );
                 if edit.has_focus()
@@ -155,7 +158,8 @@ impl FilterBar {
                 } else if edit.changed() || self.autocomplete.ui(ui, &mut self.text, &edit) {
                     self.mark_edited(now);
                 }
-                let enter = edit.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
+                let taken = self.autocomplete.take_enter();
+                let enter = !taken && edit.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
                 if apply_btn.clicked() || enter {
                     self.apply(&mut out);
                 }

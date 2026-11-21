@@ -8,14 +8,15 @@ use wl_kit::widgets::protocol_pill;
 use super::card::{DIR_W, kv, kv_w};
 use super::model::Graph;
 use super::state::Resolved;
+use crate::overview::NameResolver;
 
 const WIDTH: f32 = 250.0;
 
-pub fn show(resp: &Response, g: &Graph, hover: Resolved) {
+pub fn show(resp: &Response, g: &Graph, hover: Resolved, r: &dyn NameResolver) {
     match hover {
         Resolved::None => {}
         Resolved::Node(i) => {
-            resp.clone().on_hover_ui_at_pointer(|ui| node(ui, g, i));
+            resp.clone().on_hover_ui_at_pointer(|ui| node(ui, g, i, r));
         }
         Resolved::Link(i) => {
             resp.clone().on_hover_ui_at_pointer(|ui| link(ui, g, i));
@@ -31,12 +32,18 @@ fn egui_label(text: &str) -> wl_kit::egui::Label {
     wl_kit::egui::Label::new(RichText::new(text).strong().color(Palette::text())).truncate()
 }
 
-fn node(ui: &mut Ui, g: &Graph, i: usize) {
+fn node(ui: &mut Ui, g: &Graph, i: usize, r: &dyn NameResolver) {
     let n = &g.nodes[i];
     ui.set_width(WIDTH);
     head(ui, n.label());
     if n.name.is_some() {
         ui.label(RichText::new(&*n.addr).color(Palette::muted()));
+    }
+    if let Some(geo) = r.geo(&n.addr) {
+        ui.label(RichText::new(geo.summary()).color(Palette::muted()));
+        if let Some(c) = &geo.country {
+            ui.label(RichText::new(&**c).color(Palette::muted()));
+        }
     }
     ui.add_space(spacing::XS);
     kv(ui, "Total", &format::bytes(n.bytes));

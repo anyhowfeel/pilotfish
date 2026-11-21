@@ -1,25 +1,26 @@
 //! Coordinates the secondary features: command palette, stream view, insights, autocomplete, bookmarks and exports.
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crossbeam_channel::{Receiver, Sender, bounded};
 use eframe::egui;
 use wl_model::{
-    CaptureError, ExpertReport, FilterField, PacketRow, ProtocolHierarchy, StatsSnapshot,
-    StreamConversation, StreamFormat, StreamProtocol,
+    BehaviorData, CaptureBackend, CaptureError, ExpertReport, HealthInsight, PacketRow,
+    ProtocolHierarchy, StatsSnapshot, StreamConversation, StreamFormat, StreamProtocol,
 };
 use wl_panels::features::{
-    BookmarkStore, CommandPalette, InsightsAction, InsightsPanel, PaletteAction, PalettePage,
-    StreamView, StreamViewAction, synthesize_insights,
+    BookmarkStore, CommandPalette, FieldCatalog, InsightsAction, InsightsPanel, PaletteAction,
+    PalettePage, StreamView, StreamViewAction, synthesize_insights,
 };
 
 use crate::export_data::{write_html_report, write_packets_csv, write_stats_json};
 use crate::page::Page;
 
 enum Msg {
-    Fields(Vec<FilterField>),
+    Fields(Arc<FieldCatalog>),
     Stream(Result<StreamConversation, CaptureError>),
     Insights(Option<ExpertReport>, Option<ProtocolHierarchy>),
+    Behavior(BehaviorData),
     ExportDone(Result<String, String>),
 }
 
@@ -54,6 +55,7 @@ pub struct FeaturesHub {
     pub bookmark_frame: Option<u64>,
     pub expert: Option<ExpertReport>,
     pub phs: Option<ProtocolHierarchy>,
+    pub behavior: Option<BehaviorData>,
     tx: Sender<Msg>,
     rx: Receiver<Msg>,
     pub notice: Option<String>,
@@ -66,8 +68,9 @@ impl FeaturesHub {
         if let Some(b) = tshark.clone() {
             let tx2 = tx.clone();
             std::thread::spawn(move || {
-                if let Ok(fields) = b.filter_fields(Some(25_000)) {
-                    let _ = tx2.try_send(Msg::Fields(fields));
+                if let Ok(fields) = b.filter_fields(None) {
+                    let catalog = Arc::new(FieldCatalog::from_fields(fields));
+                    let _ = tx2.try_send(Msg::Fields(catalog));
                     ctx.request_repaint();
                 }
             });
@@ -82,6 +85,7 @@ impl FeaturesHub {
             bookmark_frame: None,
             expert: None,
             phs: None,
+            behavior: None,
             tx,
             rx,
             notice: None,
@@ -89,20 +93,51 @@ impl FeaturesHub {
         }
     }
 
+    pub(crate) fn insights_for(&self, stats: &StatsSnapshot) -> Vec<HealthInsight> {
+        synthesize_insights(
+            self.expert.as_ref(),
+            self.phs.as_ref(),
+            self.behavior.as_ref(),
+            stats,
+        )
+    }
+
     pub fn clear_capture(&mut self) {
         self.expert = None;
         self.phs = None;
+        self.behavior = None;
         self.stream_view.close();
     }
 
-    pub fn refresh_insights(&mut self, file: PathBuf, ctx: egui::Context) {
+    fn spawn_job<F>(&self, file: &Arc<PathBuf>, ctx: &egui::Context, job: F)
+    where
+        F: FnOnce(&wl_tshark::TsharkBackend, &Path) -> Msg + Send + 'static,
+    {
         let Some(b) = self.tshark.clone() else { return };
-        let tx = self.tx.clone();
+        let (file, tx, ctx) = (file.clone(), self.tx.clone(), ctx.clone());
         std::thread::spawn(move || {
-            let expert = b.expert_info(&file, None).ok();
-            let phs = b.protocol_hierarchy(&file, None).ok();
-            let _ = tx.try_send(Msg::Insights(expert, phs));
+            let _ = tx.try_send(job(&b, &file));
             ctx.request_repaint();
+        });
+    }
+
+    /// Expert info + protocol hierarchy, channel summaries and DNS names run in parallel; each
+    /// result is delivered as soon as it is ready.
+    pub fn refresh_insights(&mut self, file: PathBuf, ctx: egui::Context) {
+        let file = Arc::new(file);
+        self.spawn_job(&file, &ctx, |b, f| {
+            Msg::Insights(
+                b.expert_info(f, None).ok(),
+                b.protocol_hierarchy(f, None).ok(),
+            )
+        });
+        self.spawn_job(&file, &ctx, |b, f| {
+            let (channels, dns) = std::thread::scope(|s| {
+                let c = s.spawn(|| b.behavior_channels(f).unwrap_or_default());
+                let d = b.dns_queries(f).unwrap_or_default();
+                (c.join().unwrap_or_default(), d)
+            });
+            Msg::Behavior(BehaviorData { channels, dns })
         });
     }
 
@@ -129,7 +164,7 @@ impl FeaturesHub {
         });
     }
 
-    pub fn poll(&mut self) -> (Option<Vec<FilterField>>, bool) {
+    pub fn poll(&mut self) -> (Option<Arc<FieldCatalog>>, bool) {
         let (mut fields, mut changed) = (None, false);
         while let Ok(msg) = self.rx.try_recv() {
             changed = true;
@@ -141,6 +176,7 @@ impl FeaturesHub {
                     self.expert = e;
                     self.phs = p;
                 }
+                Msg::Behavior(b) => self.behavior = Some(b),
                 Msg::ExportDone(Ok(n)) => self.notice = Some(n),
                 Msg::ExportDone(Err(e)) => self.error = Some(e),
             }
@@ -188,8 +224,13 @@ impl FeaturesHub {
     }
 
     pub fn insights_ui(&mut self, ui: &mut egui::Ui, stats: &StatsSnapshot) -> Vec<InsightsAction> {
-        self.insights
-            .ui(ui, stats, self.expert.as_ref(), self.phs.as_ref())
+        self.insights.ui(
+            ui,
+            stats,
+            self.expert.as_ref(),
+            self.phs.as_ref(),
+            self.behavior.as_ref(),
+        )
     }
 }
 

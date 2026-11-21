@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 
+use wl_kit::text::contains_ci;
 use wl_model::DetailNode;
 
 /// One visible line of the tree. `idx` is the node's pre-order index (stable per frame).
@@ -17,7 +18,7 @@ pub struct FlatRow {
 }
 
 fn node_matches(n: &DetailNode, q: &str) -> bool {
-    !q.is_empty() && n.label.to_lowercase().contains(q)
+    !q.is_empty() && contains_ci(&n.label, q)
 }
 
 fn subtree_matches(n: &DetailNode, q: &str) -> bool {

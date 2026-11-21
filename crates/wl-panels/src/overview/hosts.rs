@@ -95,12 +95,16 @@ impl HostsPanel {
                 egui::RichText::new(format!("{} / {} hosts", self.rows.len(), stats.hosts.len()))
                     .color(Palette::muted()),
             );
+            if let Some(hint) = self.resolver.geo_hint() {
+                ui.label(egui::RichText::new(hint).small().color(Palette::muted()));
+            }
         });
         ui.add_space(spacing::SM);
         let mut clicked_sort = None;
         let rows = &self.rows;
         let hosts = &stats.hosts;
         let (sort, max, resolver) = (self.sort, self.max_total, &self.resolver);
+        let geo = resolver.geo_hint().is_none();
         let mut picked = None;
         let selected = self.selected.clone();
         let avail_w = ui.available_width();
@@ -112,10 +116,11 @@ impl HostsPanel {
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 ui.allocate_ui(vec2(table_w, avail_h), |ui| {
-                    TableCols::new()
-                        .flex(150.0)
-                        .fixed(90.0)
-                        .num(74.0)
+                    let mut cols = TableCols::new().flex(150.0).fixed(90.0);
+                    if geo {
+                        cols = cols.flex(130.0);
+                    }
+                    cols.num(74.0)
                         .num(74.0)
                         .num(88.0)
                         .num(88.0)
@@ -133,7 +138,17 @@ impl HostsPanel {
                                 ("Bytes out", HostCol::BytesOut, true),
                                 ("Share", HostCol::Total, false),
                             ];
-                            for (t, c, right) in heads {
+                            for (i, (t, c, right)) in heads.into_iter().enumerate() {
+                                if i == 2 && geo {
+                                    h.col(|ui| {
+                                        ui.label(
+                                            egui::RichText::new("Location")
+                                                .small()
+                                                .strong()
+                                                .color(Palette::muted()),
+                                        );
+                                    });
+                                }
                                 h.col(|ui| {
                                     if sort_header(ui, t, c, &sort, right) {
                                         clicked_sort = Some(c);
@@ -158,6 +173,19 @@ impl HostsPanel {
                                     let c = Palette::scope(host.is_private);
                                     pill(ui, t, c, PillStyle::column(SCOPE_PILL_W));
                                 });
+                                if geo {
+                                    row.col(|ui| match resolver.geo(&host.addr) {
+                                        Some(g) => {
+                                            let r = text_cell(ui, &g.summary());
+                                            if let Some(c) = &g.country {
+                                                r.on_hover_text(&**c);
+                                            }
+                                        }
+                                        None => {
+                                            text_cell(ui, "");
+                                        }
+                                    });
+                                }
                                 row.col(|ui| num_cell(ui, &format::count(host.packets_in)));
                                 row.col(|ui| num_cell(ui, &format::count(host.packets_out)));
                                 row.col(|ui| num_cell(ui, &format::bytes(host.bytes_in)));

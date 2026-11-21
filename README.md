@@ -121,18 +121,27 @@ Environment variables:
   dissection tree with click-to-filter, hex view, custom columns, time formats, bookmarks,
   stream following, export (pcap subsets, CSV, JSON, HTML report).
 - **Overview, Hosts, Conversations**: totals, throughput, protocol mix, top talkers, with an
-  optional time-window selection on the throughput chart.
+  optional time-window selection (to the millisecond) on the throughput chart. Hosts show the
+  country and network of public addresses when a local `.mmdb` database is present (see below).
 - **Graphs**: I/O graph with several display-filter series.
 - **Map**: force-directed graph of host-to-host traffic, link width by volume, optional highlight
   of encrypted flows.
 - **Flows**: sequence diagram of a conversation, plus TCP time-sequence, throughput, RTT and
   window-size graphs.
-- **Web**: HTTP requests paired with responses (headers, body preview, `curl` export) and TLS
-  sessions (SNI, version, cipher, ALPN) for HTTPS; extracted objects.
-- **Insights**: plain-language findings, expert info, protocol hierarchy, DNS log.
+- **Web**: HTTP requests paired with responses (headers, pretty or raw body, image preview,
+  `curl` export) and TLS sessions (SNI, version, cipher, ALPN, JA3 / JA4 fingerprints) for HTTPS;
+  extracted objects.
+- **Insights**: plain-language findings (including port scans, sweeps, beaconing and odd DNS
+  names), expert info, protocol hierarchy, DNS log.
 - Command palette (`Ctrl+K`), settings (`Ctrl+,`), dark and light themes.
 
 Shift+click on a sidebar entry opens that page in a separate window.
+
+### Country and network of hosts
+
+Put a MaxMind-format database (GeoLite2 or DB-IP Lite, country and/or ASN `.mmdb`) in
+`~/.local/share/wirelens/geo`, or point `WIRELENS_GEO_DIR` at a folder that holds them. Lookups are
+offline; nothing is downloaded by wirelens.
 
 ## Releases
 

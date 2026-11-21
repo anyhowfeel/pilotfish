@@ -1,11 +1,12 @@
 //! egui dropdown widget for display-filter field autocomplete.
 
+use std::sync::Arc;
+
 use eframe::egui::{
     self, Align, Area, CornerRadius, Frame, Key, Layout, Margin, Order, Response, RichText, Sense,
     Stroke, Ui, pos2,
 };
 use wl_kit::theme::{Palette, RADIUS, mono, spacing};
-use wl_model::FilterField;
 
 pub use crate::features::autocomplete_catalog::{FieldCatalog, active_token, apply_completion};
 
@@ -14,25 +15,37 @@ const MAX_SUGGESTIONS: usize = 8;
 /// Stateful dropdown helper that attaches to any filter `TextEdit` response.
 #[derive(Default)]
 pub struct FilterAutocomplete {
-    catalog: FieldCatalog,
+    catalog: Arc<FieldCatalog>,
     selected: usize,
     dismissed_for: String,
+    open: bool,
+    enter_taken: bool,
 }
 
 impl FilterAutocomplete {
-    pub fn new(catalog: FieldCatalog) -> Self {
+    pub fn new(catalog: Arc<FieldCatalog>) -> Self {
         Self {
             catalog,
             selected: 0,
             dismissed_for: String::new(),
+            open: false,
+            enter_taken: false,
         }
     }
 
     /// Replaces the catalog once background `tshark -G fields` completes.
-    pub fn set_fields(&mut self, fields: Vec<FilterField>) {
-        if !fields.is_empty() {
-            self.catalog = FieldCatalog::from_fields(fields);
-        }
+    pub fn set_catalog(&mut self, catalog: Arc<FieldCatalog>) {
+        self.catalog = catalog;
+    }
+
+    /// True while the suggestion popup is showing; the field should then keep Tab for itself.
+    pub fn is_open(&self) -> bool {
+        self.open
+    }
+
+    /// True once after an Enter that accepted a suggestion, so the caller must not also apply.
+    pub fn take_enter(&mut self) -> bool {
+        std::mem::take(&mut self.enter_taken)
     }
 
     pub fn catalog(&self) -> &FieldCatalog {
@@ -41,7 +54,10 @@ impl FilterAutocomplete {
 
     /// Renders dropdown suggestions below `input_resp`. Returns `true` if `expr` was updated.
     pub fn ui(&mut self, ui: &mut Ui, expr: &mut String, input_resp: &Response) -> bool {
-        if !input_resp.has_focus() {
+        let enter = ui.input(|i| i.key_pressed(Key::Enter));
+        let enter_on_popup = self.open && enter && input_resp.lost_focus();
+        let was_open = std::mem::take(&mut self.open);
+        if !input_resp.has_focus() && !enter_on_popup {
             return false;
         }
         let cursor = expr.chars().count();
@@ -49,7 +65,7 @@ impl FilterAutocomplete {
         if tok.len() < 2 || tok == self.dismissed_for {
             return false;
         }
-        let matches: Vec<FilterField> = self
+        let matches: Vec<_> = self
             .catalog
             .suggest(tok, MAX_SUGGESTIONS)
             .into_iter()
@@ -60,11 +76,12 @@ impl FilterAutocomplete {
         }
         self.selected = self.selected.min(matches.len() - 1);
 
-        let (down, up, accept, esc) = ui.input(|i| {
+        let (down, up, tab, back_tab, esc) = ui.input(|i| {
             (
                 i.key_pressed(Key::ArrowDown),
                 i.key_pressed(Key::ArrowUp),
-                i.key_pressed(Key::Tab) || (i.key_pressed(Key::Enter) && i.modifiers.ctrl),
+                i.key_pressed(Key::Tab) && !i.modifiers.shift,
+                i.key_pressed(Key::Tab) && i.modifiers.shift,
                 i.key_pressed(Key::Escape),
             )
         });
@@ -72,13 +89,25 @@ impl FilterAutocomplete {
             self.dismissed_for = tok.to_owned();
             return false;
         }
-        if down {
-            self.selected = (self.selected + 1) % matches.len();
+        let n = matches.len();
+        if down || (tab && was_open) {
+            self.selected = (self.selected + 1) % n;
         }
-        if up {
-            self.selected = self.selected.checked_sub(1).unwrap_or(matches.len() - 1);
+        if up || (back_tab && was_open) {
+            self.selected = self.selected.checked_sub(1).unwrap_or(n - 1);
         }
-        let mut chosen: Option<String> = accept.then(|| matches[self.selected].abbrev.clone());
+        let picked = &matches[self.selected].abbrev;
+        let mut chosen = None;
+        if enter_on_popup || (enter && was_open && input_resp.has_focus()) {
+            if picked == tok {
+                self.dismissed_for = tok.to_owned();
+                return false;
+            }
+            chosen = Some(picked.clone());
+            self.enter_taken = true;
+            input_resp.request_focus();
+        }
+        self.open = true;
 
         let pos = pos2(
             input_resp.rect.left(),
@@ -145,7 +174,7 @@ impl FilterAutocomplete {
         if let Some(abbrev) = chosen {
             let (updated, _) = apply_completion(expr, cursor, &abbrev);
             *expr = updated;
-            self.dismissed_for.clear();
+            self.dismissed_for.clone_from(&abbrev);
             self.selected = 0;
             return true;
         }

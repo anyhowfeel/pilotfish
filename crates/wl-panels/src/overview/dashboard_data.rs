@@ -3,7 +3,7 @@
 use wl_kit::egui::Color32;
 use wl_kit::format;
 use wl_kit::theme::{Palette, protocol_color};
-use wl_model::{RatePoint, StatsSnapshot};
+use wl_model::{RatePoint, StatsSnapshot, rebin};
 
 use super::services::top_services;
 
@@ -35,10 +35,11 @@ fn current(rate: &[RatePoint]) -> Option<RatePoint> {
 }
 
 pub fn derive(s: &StatsSnapshot) -> Derived {
-    let cur = current(&s.rate);
-    let pps = cur.map_or(0.0, |p| f64::from(p.packets));
-    let bps = cur.map_or(0.0, |p| p.bytes as f64);
-    let peak = s.rate.iter().map(|p| p.packets).max().unwrap_or(0);
+    let per_second = rebin(&s.rate, 1.0);
+    let cur = current(&per_second);
+    let pps = cur.map_or(0.0, |p| p.packets_per_sec());
+    let bps = cur.map_or(0.0, |p| p.bytes_per_sec());
+    let peak = per_second.iter().map(|p| p.packets).max().unwrap_or(0);
     let avg = if s.total_packets > 0 {
         s.total_bytes as f64 / s.total_packets as f64
     } else {
@@ -160,11 +161,13 @@ mod tests {
             rate: vec![
                 RatePoint {
                     t: 0.0,
+                    dt: 1.0,
                     packets: 4,
                     bytes: 400,
                 },
                 RatePoint {
                     t: 1.0,
+                    dt: 1.0,
                     packets: 1,
                     bytes: 10,
                 },
