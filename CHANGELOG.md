@@ -7,11 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-21
+
 ### Added
-- Release builds are stripped and use thin LTO.
-- Debian packages (`.deb`), a Windows installer, macOS `.dmg` images and an Arch `PKGBUILD`.
-- A `.pkg.tar.zst` for Arch Linux, built with `makepkg` in CI and attached to each release.
+- Debian packages (`.deb`) for `amd64` and `arm64`, a Windows installer, macOS `.dmg` images
+  (drag `wirelens` to Applications) and an Arch Linux `.pkg.tar.zst`, with a `PKGBUILD` in
+  `packaging/arch`.
 - `SHA256SUMS` published with each release.
+- A synthetic demo capture (`tests/fixtures/demo.pcap`) and a screenshot table in the README.
+- A short code of conduct.
+
+### Changed
+- New light theme: cooler paper greys with a stronger contrast for borders and muted text, and a
+  deep blue accent.
+- Release builds are stripped and use thin LTO, which makes the binaries about three times
+  smaller.
+- Updated `rfd` to 0.18, `dirs` to 7 and the GitHub Actions used by the CI.
 
 ### Fixed
 - The Windows build no longer opens a console window.
