@@ -17,7 +17,7 @@ jobs:
     outputs:
       run_code: ${{ steps.scope.outputs.run_code }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Decide whether code checks and builds are needed
@@ -62,7 +62,7 @@ jobs:
       - name: Skip checks for docs-only or already-published release
         if: needs.plan.outputs.run_code != 'true'
         run: echo "No code changes; skipping Rust checks."
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: needs.plan.outputs.run_code == 'true'
       - name: System packages
         if: needs.plan.outputs.run_code == 'true'
@@ -116,7 +116,7 @@ jobs:
             os: windows-latest
             target: x86_64-pc-windows-msvc
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Linux packages
         if: startsWith(matrix.os, 'ubuntu')
         run: |
@@ -187,7 +187,7 @@ jobs:
         run: |
           pacman -Syu --noconfirm --needed base-devel git rust pkgconf libxkbcommon wayland \
             libx11 libxcursor libxrandr libxi mesa
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build
         run: cargo build --release --locked
       - name: Package
