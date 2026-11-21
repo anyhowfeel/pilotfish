@@ -96,7 +96,10 @@ impl HostsPanel {
                     .color(Palette::muted()),
             );
             if let Some(hint) = self.resolver.geo_hint() {
-                ui.label(egui::RichText::new(hint).small().color(Palette::muted()));
+                ui.add(
+                    egui::Label::new(egui::RichText::new(hint).small().color(Palette::muted()))
+                        .truncate(),
+                );
             }
         });
         ui.add_space(spacing::SM);

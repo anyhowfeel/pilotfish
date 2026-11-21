@@ -28,6 +28,7 @@ mod features_hub;
 mod fields_jobs;
 mod flows_link;
 mod geo;
+mod geo_store;
 mod graphs_hub;
 mod graphs_link;
 mod icons;

@@ -26,7 +26,7 @@ pub struct AsyncResolver {
     done_rx: Receiver<()>,
     /// Settings > Names > "Resolve DNS names": off = no lookups (cached names still show).
     enabled: Arc<std::sync::atomic::AtomicBool>,
-    geo: Option<Arc<GeoDb>>,
+    geo: Arc<std::sync::RwLock<Option<Arc<GeoDb>>>>,
 }
 
 impl AsyncResolver {
@@ -53,8 +53,19 @@ impl AsyncResolver {
             req_tx,
             done_rx,
             enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
-            geo: GeoDb::discover(),
+            geo: Arc::new(std::sync::RwLock::new(GeoDb::discover())),
         }
+    }
+
+    /// Re-reads the location databases (after one was downloaded, added or removed).
+    pub fn reload_geo(&self) {
+        if let Ok(mut g) = self.geo.write() {
+            *g = GeoDb::discover();
+        }
+    }
+
+    fn geo_db(&self) -> Option<Arc<GeoDb>> {
+        self.geo.read().ok()?.clone()
     }
 
     pub fn set_enabled(&self, on: bool) {
@@ -73,16 +84,13 @@ impl AsyncResolver {
 
 impl NameResolver for AsyncResolver {
     fn geo(&self, addr: &str) -> Option<GeoInfo> {
-        self.geo.as_ref()?.lookup(addr)
+        self.geo_db()?.lookup(addr)
     }
 
     fn geo_hint(&self) -> Option<String> {
-        self.geo.is_none().then(|| {
-            format!(
-                "Country / AS: put a GeoLite2 or DB-IP .mmdb file in {}",
-                GeoDb::primary_dir().display()
-            )
-        })
+        self.geo_db()
+            .is_none()
+            .then(|| "No location database: add one in Settings > Locations".to_owned())
     }
 
     fn name(&self, addr: &str) -> Option<Arc<str>> {

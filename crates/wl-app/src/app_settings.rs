@@ -3,7 +3,7 @@ use eframe::egui;
 use wl_kit::widgets::{PillLookKind, set_pill_look, toast};
 use wl_kit::{scale, theme};
 use wl_panels::settings::{
-    AboutInfo, Category, Density, PillLook, Settings, SettingsAction, ThemeChoice,
+    AboutInfo, Category, Density, GeoAction, PillLook, Settings, SettingsAction, ThemeChoice,
 };
 
 use crate::app::App;
@@ -90,6 +90,12 @@ impl App {
         if self.settings.is_open() {
             let about = self.about_info();
             self.settings.set_about(about);
+            self.settings.set_geo(self.geo_store.info());
+        }
+        if self.geo_store.poll() {
+            self.resolver.reload_geo();
+            self.hosts.invalidate();
+            self.map.invalidate();
         }
         match self.settings.ui(ctx) {
             Some(SettingsAction::Preview(s)) => apply_visuals(ctx, &s),
@@ -102,7 +108,26 @@ impl App {
             }
             Some(SettingsAction::Cancel(orig)) => apply_visuals(ctx, &orig),
             Some(SettingsAction::OpenConfigDir) => self.open_config_dir(),
+            Some(SettingsAction::Geo(action)) => self.run_geo_action(action, ctx),
             None => {}
+        }
+    }
+
+    fn run_geo_action(&mut self, action: GeoAction, ctx: &egui::Context) {
+        match action {
+            GeoAction::Download(id) => self.geo_store.download(&id, ctx),
+            GeoAction::AddFile => self.geo_store.pick_file(ctx),
+            GeoAction::Remove(id) => {
+                self.geo_store.remove(&id);
+                self.resolver.reload_geo();
+                self.hosts.invalidate();
+                self.map.invalidate();
+            }
+            GeoAction::OpenFolder => {
+                if let Err(e) = self.geo_store.open_folder() {
+                    self.startup_error = Some(e);
+                }
+            }
         }
     }
 

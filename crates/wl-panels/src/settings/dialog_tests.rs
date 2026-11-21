@@ -80,3 +80,52 @@ fn closed_dialog_emits_nothing() {
     let mut d = SettingsDialog::default();
     assert_eq!(frame(&ctx, 1000.0, 640.0, 1.0, vec![], &mut d), None);
 }
+
+fn every_state() -> super::GeoDbInfo {
+    use super::{GeoDbRow, GeoDbState};
+    let row = |id: &str, state, custom| GeoDbRow {
+        id: id.into(),
+        title: format!("Database {id} with a rather long title that has to wrap"),
+        detail: "Country of public addresses. About 4 MB. CC BY 4.0, db-ip.com.".into(),
+        state,
+        custom,
+    };
+    super::GeoDbInfo {
+        dir: "/home/someone/.local/share/wirelens/geo".into(),
+        rows: vec![
+            row("missing", GeoDbState::Missing, false),
+            row("busy", GeoDbState::Downloading, false),
+            row("ready", GeoDbState::Ready("4.1 MiB".into()), false),
+            row(
+                "failed",
+                GeoDbState::Failed("connection refused (os error 111)".into()),
+                false,
+            ),
+            row("mine.mmdb", GeoDbState::Ready("12.0 MiB".into()), true),
+        ],
+        error: Some("notes.mmdb: not a valid MaxMind database".into()),
+    }
+}
+
+#[test]
+fn the_locations_page_renders_every_state_at_all_sizes_and_scales() {
+    for mode in [Mode::Dark, Mode::Light] {
+        let ctx = Context::default();
+        wl_kit::theme::apply_mode(&ctx, mode);
+        for (w, h) in [(700.0, 500.0), (1000.0, 640.0), (1600.0, 900.0)] {
+            for scale in [1.0, 1.5] {
+                let mut d = SettingsDialog::default();
+                d.open(
+                    Settings::default(),
+                    AboutInfo::default(),
+                    Some(Category::Locations),
+                );
+                d.set_geo(every_state());
+                for _ in 0..3 {
+                    assert_eq!(frame(&ctx, w, h, scale, vec![], &mut d), None);
+                }
+                assert!(d.is_open());
+            }
+        }
+    }
+}
