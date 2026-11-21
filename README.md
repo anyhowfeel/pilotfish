@@ -14,6 +14,33 @@ host graph.
 This is a prototype built to explore what a Wireshark front end could look like. It is not
 meant to replace Wireshark or Sniffnet, and it covers only a small part of what they do.
 
+## Screenshots
+
+Taken on a small synthetic capture (`tests/fixtures/demo.pcap`: a laptop, a TV, a phone and a
+NAS on a home network, with DNS, TLS, plain HTTP, SMB-style transfers and a retransmission
+burst), so you can open the same file and compare: `wirelens tests/fixtures/demo.pcap`.
+
+| Overview | Packets | Map |
+| :---: | :---: | :---: |
+| <img src="assets/screenshots/overview-dark.png" alt="Overview, dark theme"> | <img src="assets/screenshots/packets-dark.png" alt="Packets, dark theme"> | <img src="assets/screenshots/map-dark.png" alt="Map, dark theme"> |
+
+| Web | Flows | Graphs |
+| :---: | :---: | :---: |
+| <img src="assets/screenshots/web-dark.png" alt="Web, dark theme"> | <img src="assets/screenshots/flows-dark.png" alt="Flows, dark theme"> | <img src="assets/screenshots/graphs-dark.png" alt="Graphs, dark theme"> |
+
+<details>
+<summary>Light theme</summary>
+
+| Overview | Packets | Map |
+| :---: | :---: | :---: |
+| <img src="assets/screenshots/overview-light.png" alt="Overview, light theme"> | <img src="assets/screenshots/packets-light.png" alt="Packets, light theme"> | <img src="assets/screenshots/map-light.png" alt="Map, light theme"> |
+
+| Web | Flows | Graphs |
+| :---: | :---: | :---: |
+| <img src="assets/screenshots/web-light.png" alt="Web, light theme"> | <img src="assets/screenshots/flows-light.png" alt="Flows, light theme"> | <img src="assets/screenshots/graphs-light.png" alt="Graphs, light theme"> |
+
+</details>
+
 ## Requirements
 
 - A recent stable Rust toolchain (edition 2024).
