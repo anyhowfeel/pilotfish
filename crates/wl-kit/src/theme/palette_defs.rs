@@ -37,27 +37,27 @@ pub const SLATE_DARK: Colors = Colors {
     ],
 };
 
-/// Cool Slate (Light): "night sky by day" - white with a trace of violet over soft periwinkle
-/// neutrals, deep navy text and a deep blue accent (hue ~250, kept clear of purple).
+/// Cool Slate (Light): cool paper greys with a trace of blue, near-black navy text and a deep
+/// blue accent; borders and muted text are kept strong enough for dense tables.
 pub const SLATE_LIGHT: Colors = Colors {
-    bg: rgb(0xF3F2FB),
-    panel: rgb(0xE6E4F4),
-    surface: rgb(0xFEFDFF),
-    surface_hi: rgb(0xD8D7EA),
-    border: rgb(0xBFBED5),
-    text: rgb(0x151828),
-    muted: rgb(0x4A4C60),
-    accent: rgb(0x3550A6),
+    bg: rgb(0xF2F4F8),
+    panel: rgb(0xE6EAF1),
+    surface: rgb(0xFDFEFF),
+    surface_hi: rgb(0xD9DFEA),
+    border: rgb(0xAEB8CB),
+    text: rgb(0x0A0F1C),
+    muted: rgb(0x404859),
+    accent: rgb(0x2A4DAA),
     ok: rgb(0x12603A),
     warn: rgb(0x8F4306),
     danger: rgb(0x9A2A34),
     info: rgb(0x0B5C94),
     on_accent: rgb(0xF9FAFF),
     on_danger: rgb(0xFCF9F9),
-    row_alt: rgb(0xE9E8F6),
-    selection_bg: rgb(0xC4D2FB),
+    row_alt: rgb(0xE8ECF3),
+    selection_bg: rgb(0xC4D8FF),
     series: [
-        rgb(0x3550A6),
+        rgb(0x2A4DAA),
         rgb(0x944809),
         rgb(0x1B6B45),
         rgb(0xA23B73),
