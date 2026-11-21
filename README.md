@@ -23,28 +23,39 @@ meant to replace Wireshark or Sniffnet, and it covers only a small part of what 
 
 ## Screenshots
 
-Taken on a small synthetic capture (`tests/fixtures/demo.pcap`: a laptop, a TV, a phone and a
-NAS on a home network, with DNS, TLS, plain HTTP, SMB-style transfers and a retransmission
-burst), so you can open the same file and compare: `wirelens tests/fixtures/demo.pcap`.
+Taken on a small synthetic capture, `tests/fixtures/demo.pcap`: a laptop, a TV, a phone and a NAS on
+an invented home network, talking to well-known public services over DNS, TLS, plain HTTP and
+SMB-style transfers, with a retransmission burst and three made-up behaviours for Insights (a visitor
+scanning the NAS, a phone calling a documentation address at a steady rhythm, and very long DNS
+names). Nothing in it comes from a real network. `tests/fixtures/gen_demo_capture.py` writes it, so
+you can open the same file and compare: `wirelens tests/fixtures/demo.pcap`.
 
-| Overview | Packets | Map |
+| Overview | Packets | Hosts |
 | :---: | :---: | :---: |
-| <img src="assets/screenshots/overview-dark.png" alt="Overview, dark theme"> | <img src="assets/screenshots/packets-dark.png" alt="Packets, dark theme"> | <img src="assets/screenshots/map-dark.png" alt="Map, dark theme"> |
+| <img src="assets/screenshots/overview-dark.png" alt="Overview, dark theme"> | <img src="assets/screenshots/packets-dark.png" alt="Packets, dark theme"> | <img src="assets/screenshots/hosts-dark.png" alt="Hosts, dark theme"> |
 
-| Web | Flows | Graphs |
+| Map | Web | Insights |
 | :---: | :---: | :---: |
-| <img src="assets/screenshots/web-dark.png" alt="Web, dark theme"> | <img src="assets/screenshots/flows-dark.png" alt="Flows, dark theme"> | <img src="assets/screenshots/graphs-dark.png" alt="Graphs, dark theme"> |
+| <img src="assets/screenshots/map-dark.png" alt="Map, dark theme"> | <img src="assets/screenshots/web-dark.png" alt="Web, dark theme"> | <img src="assets/screenshots/insights-dark.png" alt="Insights, dark theme"> |
+
+| Flows | Graphs | Settings |
+| :---: | :---: | :---: |
+| <img src="assets/screenshots/flows-dark.png" alt="Flows, dark theme"> | <img src="assets/screenshots/graphs-dark.png" alt="Graphs, dark theme"> | <img src="assets/screenshots/settings-dark.png" alt="Settings, dark theme"> |
 
 <details>
 <summary>Light theme</summary>
 
-| Overview | Packets | Map |
+| Overview | Packets | Hosts |
 | :---: | :---: | :---: |
-| <img src="assets/screenshots/overview-light.png" alt="Overview, light theme"> | <img src="assets/screenshots/packets-light.png" alt="Packets, light theme"> | <img src="assets/screenshots/map-light.png" alt="Map, light theme"> |
+| <img src="assets/screenshots/overview-light.png" alt="Overview, light theme"> | <img src="assets/screenshots/packets-light.png" alt="Packets, light theme"> | <img src="assets/screenshots/hosts-light.png" alt="Hosts, light theme"> |
 
-| Web | Flows | Graphs |
+| Map | Web | Insights |
 | :---: | :---: | :---: |
-| <img src="assets/screenshots/web-light.png" alt="Web, light theme"> | <img src="assets/screenshots/flows-light.png" alt="Flows, light theme"> | <img src="assets/screenshots/graphs-light.png" alt="Graphs, light theme"> |
+| <img src="assets/screenshots/map-light.png" alt="Map, light theme"> | <img src="assets/screenshots/web-light.png" alt="Web, light theme"> | <img src="assets/screenshots/insights-light.png" alt="Insights, light theme"> |
+
+| Flows | Graphs | Settings |
+| :---: | :---: | :---: |
+| <img src="assets/screenshots/flows-light.png" alt="Flows, light theme"> | <img src="assets/screenshots/graphs-light.png" alt="Graphs, light theme"> | <img src="assets/screenshots/settings-light.png" alt="Settings, light theme"> |
 
 </details>
 
@@ -111,13 +122,15 @@ Environment variables:
 | --- | --- |
 | `SSLKEYLOGFILE` | TLS key log passed to `tshark`, so HTTPS traffic can be decrypted. |
 | `WIRELENS_CONFIG_DIR` | Directory for the preferences file (defaults to the user config directory). |
+| `WIRELENS_GEO_DIR` | Extra folder searched for location databases (`.mmdb`). |
 
 ## What it does
 
 - **Capture**: interface list grouped by type with live rates, capture options (filter,
   promiscuous, snap length, ring buffer, auto-stop), recent files.
 - **Packets**: virtualized packet list that stays responsive with about a million rows, display
-  filter bar with field completion and quick-filter chips, find (string, regex, hex),
+  filter bar with field completion (and, after an operator, the hosts and ports of the capture)
+  plus quick-filter chips, find (string, regex, hex),
   dissection tree with click-to-filter, hex view, custom columns, time formats, bookmarks,
   stream following, export (pcap subsets, CSV, JSON, HTML report).
 - **Overview, Hosts, Conversations**: totals, throughput, protocol mix, top talkers, with an
@@ -128,8 +141,8 @@ Environment variables:
   of encrypted flows.
 - **Flows**: sequence diagram of a conversation, plus TCP time-sequence, throughput, RTT and
   window-size graphs.
-- **Web**: HTTP requests paired with responses (headers, pretty or raw body, image preview,
-  `curl` export) and TLS sessions (SNI, version, cipher, ALPN, JA3 / JA4 fingerprints) for HTTPS;
+- **Web**: HTTP requests paired with responses (headers, pretty or raw JSON, readable HTML,
+  image preview, `curl` export) and TLS sessions (SNI, version, cipher, ALPN, JA3 / JA4 fingerprints) for HTTPS;
   extracted objects.
 - **Insights**: plain-language findings (including port scans, sweeps, beaconing and odd DNS
   names), expert info, protocol hierarchy, DNS log.
@@ -144,6 +157,9 @@ or to add your own MaxMind-format `.mmdb` files (GeoLite2, DB-IP Lite). They are
 `~/.local/share/wirelens/geo`; wirelens also reads the qBittorrent `GeoDB` folder, `/usr/share/GeoIP`
 and the folder named by `WIRELENS_GEO_DIR`. Lookups are offline. The only thing wirelens downloads is
 the file you ask for with the Download button.
+
+The country and network shown in the screenshots come from the DB-IP Lite databases, licensed
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/): IP Geolocation by [DB-IP](https://db-ip.com).
 
 ## Releases
 
@@ -164,8 +180,8 @@ installed separately on Windows and macOS.
 | `wl-panels` | The pages (packets, overview, map, flows, web, settings, ...). |
 | `wl-app` | The `wirelens` binary: window, state, background jobs. |
 
-`tests/fixtures/` holds the small capture files the tests read, `assets/screenshots/` the README
-images, and `assets/logo/` the logo (SVG sources in a blue and a dark version, PNG, `.ico` and
+`tests/fixtures/` holds the small capture files the tests read (with the scripts that write the
+synthetic ones), `assets/screenshots/` the README images (taken on `demo.pcap`), and `assets/logo/` the logo (SVG sources in a blue and a dark version, PNG, `.ico` and
 `.icns` exports, and the GitHub social preview image).
 
 ## Tests
@@ -181,6 +197,9 @@ Tests that need `tshark` or loopback capture rights skip themselves when those a
 - Everything depends on the installed Wireshark version; field names follow `tshark` 4.x.
 - Files over a few hundred thousand packets load quickly but `tshark` itself uses a lot of
   memory on them.
+- The filter suggestions after an operator cover addresses and ports, not names.
+- The findings in Insights are heuristics with fixed thresholds (for example 20 ports for a scan, 8
+  connections for a steady rhythm); expect false positives from polling and keep-alives.
 - HTTP/2 and QUIC handling is best effort. Chunked bodies without a `Content-Length` are
   only partly accounted for.
 - Windows and macOS have not been tried.

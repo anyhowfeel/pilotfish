@@ -5,6 +5,14 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **The Locations page writes your home folder as `~`**, so the folder of the databases reads
+  `~/.local/share/wirelens/geo` instead of a full path.
+- **A richer demo capture and new screenshots.** `tests/fixtures/demo.pcap` now also holds a visitor scanning the NAS, a
+  phone calling an address at a steady rhythm and very long DNS names, so Insights has something to show, and
+  `tests/fixtures/gen_demo_capture.py` writes it. The README shows nine pages instead of six (Hosts with its locations,
+  Insights and the Locations settings were added) in both themes, all taken on that invented network.
+
 ## [0.4.0] - 2026-11-21
 
 ### Added
