@@ -96,10 +96,18 @@ pub fn from_ssh(stderr: &str) -> CaptureError {
     let lower = msg.to_lowercase();
     let has = |needles: &[&str]| needles.iter().any(|n| lower.contains(n));
     let tcpdump = lower.contains("tcpdump");
-    if has(&["permission denied (", "host key verification failed"]) {
+    if has(&[
+        "host key verification failed",
+        "remote host identification has changed",
+    ]) {
+        CaptureError::Permission(format!(
+            "The SSH host key is unknown or has changed. Verify the host's fingerprint \
+             out-of-band before trusting it; do not add it to known_hosts blindly.\n{msg}"
+        ))
+    } else if has(&["permission denied ("]) {
         CaptureError::Permission(format!(
             "SSH authentication failed. Pilotfish never asks for a password: load your key into \
-             ssh-agent or configure key login, and make sure the host is in known_hosts.\n{msg}"
+             ssh-agent or configure key login.\n{msg}"
         ))
     } else if has(&[
         "a password is required",
@@ -222,7 +230,12 @@ mod tests {
                 "permission",
                 "authentication",
             ),
-            ("Host key verification failed.", "permission", "known_hosts"),
+            ("Host key verification failed.", "permission", "out-of-band"),
+            (
+                "WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!",
+                "permission",
+                "has changed",
+            ),
             ("sudo: a password is required", "permission", "NOPASSWD"),
             ("bash: tcpdump: command not found", "other", "not installed"),
             ("sh: 1: tcpdump: not found", "other", "not installed"),

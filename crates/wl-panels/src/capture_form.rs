@@ -1,7 +1,8 @@
 //! Capture > Options form, shared by the Setup page and the Settings dialog (one code path).
 //! Interface selection and the capture filter live on the Setup page; everything else is here.
 
-use wl_kit::egui::Ui;
+use wl_kit::egui::{RichText, Ui};
+use wl_kit::theme::Palette;
 use wl_kit::widgets::{number_row, settings_card, text_row, toggle_row};
 use wl_model::{CaptureOptions, RemoteTarget, SNAPLEN_MAX};
 
@@ -132,6 +133,15 @@ fn remote_card(ui: &mut Ui, r: &mut RemoteTarget, changed: &mut bool) {
             "Runs `sudo -n tcpdump`; the account needs passwordless sudo for it.",
             &mut r.sudo,
         );
+        ui.add_space(4.0);
+        ui.label(
+            RichText::new(
+                "Ring buffer, size and duration auto-stop do not apply to remote captures.",
+            )
+            .small()
+            .color(Palette::muted()),
+        );
+        ui.add_space(4.0);
     });
 }
 
