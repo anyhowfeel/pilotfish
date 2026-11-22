@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use wl_model::CaptureBackend;
+use wl_model::{CaptureBackend, StreamKind};
 use wl_tshark::TsharkBackend;
 
 fn fixture(name: &str) -> PathBuf {
@@ -85,5 +85,100 @@ fn tls12_sessions_carry_the_parsed_certificate_chain() {
         later
             .iter()
             .any(|f| f.warning == wl_model::CertWarning::Expired)
+    );
+}
+
+fn streams() -> Option<Vec<wl_model::MessageStream>> {
+    let b = TsharkBackend::new().ok()?;
+    b.set_tls_keylog(None);
+    Some(
+        b.message_streams(&fixture("web-streams.pcap"))
+            .expect("message_streams"),
+    )
+}
+
+fn view(s: &wl_model::MessageStream) -> Vec<(wl_model::MsgDir, &str, &str)> {
+    s.messages
+        .iter()
+        .map(|m| (m.dir, m.label.as_str(), m.payload.as_str()))
+        .collect()
+}
+
+#[test]
+fn fixture_yields_one_stream_of_each_kind() {
+    let Some(all) = streams() else { return };
+    let kinds: Vec<_> = all.iter().map(|s| s.kind).collect();
+    assert_eq!(
+        kinds,
+        [StreamKind::WebSocket, StreamKind::Sse, StreamKind::Grpc],
+        "{all:#?}"
+    );
+}
+
+#[test]
+fn websocket_timeline_has_directions_opcodes_and_payloads() {
+    use wl_model::MsgDir::{ToClient, ToServer};
+    let Some(all) = streams() else { return };
+    let ws = &all[0];
+    assert_eq!((ws.host.as_str(), ws.target.as_str()), ("ws.test", "/chat"));
+    assert_eq!(
+        view(ws),
+        [
+            (ToServer, "text", "hello server"),
+            (ToClient, "text", "{\"reply\":\"hello client\"}"),
+            (ToServer, "ping", "70 69 6e 67"),
+            (ToClient, "pong", "70 69 6e 67"),
+            (ToClient, "binary", "01 02 03 04"),
+            (ToServer, "close", "code 1000"),
+            (ToClient, "close", "code 1000"),
+        ]
+    );
+    assert_eq!(ws.status, "closed 1000");
+}
+
+#[test]
+fn sse_events_are_split_with_names_ids_and_comments() {
+    use wl_model::MsgDir::ToClient;
+    let Some(all) = streams() else { return };
+    let sse = &all[1];
+    assert_eq!(
+        (sse.host.as_str(), sse.target.as_str(), sse.status.as_str()),
+        ("sse.test", "/events", "200")
+    );
+    assert_eq!(
+        view(sse),
+        [
+            (ToClient, "message", "welcome"),
+            (ToClient, "tick #1", "{\"n\":1}"),
+            (ToClient, "tick #2", "{\"n\":2}"),
+            (ToClient, "comment", "keep-alive"),
+            (ToClient, "message", "line one line two"),
+        ]
+    );
+    let frames: Vec<_> = sse.messages.iter().map(|m| m.frame).collect();
+    assert!(
+        frames.windows(2).all(|w| w[0] < w[1]),
+        "per-segment timing: {frames:?}"
+    );
+}
+
+#[test]
+fn grpc_call_shows_method_messages_and_status() {
+    use wl_model::MsgDir::{ToClient, ToServer};
+    let Some(all) = streams() else { return };
+    let g = &all[2];
+    assert_eq!(
+        (g.host.as_str(), g.target.as_str(), g.status.as_str()),
+        ("grpc.test:50051", "/helloworld.Greeter/SayHello", "0 OK")
+    );
+    assert_eq!(
+        view(g),
+        [
+            (ToServer, "request", "/helloworld.Greeter/SayHello"),
+            (ToServer, "message", "world"),
+            (ToClient, "response", "HTTP 200"),
+            (ToClient, "message", "Hello world"),
+            (ToClient, "trailers", "grpc-status 0 OK OK"),
+        ]
     );
 }

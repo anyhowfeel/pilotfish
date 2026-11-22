@@ -38,6 +38,10 @@ mod json_ordered;
 pub mod keylog;
 mod keys_embed;
 mod live;
+mod msg_group;
+mod msg_preview;
+mod msg_rows;
+mod msg_scan;
 pub mod netinfo;
 mod object_names;
 pub mod objects;
@@ -50,6 +54,7 @@ mod process;
 mod pump;
 mod ring;
 mod row_parser;
+mod sse;
 mod tcp_scan;
 mod tls_merge;
 mod tls_names;
@@ -65,7 +70,7 @@ use tempfile::TempDir;
 use wl_model::{
     CaptureBackend, CaptureError, CaptureOptions, CaptureProperties, CaptureSource, Channel,
     DecodeAs, DnsQuery, FlowEvents, FrameDetail, FrameFields, HttpDetail, HttpExchange, Interface,
-    IoGraph, IoSpec, ObjectSet, Session, TcpSamples, TlsSession,
+    IoGraph, IoSpec, MessageStream, ObjectSet, Session, TcpSamples, TlsSession,
 };
 
 use process::Tools;
@@ -158,6 +163,10 @@ impl CaptureBackend for TsharkBackend {
             ex,
             &self.dissect_opts(),
         )
+    }
+
+    fn message_streams(&self, file: &Path) -> Result<Vec<MessageStream>, CaptureError> {
+        msg_scan::message_streams(&self.tools, file, &self.dissect_opts())
     }
 
     fn flow_events(&self, file: &Path, filter: &str) -> Result<FlowEvents, CaptureError> {

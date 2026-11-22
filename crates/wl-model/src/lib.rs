@@ -10,6 +10,7 @@ mod detail;
 mod extras;
 mod flow;
 mod io_graph;
+mod msg_stream;
 mod packet;
 mod stats;
 mod sysinfo;
@@ -27,6 +28,7 @@ pub use detail::{DetailNode, FrameDetail};
 pub use extras::{DecodeAs, DnsQuery, ExportObject, ObjectSet, Rcode, sanitize_filename};
 pub use flow::{FlowEvent, FlowEvents, FlowFlags, FlowSel, MAX_FLOW_EVENTS};
 pub use io_graph::{CaptureProperties, DeltaStat, InterfaceInfo, IoGraph, IoSeries, IoSpec};
+pub use msg_stream::{MessageStream, MsgDir, StreamKind, StreamMessage, grpc_status_name};
 pub use packet::{Direction, FlowKey, PacketRow, Transport, is_encrypted_protocol};
 pub use stats::{
     ConversationStat, HostEdge, HostStat, ProtocolStat, RatePoint, StatsSnapshot, rebin,
