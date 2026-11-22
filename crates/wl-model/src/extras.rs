@@ -67,6 +67,18 @@ impl Rcode {
         }
     }
 
+    pub fn code(self) -> u8 {
+        match self {
+            Rcode::NoError => 0,
+            Rcode::FormErr => 1,
+            Rcode::ServFail => 2,
+            Rcode::NxDomain => 3,
+            Rcode::NotImp => 4,
+            Rcode::Refused => 5,
+            Rcode::Other(n) => n,
+        }
+    }
+
     pub fn label(self) -> String {
         match self {
             Rcode::NoError => "NOERROR".into(),

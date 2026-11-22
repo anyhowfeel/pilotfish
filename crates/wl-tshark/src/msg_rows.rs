@@ -2,11 +2,11 @@
 //! gRPC messages). Multi-valued fields arrive joined by `SEP`.
 
 use crate::cert_parse::hex_to_bytes;
-use crate::tsv_pass::columns;
+use crate::tsv_pass::{columns, flag};
 
 pub const SEP: char = '\u{1f}';
 
-pub const FIELDS: [&str; 24] = [
+pub const FIELDS: [&str; 28] = [
     "frame.number",
     "frame.time_relative",
     "tcp.stream",
@@ -31,6 +31,10 @@ pub const FIELDS: [&str; 24] = [
     "grpc.message_length",
     "grpc.compressed_flag",
     "grpc.message_data",
+    "http.accept",
+    "tls.record.content_type",
+    "websocket.fin",
+    "http2.rst_stream.error",
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -39,6 +43,8 @@ pub struct WsFrame {
     pub masked: bool,
     pub payload: Vec<u8>,
     pub close_code: Option<u16>,
+    /// Last fragment of its message.
+    pub fin: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -49,6 +55,10 @@ pub enum H2Frame {
     },
     Data {
         stream_id: u32,
+    },
+    Reset {
+        stream_id: u32,
+        error: u32,
     },
 }
 
@@ -72,6 +82,10 @@ pub struct Row {
     pub code: Option<u16>,
     pub content_type: String,
     pub upgrade: bool,
+    /// The request accepts `text/event-stream`.
+    pub accepts_sse: bool,
+    /// Carried by TLS (decrypted): the raw segments are ciphertext.
+    pub tls: bool,
     pub ws: Vec<WsFrame>,
     pub h2: Vec<H2Frame>,
     pub grpc: Vec<GrpcMsg>,
@@ -105,28 +119,27 @@ fn aligned<T: Clone + Default>(values: Vec<T>, frames: usize) -> Vec<T> {
 
 fn ws_frames(f: &[&str]) -> Vec<WsFrame> {
     let opcodes: Vec<u8> = nums(f[12]);
-    let masks: Vec<bool> = list(f[13])
-        .into_iter()
-        .map(|m| m.eq_ignore_ascii_case("true") || m == "1")
-        .collect();
+    let masks: Vec<bool> = list(f[13]).into_iter().map(flag).collect();
     let payloads: Vec<Vec<u8>> = list(f[14])
         .into_iter()
         .map(|h| hex_to_bytes(h).unwrap_or_default())
         .collect();
     let mut closes = nums::<u16>(f[15]).into_iter();
-    let (masks, payloads) = (
-        aligned(masks, opcodes.len()),
-        aligned(payloads, opcodes.len()),
-    );
+    let n = opcodes.len();
+    let fins: Vec<bool> = list(f[26]).into_iter().map(flag).collect();
+    let fins = if fins.len() == n { fins } else { vec![true; n] };
+    let (masks, payloads) = (aligned(masks, n), aligned(payloads, n));
     opcodes
         .into_iter()
         .zip(masks)
         .zip(payloads)
-        .map(|((opcode, masked), payload)| WsFrame {
+        .zip(fins)
+        .map(|(((opcode, masked), payload), fin)| WsFrame {
             opcode,
             masked,
             payload,
             close_code: if opcode == 8 { closes.next() } else { None },
+            fin,
         })
         .collect()
 }
@@ -137,6 +150,7 @@ fn h2_frames(f: &[&str]) -> Vec<H2Frame> {
     let mut counts = nums::<usize>(f[18]).into_iter();
     let mut names = list(f[19]).into_iter();
     let mut values = list(f[20]).into_iter();
+    let mut errors = nums::<u32>(f[27]).into_iter();
     ids.into_iter()
         .zip(types)
         .filter_map(|(stream_id, kind)| match kind {
@@ -150,6 +164,10 @@ fn h2_frames(f: &[&str]) -> Vec<H2Frame> {
                     .collect();
                 Some(H2Frame::Headers { stream_id, headers })
             }
+            3 => Some(H2Frame::Reset {
+                stream_id,
+                error: errors.next().unwrap_or(0),
+            }),
             _ => None,
         })
         .collect()
@@ -188,6 +206,8 @@ pub fn parse_line(line: &str) -> Option<Row> {
         code: f[9].trim().parse().ok(),
         content_type: f[10].to_owned(),
         upgrade: !f[11].is_empty(),
+        accepts_sse: f[24].contains("text/event-stream"),
+        tls: !f[25].is_empty(),
         ws: ws_frames(&f),
         h2: h2_frames(&f),
         grpc: grpc_msgs(&f),
@@ -220,7 +240,8 @@ mod tests {
                 opcode: 1,
                 masked: true,
                 payload: b"hi".to_vec(),
-                close_code: None
+                close_code: None,
+                fin: true
             }]
         );
     }
@@ -274,6 +295,36 @@ mod tests {
         );
         assert_eq!(r.grpc.len(), 1);
         assert_eq!(r.grpc[0].data, b"\x0a\x05world");
+    }
+
+    #[test]
+    fn fragments_and_resets_are_parsed() {
+        let s = SEP.to_string();
+        let join = |v: &[&str]| v.join(&s);
+        let r = parse_line(&line(&[
+            (12, &join(&["1", "0"])),
+            (13, &join(&["True", "True"])),
+            (14, &join(&["6869", "6f6b"])),
+            (26, &join(&["False", "True"])),
+            (16, "1"),
+            (17, "3"),
+            (27, "8"),
+            (24, "text/event-stream"),
+            (25, "23"),
+        ]))
+        .expect("row");
+        assert_eq!(
+            r.ws.iter().map(|w| w.fin).collect::<Vec<_>>(),
+            [false, true]
+        );
+        assert_eq!(
+            r.h2,
+            [H2Frame::Reset {
+                stream_id: 1,
+                error: 8
+            }]
+        );
+        assert!(r.accepts_sse && r.tls);
     }
 
     #[test]

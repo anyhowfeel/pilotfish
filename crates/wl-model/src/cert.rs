@@ -26,6 +26,8 @@ pub enum CertWarning {
     Expired,
     NotYetValid,
     HostnameMismatch,
+    WeakKey,
+    NoAltNames,
 }
 
 impl CertWarning {
@@ -35,6 +37,8 @@ impl CertWarning {
             CertWarning::Expired => "Expired",
             CertWarning::NotYetValid => "Not yet valid",
             CertWarning::HostnameMismatch => "Name mismatch",
+            CertWarning::WeakKey => "Weak RSA key",
+            CertWarning::NoAltNames => "No alt names (CN only)",
         }
     }
 }
@@ -68,6 +72,16 @@ impl CertInfo {
         }
     }
 
+    /// RSA keys below 2048 bits; other key types are not judged.
+    pub fn has_weak_key(&self) -> bool {
+        let mut words = self.key.split_whitespace();
+        words.next() == Some("RSA")
+            && words
+                .next()
+                .and_then(|bits| bits.parse::<u32>().ok())
+                .is_some_and(|bits| bits < 2048)
+    }
+
     /// RFC 6125 matching: the SANs when present, the common name otherwise.
     pub fn matches_host(&self, host: &str) -> bool {
         let host = host.trim_end_matches('.').to_ascii_lowercase();
@@ -91,22 +105,53 @@ fn name_matches(pattern: &str, host: &str) -> bool {
     }
 }
 
-/// Problems of a chain as presented for `host` (the SNI; empty skips the name check) at `now`.
-pub fn evaluate(chain: &[CertInfo], host: &str, now: i64) -> Vec<CertFinding> {
+/// Problems of a chain as presented for `host` (the SNI; empty skips the name check) at `at`.
+pub fn evaluate(chain: &[CertInfo], host: &str, at: i64) -> Vec<CertFinding> {
     let mut out = Vec::new();
     for (depth, cert) in chain.iter().enumerate() {
         let mut add = |warning| out.push(CertFinding { depth, warning });
         if depth == 0 && cert.is_self_signed() {
             add(CertWarning::SelfSigned);
         }
-        if let Some(w) = cert.validity_warning(now) {
+        if let Some(w) = cert.validity_warning(at) {
             add(w);
         }
         if depth == 0 && !host.is_empty() && !cert.matches_host(host) {
             add(CertWarning::HostnameMismatch);
         }
+        if cert.has_weak_key() {
+            add(CertWarning::WeakKey);
+        }
+        if depth == 0 && !cert.is_ca && cert.sans.is_empty() {
+            add(CertWarning::NoAltNames);
+        }
     }
     out
+}
+
+/// Findings when the certificates were presented, and the validity findings that only hold now.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Assessment {
+    pub at_capture: Vec<CertFinding>,
+    pub only_now: Vec<CertFinding>,
+}
+
+/// Judges the chain at `captured_at` (a certificate that expired later was fine then); without
+/// a capture time `now` is the reference and `only_now` stays empty.
+pub fn assess(chain: &[CertInfo], host: &str, captured_at: Option<i64>, now: i64) -> Assessment {
+    let at_capture = evaluate(chain, host, captured_at.unwrap_or(now));
+    let only_now = match captured_at {
+        Some(_) => evaluate(chain, host, now)
+            .into_iter()
+            .filter(|f| matches!(f.warning, CertWarning::Expired | CertWarning::NotYetValid))
+            .filter(|f| !at_capture.contains(f))
+            .collect(),
+        None => Vec::new(),
+    };
+    Assessment {
+        at_capture,
+        only_now,
+    }
 }
 
 /// "2026-11-20" from epoch seconds (UTC).
@@ -224,5 +269,42 @@ mod tests {
         assert_eq!(date_label(0), "1970-01-01");
         assert_eq!(date_label(1_795_194_348), "2026-11-20");
         assert_eq!(date_label(951_782_400), "2000-02-29");
+    }
+
+    #[test]
+    fn weak_rsa_keys_and_missing_alt_names_are_flagged() {
+        let mut leaf = cert("CN=a.test", "CN=CA", &[]);
+        leaf.key = "RSA 1024 bit".into();
+        assert_eq!(
+            warnings(&[leaf.clone()], "", 1_500),
+            [(0, CertWarning::WeakKey), (0, CertWarning::NoAltNames)]
+        );
+        leaf.key = "EC P-256".into();
+        leaf.sans = vec!["a.test".into()];
+        assert!(warnings(&[leaf.clone()], "a.test", 1_500).is_empty());
+        let mut ca = cert("CN=CA", "CN=Root", &[]);
+        ca.is_ca = true;
+        ca.key = "RSA 4096 bit".into();
+        assert!(warnings(&[leaf, ca], "a.test", 1_500).is_empty());
+    }
+
+    #[test]
+    fn validity_is_judged_at_capture_time_and_now() {
+        let chain = [cert("CN=a.test", "CN=CA", &["a.test"])];
+        let a = assess(&chain, "a.test", Some(1_500), 3_000);
+        assert!(a.at_capture.is_empty());
+        assert_eq!(
+            a.only_now,
+            [CertFinding {
+                depth: 0,
+                warning: CertWarning::Expired
+            }]
+        );
+        let late = assess(&chain, "a.test", Some(2_500), 3_000);
+        assert_eq!(late.at_capture.len(), 1);
+        assert!(late.only_now.is_empty());
+        let unknown = assess(&chain, "a.test", None, 3_000);
+        assert_eq!(unknown.at_capture.len(), 1);
+        assert!(unknown.only_now.is_empty());
     }
 }

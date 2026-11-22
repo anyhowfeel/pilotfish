@@ -31,6 +31,7 @@ fn ws(frame: u64, src: &str, opcode: u8, masked: bool, payload: &[u8]) -> Row {
             masked,
             payload: payload.to_vec(),
             close_code: (opcode == 8).then_some(1000),
+            fin: true,
         }],
         ..row(frame, src)
     }
@@ -74,7 +75,7 @@ fn websocket_frames_become_one_stream_with_directions() {
         ]
     );
     assert_eq!(s.status, "closed 1000");
-    assert_eq!((s.sent(), s.received()), (2, 2));
+    assert_eq!((s.sent(), s.received()), (1, 2));
 }
 
 #[test]
@@ -226,6 +227,7 @@ fn event_stream_responses_are_collected_for_decoding() {
         method: "GET".into(),
         host: "sse.test".into(),
         uri: "/events".into(),
+        accepts_sse: true,
         ..row(19, CLIENT)
     };
     let resp = Row {
@@ -242,9 +244,80 @@ fn event_stream_responses_are_collected_for_decoding() {
         (
             t.id,
             t.target.as_str(),
-            t.server.as_str(),
-            t.status.as_str()
+            t.server_port,
+            t.status.as_str(),
+            t.confirmed
         ),
-        (19, "/events", SERVER, "200")
+        (19, "/events", Some(8080), "200", true)
     );
+}
+
+#[test]
+fn a_request_alone_makes_an_unconfirmed_event_stream_target() {
+    let req = Row {
+        method: "GET".into(),
+        host: "sse.test".into(),
+        uri: "/open".into(),
+        accepts_sse: true,
+        ..row(4, CLIENT)
+    };
+    let (_, sse) = run(&[req]);
+    let [t] = sse.as_slice() else {
+        panic!("{sse:?}")
+    };
+    assert!(!t.confirmed);
+    assert!(t.is_server_port(8080) && !t.is_server_port(50000));
+}
+
+#[test]
+fn grpc_counts_messages_not_bookkeeping_rows() {
+    let (streams, _) = run(&grpc_call());
+    assert_eq!((streams[0].sent(), streams[0].received()), (1, 1));
+}
+
+#[test]
+fn rst_stream_cancels_an_open_call_but_not_a_finished_one() {
+    let reset = |frame, sid| Row {
+        h2: vec![H2Frame::Reset {
+            stream_id: sid,
+            error: 8,
+        }],
+        ..row(frame, CLIENT)
+    };
+    let mut rows = grpc_call();
+    rows.push(reset(50, 1));
+    let open = headers(
+        60,
+        CLIENT,
+        3,
+        &[
+            (":method", "POST"),
+            (":path", "/svc/Slow"),
+            ("content-type", "application/grpc"),
+        ],
+    );
+    rows.extend([open, reset(61, 3)]);
+    let (mut streams, _) = run(&rows);
+    streams.sort_by_key(|s| s.id);
+    assert_eq!(streams[0].status, "0 OK");
+    assert_eq!(streams[1].status, "cancelled");
+}
+
+#[test]
+fn fragmented_websocket_messages_count_once() {
+    let frag = |frame, src, opcode, fin: bool, payload: &[u8]| {
+        let mut r = ws(frame, src, opcode, true, payload);
+        r.ws[0].fin = fin;
+        r
+    };
+    let (streams, _) = run(&[
+        upgrade(3),
+        frag(4, CLIENT, 1, false, b"hel"),
+        ws(5, CLIENT, 9, true, b""),
+        frag(6, CLIENT, 0, true, b"lo"),
+    ]);
+    let s = &streams[0];
+    let texts: Vec<_> = s.messages.iter().map(|m| m.payload.as_str()).collect();
+    assert_eq!(texts, ["", "hello"]);
+    assert_eq!((s.sent(), s.received()), (1, 0));
 }

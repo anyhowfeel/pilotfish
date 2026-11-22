@@ -35,6 +35,18 @@ pub struct StreamMessage {
     /// Single-line preview of the payload.
     pub payload: String,
     pub bytes: u64,
+    /// Protocol bookkeeping (gRPC request / response headers, trailers, reset; WebSocket ping,
+    /// pong, close; SSE comments) rather than a message.
+    #[serde(default)]
+    pub control: bool,
+}
+
+/// Labels of the bookkeeping rows that are not messages.
+pub fn is_control_label(label: &str) -> bool {
+    matches!(
+        label,
+        "ping" | "pong" | "close" | "request" | "response" | "trailers" | "reset" | "comment"
+    )
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -47,7 +59,8 @@ pub struct MessageStream {
     /// Request path, or `/package.Service/Method` for gRPC.
     pub target: String,
     pub start_rel: f64,
-    /// gRPC status, WebSocket close code or HTTP status; empty while open.
+    /// gRPC status or `cancelled`, WebSocket close code, or HTTP status (`open` appended while an
+    /// event stream has not ended); empty while a call or socket is open.
     pub status: String,
     pub messages: Vec<StreamMessage>,
 }
@@ -62,7 +75,10 @@ impl MessageStream {
     }
 
     fn count(&self, dir: MsgDir) -> usize {
-        self.messages.iter().filter(|m| m.dir == dir).count()
+        self.messages
+            .iter()
+            .filter(|m| m.dir == dir && !m.control)
+            .count()
     }
 }
 
@@ -113,6 +129,7 @@ mod tests {
             label: String::new(),
             payload: String::new(),
             bytes: 0,
+            control: false,
         };
         let s = MessageStream {
             id: 1,

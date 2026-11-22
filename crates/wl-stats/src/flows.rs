@@ -14,6 +14,7 @@ struct Flow {
     /// Per-protocol packet counts (tiny: flows rarely see >3 protocols).
     protos: Vec<(Arc<str>, u64)>,
     dominant: usize,
+    server_port: Option<u16>,
 }
 
 impl Flow {
@@ -25,11 +26,15 @@ impl Flow {
             last: row.rel,
             protos: vec![(row.protocol.clone(), 0)],
             dominant: 0,
+            server_port: None,
         }
     }
 
     fn add(&mut self, row: &PacketRow) {
         self.packets += 1;
+        if self.server_port.is_none() && row.info.contains("[SYN, ACK]") {
+            self.server_port = row.src_port;
+        }
         self.bytes += u64::from(row.len);
         self.first = self.first.min(row.rel);
         self.last = self.last.max(row.rel);
@@ -78,6 +83,7 @@ impl FlowTable {
             first_rel: f.first,
             last_rel: f.last,
             protocol: f.protos[f.dominant].0.clone(),
+            server_port: f.server_port,
         })
         .collect()
     }

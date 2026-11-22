@@ -174,3 +174,13 @@ fn perf_one_million_rows() {
     assert_eq!(e.snapshot(10).total_packets, 1_000_000);
     assert!(dt.as_secs_f64() < 1.0, "too slow: {dt:?}");
 }
+
+#[test]
+fn syn_ack_sender_is_the_conversation_server() {
+    let mut e = StatsEngine::new();
+    e.ingest(&row("10.0.0.1", 40001, "10.0.0.9", 50051, "TCP", 60, 0.0));
+    let mut synack = row("10.0.0.9", 50051, "10.0.0.1", 40001, "TCP", 60, 0.1);
+    synack.info = Arc::from("50051 \u{2192} 40001 [SYN, ACK] Seq=0 Ack=1");
+    e.ingest(&synack);
+    assert_eq!(e.snapshot(10).conversations[0].server_port, Some(50051));
+}

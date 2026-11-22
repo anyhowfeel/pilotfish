@@ -27,14 +27,19 @@ pub use backend::{
 };
 pub use behavior::{BehaviorData, Channel, ChannelKind, Proto};
 pub use capture_options::{AutoStop, CaptureOptions, RingBuffer, SNAPLEN_MAX};
-pub use cert::{CertFinding, CertInfo, CertWarning, date_label, evaluate as evaluate_chain};
+pub use cert::{
+    Assessment, CertFinding, CertInfo, CertWarning, assess as assess_chain, date_label,
+    evaluate as evaluate_chain,
+};
 pub use credential::{CredKind, Credential, SecurityData, mask};
 pub use detail::{DetailNode, FrameDetail};
 pub use extras::{DecodeAs, DnsQuery, ExportObject, ObjectSet, Rcode, sanitize_filename};
 pub use flow::{FlowEvent, FlowEvents, FlowFlags, FlowSel, MAX_FLOW_EVENTS};
 pub use intel::{Fingerprint, Indicator, ThreatIntel};
 pub use io_graph::{CaptureProperties, DeltaStat, InterfaceInfo, IoGraph, IoSeries, IoSpec};
-pub use msg_stream::{MessageStream, MsgDir, StreamKind, StreamMessage, grpc_status_name};
+pub use msg_stream::{
+    MessageStream, MsgDir, StreamKind, StreamMessage, grpc_status_name, is_control_label,
+};
 pub use packet::{Direction, FlowKey, PacketRow, Transport, is_encrypted_protocol};
 pub use procmap::{
     ProcessInfo, ProcessMap, SockProto, SocketEntry, parse_proc_net, socket_inode, summarize,

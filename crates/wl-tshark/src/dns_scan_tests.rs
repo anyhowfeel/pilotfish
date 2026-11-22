@@ -89,3 +89,21 @@ fn orphan_response_gets_a_row() {
     assert_eq!(b.out[0].rcode, Some(Rcode::ServFail));
     assert!((b.out[0].rel - 0.5).abs() < 1e-9);
 }
+
+#[test]
+fn only_answer_section_records_are_kept() {
+    let mut b = Builder::default();
+    b.push(&line(&[(0, "1"), (6, "False"), (8, "a.test"), (9, "1")]));
+    b.push(&line(&[
+        (0, "2"),
+        (6, "True"),
+        (7, "0"),
+        (8, "a.test"),
+        (9, "1"),
+        (10, "1"),
+        (13, "1.1.1.1,9.9.9.9"),
+        (19, "1"),
+        (20, "1,1"),
+    ]));
+    assert_eq!(b.out[0].answers, ["1.1.1.1"]);
+}

@@ -201,7 +201,7 @@ fn comments_round_trip_through_a_new_pcapng() {
     b.save_with_comments(&src, &notes, &out).expect("write");
     assert_eq!(
         b.packet_comments(&out).expect("read back"),
-        [bm(3, "first: handshake"), bm(5, "two lines")]
+        [bm(3, "first: handshake"), bm(5, "two\nlines")]
     );
     assert!(b.packet_comments(&src).expect("untouched").is_empty());
 }
@@ -260,4 +260,23 @@ fn embedding_fails_when_no_key_belongs_to_the_capture() {
     let out = dir.path().join("out.pcapng");
     assert!(b.embed_tls_keys(&fixture("web-tls.pcapng"), &out).is_err());
     assert!(!out.exists());
+}
+
+#[test]
+fn every_comment_of_a_packet_survives_a_save() {
+    let Some(b) = backend() else { return };
+    let src = fixture("comments-multi.pcapng");
+    let read = b.packet_comments(&src).expect("read");
+    assert_eq!(
+        read,
+        [
+            bm(1, "first note\n\nsecond\nnote with\ttab"),
+            bm(2, "only one"),
+            bm(3, "back\\slash \"q\""),
+        ]
+    );
+    let dir = tempfile::tempdir().expect("tempdir");
+    let out = dir.path().join("copy.pcapng");
+    b.save_with_comments(&src, &read, &out).expect("write");
+    assert_eq!(b.packet_comments(&out).expect("read back"), read);
 }

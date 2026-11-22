@@ -17,6 +17,11 @@ enum Chunk {
     Done,
 }
 
+/// Bounds against hostile or non-SSE payloads: nothing buffered grows past these.
+const MAX_HEAD: usize = 16 * 1024;
+const MAX_LINE: usize = 64 * 1024;
+const MAX_DATA: usize = 64 * 1024;
+
 #[derive(Debug, Default)]
 pub struct SseDecoder {
     head: Vec<u8>,
@@ -25,6 +30,9 @@ pub struct SseDecoder {
     line: Vec<u8>,
     block: SseEvent,
     block_open: bool,
+    event_stream: bool,
+    rejected: bool,
+    terminated: bool,
 }
 
 fn is_chunked(head: &[u8]) -> bool {
@@ -38,6 +46,9 @@ impl SseDecoder {
     pub fn push(&mut self, bytes: &[u8]) -> Vec<SseEvent> {
         let mut out = Vec::new();
         for &b in bytes {
+            if self.rejected {
+                break;
+            }
             if self.in_body {
                 self.body_byte(b, &mut out);
                 continue;
@@ -45,10 +56,41 @@ impl SseDecoder {
             self.head.push(b);
             if self.head.ends_with(b"\r\n\r\n") {
                 self.in_body = true;
+                self.event_stream = String::from_utf8_lossy(&self.head)
+                    .to_ascii_lowercase()
+                    .contains("content-type: text/event-stream");
+                self.rejected = !self.event_stream;
                 self.chunk = is_chunked(&self.head).then(|| Chunk::Size(Vec::new()));
+            } else if self.head.len() > MAX_HEAD {
+                self.rejected = true;
             }
         }
         out
+    }
+
+    /// The server closed its half: a stream that is not chunked ends here.
+    pub fn server_closed(&mut self) {
+        self.terminated |= self.chunk.is_none();
+    }
+
+    /// True once a response head with `Content-Type: text/event-stream` was seen.
+    pub fn is_event_stream(&self) -> bool {
+        self.event_stream
+    }
+
+    /// HTTP status of the response head.
+    pub fn status(&self) -> Option<u16> {
+        let line = self.head.split(|&b| b == b'\r').next()?;
+        String::from_utf8_lossy(line)
+            .split(' ')
+            .nth(1)?
+            .parse()
+            .ok()
+    }
+
+    /// No terminating chunk or close was seen: the capture ends mid-stream.
+    pub fn is_open(&self) -> bool {
+        !self.terminated && !matches!(self.chunk, Some(Chunk::Done))
     }
 
     fn body_byte(&mut self, b: u8, out: &mut Vec<SseEvent>) {
@@ -85,7 +127,9 @@ impl SseDecoder {
 
     fn text_byte(&mut self, b: u8, out: &mut Vec<SseEvent>) {
         if b != b'\n' {
-            self.line.push(b);
+            if self.line.len() < MAX_LINE {
+                self.line.push(b);
+            }
             return;
         }
         let line = String::from_utf8_lossy(&self.line)
@@ -112,7 +156,7 @@ impl SseDecoder {
         match name {
             "event" => self.block.event = Some(value),
             "id" => self.block.id = Some(value),
-            "data" => {
+            "data" if self.block.data.len() < MAX_DATA => {
                 if !self.block.data.is_empty() {
                     self.block.data.push('\n');
                 }
@@ -173,6 +217,43 @@ mod tests {
         let ev = decode(&[HEAD, b"\r\n", b": keep-alive\n\ndata: unfinished\n"]);
         assert_eq!(ev.len(), 1);
         assert_eq!(ev[0].comment.as_deref(), Some("keep-alive"));
+    }
+
+    #[test]
+    fn other_content_types_are_rejected() {
+        let mut d = SseDecoder::default();
+        assert!(
+            d.push(b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\ndata: x\n\n")
+                .is_empty()
+        );
+        assert!(!d.is_event_stream());
+    }
+
+    #[test]
+    fn status_and_openness_follow_the_stream() {
+        let mut d = SseDecoder::default();
+        d.push(&[HEAD, b"\r\n", b"data: a\n\n"].concat());
+        assert_eq!(d.status(), Some(200));
+        assert!(d.is_open());
+        d.server_closed();
+        assert!(!d.is_open());
+        let mut c = SseDecoder::default();
+        c.push(&[HEAD, b"Transfer-Encoding: chunked\r\n\r\n"].concat());
+        c.server_closed();
+        assert!(c.is_open(), "FIN without the final chunk is a cut stream");
+        c.push(b"0\r\n\r\n");
+        assert!(!c.is_open());
+    }
+
+    #[test]
+    fn buffers_are_bounded() {
+        let mut d = SseDecoder::default();
+        d.push(&[HEAD, b"\r\n"].concat());
+        d.push(&vec![b'x'; MAX_LINE * 3]);
+        assert!(d.line.len() <= MAX_LINE);
+        let mut h = SseDecoder::default();
+        h.push(&vec![b'h'; MAX_HEAD * 2]);
+        assert!(h.head.len() <= MAX_HEAD + 1);
     }
 
     #[test]

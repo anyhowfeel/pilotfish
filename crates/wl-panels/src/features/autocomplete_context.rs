@@ -73,7 +73,8 @@ pub fn quoted_insert(expr: &str, a: &Active, text: &str) -> String {
     } else {
         "\""
     };
-    format!("{open}{text}{close}")
+    let escaped = text.replace('\\', "\\\\").replace('"', "\\\"");
+    format!("{open}{escaped}{close}")
 }
 
 /// Token at `cursor_char` and whether it is a field or a value.
@@ -177,5 +178,13 @@ mod tests {
             };
             assert_eq!(quoted_insert(expr, &a, "a.test"), want, "{expr}");
         }
+    }
+
+    #[test]
+    fn quotes_and_backslashes_in_names_are_escaped() {
+        let expr = "dns.qry.name == we";
+        let a = at_end(expr);
+        let name = r#"we"i\rd"#;
+        assert_eq!(quoted_insert(expr, &a, name), r#""we\"i\\rd""#);
     }
 }

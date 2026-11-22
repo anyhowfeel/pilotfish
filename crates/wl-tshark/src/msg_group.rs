@@ -2,22 +2,14 @@
 
 use std::collections::HashMap;
 
-use wl_model::{MessageStream, MsgDir, StreamKind, StreamMessage, grpc_status_name};
+use wl_model::{
+    MessageStream, MsgDir, StreamKind, StreamMessage, grpc_status_name, is_control_label,
+};
 
 use crate::msg_preview as preview;
 use crate::msg_rows::{GrpcMsg, H2Frame, Row, WsFrame};
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct SseTarget {
-    pub stream: u32,
-    pub id: u64,
-    pub host: String,
-    pub target: String,
-    pub start_rel: f64,
-    pub status: String,
-    /// `address:port` of the server, to pick its half of the connection.
-    pub server: String,
-}
+use crate::msg_target::{SseTarget, port_of};
+use crate::msg_ws::{Reassembly, opcode_label, ws_payload};
 
 struct Request {
     frame: u64,
@@ -27,9 +19,13 @@ struct Request {
     upgrade: bool,
 }
 
+/// HTTP/2 error code CANCEL.
+const RST_CANCEL: u32 = 8;
+
 struct Builder {
     stream: MessageStream,
     client: String,
+    fragments: Reassembly,
 }
 
 impl Builder {
@@ -49,6 +45,7 @@ impl Builder {
             label: label.to_owned(),
             payload,
             bytes,
+            control: is_control_label(label),
         });
     }
 }
@@ -59,33 +56,6 @@ pub struct Grouper {
     ws: HashMap<u32, Builder>,
     grpc: HashMap<(u32, u32), Builder>,
     sse: Vec<SseTarget>,
-}
-
-fn opcode_label(op: u8) -> String {
-    match op {
-        0 => "continuation".into(),
-        1 => "text".into(),
-        2 => "binary".into(),
-        8 => "close".into(),
-        9 => "ping".into(),
-        10 => "pong".into(),
-        n => format!("opcode {n}"),
-    }
-}
-
-fn ws_payload(f: &WsFrame) -> String {
-    match f.opcode {
-        1 | 0 => preview::text(&f.payload),
-        8 => {
-            let reason = f.payload.get(2..).map(preview::text).unwrap_or_default();
-            let code = f
-                .close_code
-                .map(|c| format!("code {c}"))
-                .unwrap_or_default();
-            format!("{code} {reason}").trim().to_owned()
-        }
-        _ => preview::hex(&f.payload),
-    }
 }
 
 fn header<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a str> {
@@ -125,6 +95,9 @@ fn message_frames(frames: &[H2Frame], msgs: &[GrpcMsg]) -> Vec<usize> {
 impl Grouper {
     pub fn push(&mut self, row: &Row) {
         if !row.method.is_empty() {
+            if row.accepts_sse {
+                self.sse_request(row);
+            }
             self.requests.insert(
                 row.stream,
                 Request {
@@ -145,26 +118,51 @@ impl Grouper {
         self.http2(row);
     }
 
+    fn sse_request(&mut self, row: &Row) {
+        if self.sse.iter().any(|t| t.stream == row.stream) {
+            return;
+        }
+        self.sse.push(SseTarget {
+            stream: row.stream,
+            id: row.frame,
+            host: row.host.clone(),
+            target: row.uri.clone(),
+            start_rel: row.rel,
+            client_port: port_of(&row.src),
+            tls: row.tls,
+            ..SseTarget::default()
+        });
+    }
+
     fn response(&mut self, row: &Row, code: u16) {
         if !row.content_type.contains("text/event-stream") {
             return;
         }
+        let known = self.sse.iter().position(|t| t.stream == row.stream);
         let req = self.requests.get(&row.stream);
-        self.sse.push(SseTarget {
-            stream: row.stream,
-            id: req.map_or(row.frame, |r| r.frame),
-            host: req.map(|r| r.host.clone()).unwrap_or_default(),
-            target: req.map(|r| r.uri.clone()).unwrap_or_default(),
-            start_rel: req.map_or(row.rel, |r| r.rel),
-            status: code.to_string(),
-            server: row.src.clone(),
-        });
+        let i = known.unwrap_or(self.sse.len());
+        if known.is_none() {
+            self.sse.push(SseTarget {
+                stream: row.stream,
+                id: req.map_or(row.frame, |r| r.frame),
+                host: req.map(|r| r.host.clone()).unwrap_or_default(),
+                target: req.map(|r| r.uri.clone()).unwrap_or_default(),
+                start_rel: req.map_or(row.rel, |r| r.rel),
+                tls: row.tls,
+                ..SseTarget::default()
+            });
+        }
+        let target = &mut self.sse[i];
+        target.status = code.to_string();
+        target.server_port = port_of(&row.src);
+        target.confirmed = true;
     }
 
     fn websocket(&mut self, row: &Row, f: &WsFrame) {
         let req = self.requests.get(&row.stream).filter(|r| r.upgrade);
         let b = self.ws.entry(row.stream).or_insert_with(|| Builder {
             client: String::new(),
+            fragments: Reassembly::default(),
             stream: MessageStream {
                 id: req.map_or(row.frame, |r| r.frame),
                 stream: row.stream,
@@ -181,13 +179,18 @@ impl Grouper {
         } else {
             MsgDir::ToClient
         };
-        b.push(
-            row,
-            dir,
-            &opcode_label(f.opcode),
-            ws_payload(f),
-            f.payload.len() as u64,
-        );
+        if matches!(f.opcode, 0..=2) {
+            let whole = b.fragments.add(row.frame, row.rel, f);
+            b.stream.messages.extend(whole);
+        } else {
+            b.push(
+                row,
+                dir,
+                &opcode_label(f.opcode),
+                ws_payload(f),
+                f.payload.len() as u64,
+            );
+        }
         if f.opcode == 8 && b.stream.status.is_empty() {
             b.stream.status = f
                 .close_code
@@ -202,6 +205,7 @@ impl Grouper {
                 H2Frame::Headers { stream_id, headers } => {
                     self.h2_headers(row, *stream_id, headers)
                 }
+                H2Frame::Reset { stream_id, error } => self.h2_reset(row, *stream_id, *error),
                 H2Frame::Data { stream_id } => {
                     for (m, _) in row.grpc.iter().zip(&owners).filter(|(_, o)| **o == fi) {
                         self.h2_message(row, *stream_id, m);
@@ -237,6 +241,7 @@ impl Grouper {
         {
             let mut b = Builder {
                 client: row.src.clone(),
+                fragments: Reassembly::default(),
                 stream: MessageStream {
                     id: row.frame,
                     stream: row.stream,
@@ -265,13 +270,31 @@ impl Grouper {
         }
     }
 
+    fn h2_reset(&mut self, row: &Row, sid: u32, error: u32) {
+        let Some(b) = self.grpc.get_mut(&(row.stream, sid)) else {
+            return;
+        };
+        if b.stream.status.is_empty() {
+            b.stream.status = if error == RST_CANCEL {
+                "cancelled".into()
+            } else {
+                format!("reset (error {error})")
+            };
+        }
+        let dir = b.dir_of(&row.src);
+        b.push(row, dir, "reset", format!("RST_STREAM error {error}"), 0);
+    }
+
     /// Finished WebSocket / gRPC streams and the SSE responses still to be decoded.
     pub fn finish(self) -> (Vec<MessageStream>, Vec<SseTarget>) {
         let streams = self
             .ws
             .into_values()
             .chain(self.grpc.into_values())
-            .map(|b| b.stream)
+            .map(|mut b| {
+                b.stream.messages.extend(b.fragments.drain());
+                b.stream
+            })
             .collect();
         (streams, self.sse)
     }

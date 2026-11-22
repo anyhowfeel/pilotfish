@@ -44,6 +44,7 @@ fn snapshot() -> StatsSnapshot {
             } else {
                 "DHCPv6".into()
             },
+            server_port: None,
         })
         .collect();
     let protocols = [
