@@ -122,7 +122,7 @@ impl WebPanel {
             Some(("tls", n)) => n.parse().ok().map(Sel::Tls),
             Some(("stream", n)) => {
                 self.tab = Tab::Streams;
-                if let Some(id) = n.parse().ok() {
+                if let Ok(id) = n.parse() {
                     self.streams.select(id);
                 }
                 None

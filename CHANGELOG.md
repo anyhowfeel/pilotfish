@@ -5,6 +5,21 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **TLS keys can be loaded from the app.** The Web page has a TLS keys line: pick a key log file, or drop one on the
+  window, and the capture is read again with it, so HTTPS shows up as ordinary HTTP. A dropped file is recognised as a
+  key log by its content, anything else still opens as a capture. Embed into .pcapng saves a copy of the capture that
+  carries the keys (it needs `editcap` and is greyed out without it); the original file is never overwritten.
+- **Certificates can be inspected.** An HTTPS session lists the certificate chain the server sent: subject, issuer,
+  validity dates, alternative names, key type and signature, with warnings for a self-signed, expired, not yet valid
+  or mismatching (against the SNI) certificate. TLS 1.3 chains appear once the keys are loaded.
+- **WebSocket, Server-Sent Events and gRPC have a Streams tab** in Web. Each conversation is one row with its
+  endpoint, message counts and status (WebSocket close code, gRPC status); selecting it shows the timeline of
+  messages with direction, opcode, event name or gRPC call, and a payload preview.
+- **Packet comments of pcapng files are read and written.** Comments stored in a capture become bookmarks when it is
+  opened, and the bookmark bar's Save to .pcapng writes the bookmark comments into a new capture. The HTML report now
+  lists each bookmarked packet with its time, addresses, protocol and info next to your comment.
+
 ### Changed
 - **New screenshots in the README.** It shows nine pages instead of six (Hosts with its locations, Insights and the
   Locations settings were added), in both themes, all taken on an invented home network.

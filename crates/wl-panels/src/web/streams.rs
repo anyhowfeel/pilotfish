@@ -10,10 +10,11 @@ use wl_model::{MessageStream, MsgDir, StreamKind, StreamMessage};
 
 use super::actions::WebAction;
 use super::detail::placeholder;
+use super::table_cells::time_text;
 use crate::packets::split;
 
 const KIND_W: f32 = 92.0;
-const DIR_W: f32 = 28.0;
+const DIR_W: f32 = 44.0;
 const STATUS_W: f32 = 120.0;
 const COUNT_W: f32 = 76.0;
 const TIME_W: f32 = 68.0;
@@ -35,8 +36,8 @@ fn kind_color(kind: StreamKind) -> wl_kit::egui::Color32 {
 
 fn arrow(dir: MsgDir) -> &'static str {
     match dir {
-        MsgDir::ToServer => "\u{2192}",
-        MsgDir::ToClient => "\u{2190}",
+        MsgDir::ToServer => "out",
+        MsgDir::ToClient => "in",
     }
 }
 
@@ -60,14 +61,14 @@ fn list_table(ui: &mut Ui, streams: &[MessageStream], selected: Option<u64>) -> 
             h.col(|ui| header_cell(ui, "Time", true));
             h.col(|ui| header_cell(ui, "Type", false));
             h.col(|ui| header_cell(ui, "Endpoint", false));
-            h.col(|ui| header_cell(ui, "\u{2191} / \u{2193}", true));
+            h.col(|ui| header_cell(ui, "Out / In", true));
             h.col(|ui| header_cell(ui, "Status", false));
         })
         .body(|body| {
             body.rows(row_h(), streams.len(), |mut row| {
                 let s = &streams[row.index()];
                 row.set_selected(selected == Some(s.id));
-                row.col(|ui| num_cell(ui, &format::time_rel(s.start_rel)));
+                row.col(|ui| num_cell(ui, &time_text(s.start_rel)));
                 row.col(|ui| {
                     cell_pad(ui);
                     pill(ui, s.kind.label(), kind_color(s.kind), PillStyle::badge());
@@ -101,7 +102,7 @@ fn timeline(ui: &mut Ui, s: &MessageStream) -> Option<u64> {
         .max_scroll_height(h)
         .header(HEADER_H, |mut h| {
             h.col(|ui| header_cell(ui, "Time", true));
-            h.col(|ui| header_cell(ui, "", false));
+            h.col(|ui| header_cell(ui, "Dir", false));
             h.col(|ui| header_cell(ui, "Event", false));
             h.col(|ui| header_cell(ui, "Payload", false));
             h.col(|ui| header_cell(ui, "Size", true));
@@ -109,7 +110,7 @@ fn timeline(ui: &mut Ui, s: &MessageStream) -> Option<u64> {
         .body(|body| {
             body.rows(row_h(), s.messages.len(), |mut row| {
                 let m: &StreamMessage = &s.messages[row.index()];
-                row.col(|ui| num_cell(ui, &format::time_rel(m.rel)));
+                row.col(|ui| num_cell(ui, &time_text(m.rel)));
                 row.col(|ui| {
                     ui.label(
                         RichText::new(arrow(m.dir))

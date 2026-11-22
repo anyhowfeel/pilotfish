@@ -150,3 +150,33 @@ fn streams_tab_fits_with_and_without_a_selection() {
         }
     }
 }
+
+#[test]
+fn keys_bar_fits_with_a_key_log_loaded() {
+    let (ex, tls) = demo_data();
+    let keys = KeysInfo {
+        file: Some("sslkeys-2026-11-20.log".into()),
+        can_embed: false,
+    };
+    for width in [1000.0_f32, 1600.0] {
+        let mut panel = WebPanel::default();
+        run(width, 640.0, 1.5, Mode::Light, |ui| {
+            let area = ui.max_rect();
+            let d = WebData {
+                rev: 1,
+                exchanges: &ex,
+                tls: &tls,
+                streams: &[],
+                detail: None,
+                status: WebStatus::Ready,
+                keys: &keys,
+            };
+            panel.ui(ui, &d);
+            assert!(
+                area.expand(1.0).contains_rect(ui.min_rect()),
+                "{width}: {:?} outside {area:?}",
+                ui.min_rect()
+            );
+        });
+    }
+}

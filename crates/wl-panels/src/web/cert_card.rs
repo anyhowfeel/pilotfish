@@ -81,8 +81,10 @@ pub fn cert_card(ui: &mut Ui, t: &TlsSession) {
             warnings_row(ui, t, now);
             for (i, cert) in t.certs.iter().enumerate() {
                 let last = i + 1 == t.certs.len();
-                ui.label(RichText::new(role(i, cert, last)).strong());
-                headers_table(ui, &cert_rows(cert, now));
+                ui.push_id(("cert", i), |ui| {
+                    ui.label(RichText::new(role(i, cert, last)).strong());
+                    headers_table(ui, &cert_rows(cert, now));
+                });
             }
             if t.certs.len() == 1 {
                 muted(ui, "Only the server certificate was sent.");
