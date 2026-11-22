@@ -47,6 +47,7 @@ fn tls(sni: &str, ja3: &str, ja4: &str) -> TlsSession {
         cipher: None,
         alpn: None,
         cert_subject: None,
+        certs: Vec::new(),
         ja3: Some(ja3.into()),
         ja4: Some(ja4.into()),
         ja3s: None,

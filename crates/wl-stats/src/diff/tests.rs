@@ -71,6 +71,9 @@ fn tls(name: &str) -> TlsSession {
         src: "10.0.0.1".into(),
         dst: "10.0.0.9".into(),
         bytes: 0,
+        certs: Vec::new(),
+        client: None,
+        threat: None,
     }
 }
 

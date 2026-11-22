@@ -137,6 +137,7 @@ fn session(ja3: Option<&str>, ja4: Option<&str>, sni: &str, dst: &str) -> TlsSes
         cipher: None,
         alpn: None,
         cert_subject: None,
+        certs: Vec::new(),
         ja3: ja3.map(Into::into),
         ja4: ja4.map(Into::into),
         ja3s: None,
