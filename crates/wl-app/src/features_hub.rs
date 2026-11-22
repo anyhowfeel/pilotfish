@@ -9,8 +9,8 @@ use wl_model::{
     ProtocolHierarchy, StatsSnapshot, StreamConversation, StreamFormat, StreamProtocol,
 };
 use wl_panels::features::{
-    BookmarkStore, CommandPalette, FieldCatalog, InsightsAction, InsightsPanel, PaletteAction,
-    PalettePage, StreamView, StreamViewAction, synthesize_insights,
+    BookmarkStore, CommandPalette, FieldCatalog, InsightsAction, InsightsPanel, NameBook,
+    PaletteAction, PalettePage, StreamView, StreamViewAction, synthesize_insights,
 };
 
 use crate::export_data::{write_html_report, write_packets_csv, write_stats_json};
@@ -20,7 +20,7 @@ enum Msg {
     Fields(Arc<FieldCatalog>),
     Stream(Result<StreamConversation, CaptureError>),
     Insights(Option<ExpertReport>, Option<ProtocolHierarchy>),
-    Behavior(BehaviorData),
+    Behavior(BehaviorData, NameBook),
     ExportDone(Result<String, String>),
 }
 
@@ -56,6 +56,8 @@ pub struct FeaturesHub {
     pub expert: Option<ExpertReport>,
     pub phs: Option<ProtocolHierarchy>,
     pub behavior: Option<BehaviorData>,
+    /// Names for the filter suggestions and how many times they were rebuilt.
+    pub names: (Arc<NameBook>, u64),
     tx: Sender<Msg>,
     rx: Receiver<Msg>,
     pub notice: Option<String>,
@@ -86,6 +88,7 @@ impl FeaturesHub {
             expert: None,
             phs: None,
             behavior: None,
+            names: (Arc::default(), 0),
             tx,
             rx,
             notice: None,
@@ -106,6 +109,7 @@ impl FeaturesHub {
         self.expert = None;
         self.phs = None;
         self.behavior = None;
+        self.names = (Arc::default(), self.names.1 + 1);
         self.stream_view.close();
     }
 
@@ -132,12 +136,20 @@ impl FeaturesHub {
             )
         });
         self.spawn_job(&file, &ctx, |b, f| {
-            let (channels, dns) = std::thread::scope(|s| {
+            let (channels, dns, tls, http) = std::thread::scope(|s| {
                 let c = s.spawn(|| b.behavior_channels(f).unwrap_or_default());
+                let t = s.spawn(|| b.tls_sessions(f).unwrap_or_default());
+                let h = s.spawn(|| b.http_exchanges(f).unwrap_or_default());
                 let d = b.dns_queries(f).unwrap_or_default();
-                (c.join().unwrap_or_default(), d)
+                (
+                    c.join().unwrap_or_default(),
+                    d,
+                    t.join().unwrap_or_default(),
+                    h.join().unwrap_or_default(),
+                )
             });
-            Msg::Behavior(BehaviorData { channels, dns })
+            let names = NameBook::build(&dns, &tls, &http);
+            Msg::Behavior(BehaviorData { channels, dns }, names)
         });
     }
 
@@ -176,7 +188,10 @@ impl FeaturesHub {
                     self.expert = e;
                     self.phs = p;
                 }
-                Msg::Behavior(b) => self.behavior = Some(b),
+                Msg::Behavior(b, names) => {
+                    self.behavior = Some(b);
+                    self.names = (Arc::new(names), self.names.1 + 1);
+                }
                 Msg::ExportDone(Ok(n)) => self.notice = Some(n),
                 Msg::ExportDone(Err(e)) => self.error = Some(e),
             }

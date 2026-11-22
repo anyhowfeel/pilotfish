@@ -98,8 +98,8 @@ impl DiffPanel {
                 &[
                     (Show::All, "All"),
                     (Show::Added, "New"),
-                    (Show::Removed, "Missing"),
-                    (Show::Changed, "Changed"),
+                    (Show::Removed, "Gone"),
+                    (Show::Changed, "Diff"),
                 ],
             );
         });

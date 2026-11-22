@@ -61,6 +61,21 @@ fn field_before(before: &str) -> Option<&str> {
     (start < name.len()).then(|| &name[start..])
 }
 
+/// `text` wrapped in the double quotes the expression does not already have around the token.
+pub fn quoted_insert(expr: &str, a: &Active, text: &str) -> String {
+    let open = if expr[..a.start].ends_with('"') {
+        ""
+    } else {
+        "\""
+    };
+    let close = if expr[a.end..].starts_with('"') {
+        ""
+    } else {
+        "\""
+    };
+    format!("{open}{text}{close}")
+}
+
 /// Token at `cursor_char` and whether it is a field or a value.
 pub fn active(expr: &str, cursor_char: usize) -> Active<'_> {
     let cursor = expr
@@ -145,5 +160,22 @@ mod tests {
         let a = active(expr, 14);
         assert_eq!(a.token, "10.0.0.1");
         assert_eq!(&expr[a.start..a.end], "10.0.0.1");
+    }
+
+    #[test]
+    fn quotes_are_added_only_where_missing() {
+        for (expr, want) in [
+            ("http.host == ex", "\"a.test\""),
+            ("http.host == \"ex", "a.test\""),
+            ("http.host == \"ex\"", "a.test"),
+        ] {
+            let a = at_end(expr);
+            let a = if expr.ends_with('"') {
+                active(expr, expr.len() - 1)
+            } else {
+                a
+            };
+            assert_eq!(quoted_insert(expr, &a, "a.test"), want, "{expr}");
+        }
     }
 }

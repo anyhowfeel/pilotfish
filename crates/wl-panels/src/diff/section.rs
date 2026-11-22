@@ -29,8 +29,8 @@ impl Show {
 fn tag(p: Presence) -> (&'static str, wl_kit::egui::Color32) {
     match p {
         Presence::Added => ("new", Palette::ok()),
-        Presence::Removed => ("missing", Palette::danger()),
-        Presence::Changed => ("changed", Palette::warn()),
+        Presence::Removed => ("gone", Palette::danger()),
+        Presence::Changed => ("diff", Palette::warn()),
     }
 }
 

@@ -44,7 +44,7 @@ pub struct App {
     pub(crate) map: TopologyView,
     pub(crate) demo_map: Option<wl_model::StatsSnapshot>,
     /// Size of the stats the filter value suggestions were last built from.
-    pub(crate) values_key: Option<(usize, usize)>,
+    pub(crate) values_key: Option<(usize, usize, u64)>,
     pub(crate) diff: crate::diff_hub::DiffHub,
     pub(crate) web: WebPanel,
     pub(crate) web_link: WebLink,
