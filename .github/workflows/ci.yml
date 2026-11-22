@@ -240,4 +240,4 @@ jobs:
             | sed '/./,$!d' > notes.md
           [ -s notes.md ] || { echo "CHANGELOG.md has no entry for $version" >&2; exit 1; }
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
-            --title "wirelens $version" --notes-file notes.md
+            --title "pilotfish $version" --notes-file notes.md

@@ -49,11 +49,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - **The Locations page writes your home folder as `~`**, so the folder of the databases reads
-  `~/.local/share/wirelens/geo` instead of a full path.
+  `~/.local/share/pilotfish/geo` instead of a full path.
 - **A richer demo capture.** `tests/fixtures/demo.pcap` now also holds a visitor scanning the NAS, a phone calling an
   address at a steady rhythm and very long DNS names, so Insights has something to show, and
   `tests/fixtures/gen_demo_capture.py` writes it.
-- **The releases take their notes from this changelog**: the title is "wirelens X.Y.Z" and the notes are the section of
+- **The releases take their notes from this changelog**: the title is "pilotfish X.Y.Z" and the notes are the section of
   the tag, instead of a list of pull request titles.
 - **New screenshots in the README.** It shows nine pages instead of six (Hosts with its locations, Insights and the
   Locations settings were added), in both themes, all taken on an invented home network.

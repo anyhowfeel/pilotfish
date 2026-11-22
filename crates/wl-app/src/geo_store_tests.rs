@@ -61,8 +61,8 @@ fn the_tiny_database_is_accepted_by_the_reader() {
 fn the_home_folder_is_shown_as_a_tilde() {
     let home = dirs::home_dir().expect("a home folder");
     assert_eq!(
-        tilde(&home.join(".local/share/wirelens/geo")),
-        "~/.local/share/wirelens/geo"
+        tilde(&home.join(".local/share/pilotfish/geo")),
+        "~/.local/share/pilotfish/geo"
     );
     assert_eq!(tilde(&home), "~");
     assert_eq!(tilde(Path::new("/srv/geo")), "/srv/geo");

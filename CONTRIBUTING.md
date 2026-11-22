@@ -29,7 +29,46 @@ Conventions used in the code:
 - Colours come from the theme (`Palette`), never from literals in the panels.
 - Check UI changes in both the dark and the light theme.
 
-## Commits
+## Pull requests and commits
 
-Short, imperative subject line ("Fix the flow list width"), one logical change per commit, and
-a few lines of explanation in the body when the reason is not obvious.
+Pull requests are squash-merged, so `main` has one commit per pull request and no merge commits.
+The pull request title becomes that commit, and the description its body. The title follows
+[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) and is checked by the CI:
+
+```
+type(scope): short imperative summary
+```
+
+| Type | Use it for | Version bump (0.y.z) |
+| :--- | :--- | :--- |
+| `feat` | a new feature | minor |
+| `fix` | a bug fix | patch |
+| `perf` | a speed or memory improvement | patch |
+| `refactor`, `docs`, `test`, `build`, `ci`, `chore` | no change in behaviour | none |
+| `revert` | undoing an earlier change | as the reverted change |
+
+A `!` before the colon (`feat(cli)!: drop --old-flag`) marks a breaking change, which also bumps the
+minor version while the project is below 1.0. The scope is optional and names the area (`web`, `insights`,
+`capture`, `packaging`...). Name branches after the type: `feat/diff-page`, `fix/flow-width`,
+`release/0.5.0`.
+
+## Versioning
+
+pilotfish follows [Semantic Versioning](https://semver.org/). Below 1.0.0 a minor version (0.5.0) brings
+features and may break things, and a patch version (0.5.1) only fixes bugs. Tags are `vX.Y.Z` and only
+ever point at a commit of `main`. `CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+with full sentences.
+
+The version lives in `Cargo.toml`, `Cargo.lock`, `packaging/arch/PKGBUILD` and the latest released section of
+`CHANGELOG.md`. `tools/check-version.sh` fails when they disagree, and the CI runs it on every pull request
+and every tag.
+
+## Releasing
+
+1. Branch `release/X.Y.Z` from an up to date `main`.
+2. `tools/bump-version.sh X.Y.Z` sets the version in `Cargo.toml`, `Cargo.lock` and the PKGBUILD.
+3. In `CHANGELOG.md`, move the `Unreleased` notes under `## [X.Y.Z] - YYYY-MM-DD` and fix the compare links.
+4. `tools/check-version.sh`, then open a pull request titled `chore(release): X.Y.Z`.
+5. When the CI is green, squash-merge it, then tag the merge commit and push the tag:
+   `git tag -a vX.Y.Z -m "pilotfish X.Y.Z" && git push origin vX.Y.Z`.
+   The CI builds the packages and publishes the release, with the notes taken from `CHANGELOG.md`.
