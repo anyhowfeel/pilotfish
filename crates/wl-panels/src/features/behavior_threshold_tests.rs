@@ -1,9 +1,10 @@
 use super::*;
 
 fn run_with(th: Thresholds, channels: Vec<Channel>, dns: Vec<DnsQuery>) -> Vec<HealthInsight> {
-    let mut out = Vec::new();
-    detect(&BehaviorData { channels, dns }, &th, &mut out);
-    out
+    let rules = InsightRules::default();
+    collect(&rules, |out| {
+        detect(&BehaviorData { channels, dns }, &th, out);
+    })
 }
 
 #[test]
@@ -72,8 +73,9 @@ fn dns_length_thresholds_are_applied_and_quoted() {
     let out = run_with(th, Vec::new(), vec![dns(&name)]);
     assert_eq!(out.len(), 1);
     assert!(out[0].explanation.contains("30+ characters"));
+    assert!(out[0].explanation.contains("labels of 20+ characters"));
     assert_eq!(
         out[0].suggested_filter.as_deref(),
-        Some("dns.qry.name.len >= 30")
+        Some("dns.qry.name.len >= 30 || dns.qry.name matches \"[^.]{20,}\"")
     );
 }

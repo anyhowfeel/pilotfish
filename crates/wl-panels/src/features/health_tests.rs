@@ -81,7 +81,7 @@ fn retrans_stats() -> (ExpertReport, StatsSnapshot) {
 }
 
 #[test]
-fn muted_findings_are_hidden_and_the_all_clear_takes_their_place() {
+fn muted_findings_are_counted_and_never_reported_as_healthy() {
     let (rep, stats) = retrans_stats();
     let intel = wl_model::ThreatIntel::default();
     let titles = |rules: &crate::insights::InsightRules| {
@@ -100,6 +100,5 @@ fn muted_findings_are_hidden_and_the_all_clear_takes_their_place() {
     rules.mute("packet loss");
     rules.mute("anomaly rate");
     let after = titles(&rules);
-    assert_eq!(after.len(), 1);
-    assert!(after[0].contains("healthy"), "{after:?}");
+    assert_eq!(after, ["2 findings hidden by mutes"]);
 }

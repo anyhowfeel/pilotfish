@@ -3,6 +3,7 @@ use wl_kit::widgets::Severity;
 use wl_model::{HealthInsight, InsightSeverity};
 
 use super::category::{Category, category_of};
+use crate::features::health::HEALTHY_TITLE;
 
 pub fn severity_of(s: InsightSeverity) -> Severity {
     match s {
@@ -37,12 +38,9 @@ impl HealthState {
     }
 }
 
-/// Findings only: the synthetic "looks healthy" card (no filter) is not a finding.
+/// Findings only: the all-clear card is not a finding.
 pub fn findings(all: &[HealthInsight]) -> Vec<&HealthInsight> {
-    let mut v: Vec<&HealthInsight> = all
-        .iter()
-        .filter(|i| !(i.severity == InsightSeverity::Info && i.suggested_filter.is_none()))
-        .collect();
+    let mut v: Vec<&HealthInsight> = all.iter().filter(|i| i.title != HEALTHY_TITLE).collect();
     v.sort_by(|a, b| {
         a.severity
             .cmp(&b.severity)
@@ -131,7 +129,7 @@ mod tests {
             ins(InsightSeverity::Warning, "a", "5 errors", Some("x")),
             ins(InsightSeverity::Critical, "b", "1 errors", Some("x")),
             ins(InsightSeverity::Warning, "c", "1,200 events", Some("x")),
-            ins(InsightSeverity::Info, "ok", "10 pkts", None),
+            ins(InsightSeverity::Info, HEALTHY_TITLE, "10 pkts", None),
         ];
         let f = findings(&all);
         let titles: Vec<_> = f.iter().map(|i| i.title.as_str()).collect();

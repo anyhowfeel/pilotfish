@@ -85,6 +85,7 @@ impl Packet<'_> {
             user,
             secret,
             field: opt(field).map(str::to_owned),
+            count: 1,
         });
     }
 }

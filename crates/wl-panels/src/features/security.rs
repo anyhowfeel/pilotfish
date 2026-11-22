@@ -4,13 +4,28 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use wl_kit::format;
 use wl_model::{
-    CredKind, Credential, DnsQuery, HealthInsight, HostStat, InsightSeverity, SecurityData,
-    ThreatIntel,
+    CredKind, Credential, DnsQuery, HostStat, InsightSeverity, SecurityData, ThreatIntel,
 };
 
-use super::health::push_card;
+use super::health::{Cap, Findings, push_capped};
 
 const MAX_CARDS: usize = 8;
+const LOGINS: Cap = Cap {
+    name: "cleartext logins",
+    max: MAX_CARDS,
+};
+const ADDRESSES: Cap = Cap {
+    name: "blocklisted addresses",
+    max: MAX_CARDS,
+};
+const DOMAINS: Cap = Cap {
+    name: "blocklisted domains",
+    max: MAX_CARDS,
+};
+const FINGERPRINTS: Cap = Cap {
+    name: "malicious TLS fingerprints",
+    max: MAX_CARDS,
+};
 const MAX_SAMPLES: usize = 3;
 const MAX_FRAMES: usize = 10;
 
@@ -22,7 +37,7 @@ pub struct Inputs<'a> {
     pub reveal_secrets: bool,
 }
 
-pub fn detect(inp: &Inputs, out: &mut Vec<HealthInsight>) {
+pub fn detect(inp: &Inputs, out: &mut Findings) {
     if let Some(sec) = inp.security {
         credentials(&sec.credentials, inp.reveal_secrets, out);
     }
@@ -67,22 +82,26 @@ fn sample(c: &Credential, reveal: bool) -> String {
     if let Some(f) = &c.field {
         parts.push(format!("in {f}"));
     }
-    parts.join(", ")
+    let sample = parts.join(", ");
+    match c.count {
+        0 | 1 => sample,
+        n => format!("{sample}, seen {n} times"),
+    }
 }
 
 fn frames_filter(frames: &[u64]) -> String {
     let list: Vec<String> = frames.iter().take(MAX_FRAMES).map(u64::to_string).collect();
-    format!("frame.number in {{{}}}", list.join(" "))
+    format!("frame.number in {{{}}}", list.join(","))
 }
 
-fn credentials(all: &[Credential], reveal: bool, out: &mut Vec<HealthInsight>) {
+fn credentials(all: &[Credential], reveal: bool, out: &mut Findings) {
     let mut groups: BTreeMap<(CredKind, &str, &str), Vec<&Credential>> = BTreeMap::new();
     for c in all {
         groups.entry((c.kind, &c.src, &c.dst)).or_default().push(c);
     }
     let mut groups: Vec<_> = groups.into_iter().collect();
     groups.sort_by_key(|((kind, ..), v)| (severity(*kind), std::cmp::Reverse(v.len())));
-    for ((kind, src, dst), found) in groups.into_iter().take(MAX_CARDS) {
+    for ((kind, src, dst), found) in groups {
         let samples: Vec<String> = found
             .iter()
             .take(MAX_SAMPLES)
@@ -95,8 +114,9 @@ fn credentials(all: &[Credential], reveal: bool, out: &mut Vec<HealthInsight>) {
             String::new()
         };
         let frames: Vec<u64> = found.iter().map(|c| c.frame).collect();
-        push_card(
+        push_capped(
             out,
+            Some(LOGINS),
             severity(kind),
             format!("Cleartext {}: {src} to {dst}", kind.label()),
             format!(
@@ -105,20 +125,24 @@ fn credentials(all: &[Credential], reveal: bool, out: &mut Vec<HealthInsight>) {
                 samples.join("; "),
             ),
             Some(&frames_filter(&frames)),
-            format!("{} found", found.len()),
+            format!(
+                "{} found",
+                found.iter().map(|c| u64::from(c.count)).sum::<u64>()
+            ),
         );
     }
 }
 
-fn addresses(intel: &ThreatIntel, hosts: &[HostStat], out: &mut Vec<HealthInsight>) {
+fn addresses(intel: &ThreatIntel, hosts: &[HostStat], out: &mut Findings) {
     let mut hits: Vec<(&HostStat, &str)> = hosts
         .iter()
         .filter_map(|h| intel.ip(&h.addr).map(|l| (h, l)))
         .collect();
     hits.sort_by_key(|(h, _)| std::cmp::Reverse(h.packets_in + h.packets_out));
-    for (h, list) in hits.into_iter().take(MAX_CARDS) {
-        push_card(
+    for (h, list) in hits {
+        push_capped(
             out,
+            Some(ADDRESSES),
             InsightSeverity::Critical,
             format!("Blocklisted address: {} ({list})", h.addr),
             format!(
@@ -132,7 +156,7 @@ fn addresses(intel: &ThreatIntel, hosts: &[HostStat], out: &mut Vec<HealthInsigh
 }
 
 /// Domains from DNS queries and TLS server names, each reported once.
-fn domains(inp: &Inputs, out: &mut Vec<HealthInsight>) {
+fn domains(inp: &Inputs, out: &mut Findings) {
     let tls = inp.security.map_or(&[][..], |s| &s.tls);
     let names: BTreeSet<&str> = inp
         .dns
@@ -143,9 +167,10 @@ fn domains(inp: &Inputs, out: &mut Vec<HealthInsight>) {
     let hits = names
         .into_iter()
         .filter_map(|n| inp.intel.domain(n).map(|l| (n, l)));
-    for (name, list) in hits.take(MAX_CARDS) {
-        push_card(
+    for (name, list) in hits {
+        push_capped(
             out,
+            Some(DOMAINS),
             InsightSeverity::Critical,
             format!("Blocklisted domain: {name} ({list})"),
             format!("{name} is on the {list} list and was looked up or contacted in this capture."),
@@ -157,7 +182,7 @@ fn domains(inp: &Inputs, out: &mut Vec<HealthInsight>) {
     }
 }
 
-fn fingerprints(inp: &Inputs, out: &mut Vec<HealthInsight>) {
+fn fingerprints(inp: &Inputs, out: &mut Findings) {
     let Some(sec) = inp.security else { return };
     let mut bad: BTreeMap<(&str, &str), (&str, usize)> = BTreeMap::new();
     let mut clients: BTreeMap<std::sync::Arc<str>, usize> = BTreeMap::new();
@@ -175,9 +200,10 @@ fn fingerprints(inp: &Inputs, out: &mut Vec<HealthInsight>) {
             *clients.entry(c).or_default() += 1;
         }
     }
-    for ((field, hash), (label, n)) in bad.into_iter().take(MAX_CARDS) {
-        push_card(
+    for ((field, hash), (label, n)) in bad {
+        push_capped(
             out,
+            Some(FINGERPRINTS),
             InsightSeverity::Critical,
             format!("Malicious TLS client fingerprint: {label}"),
             format!(
@@ -196,8 +222,9 @@ fn fingerprints(inp: &Inputs, out: &mut Vec<HealthInsight>) {
             .take(5)
             .map(|(c, n)| format!("{c} ({n})"))
             .collect();
-        push_card(
+        push_capped(
             out,
+            None,
             InsightSeverity::Info,
             "TLS clients identified by JA4DB",
             format!(
