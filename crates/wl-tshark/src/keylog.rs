@@ -92,10 +92,14 @@ impl SessionIds {
     }
 }
 
-/// Reads the start of `path` and tells whether it is a TLS key log.
+/// Reads the start of `path` and tells whether it is a TLS key log. Only regular files are
+/// opened: a FIFO or device would block the caller.
 pub fn is_keylog_file(path: &Path) -> bool {
     use std::io::Read;
     let mut head = [0u8; 2048];
+    if !std::fs::metadata(path).is_ok_and(|m| m.is_file()) {
+        return false;
+    }
     std::fs::File::open(path)
         .and_then(|mut f| f.read(&mut head))
         .is_ok_and(|n| looks_like_keylog(&head[..n]))
@@ -124,6 +128,16 @@ mod tests {
             ids.filter(log),
             "CLIENT_RANDOM aabb 11\nSERVER_TRAFFIC_SECRET_0 CC 33\nRSA 0102030405060708 44\n"
         );
+    }
+
+    #[test]
+    fn only_regular_files_are_probed() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("k.log");
+        std::fs::write(&log, "CLIENT_RANDOM aa bb\n").unwrap();
+        assert!(is_keylog_file(&log));
+        assert!(!is_keylog_file(dir.path()));
+        assert!(!is_keylog_file(&dir.path().join("missing")));
     }
 
     #[test]
