@@ -12,6 +12,8 @@ mod flow;
 mod intel;
 mod io_graph;
 mod packet;
+mod procmap;
+mod remote_target;
 mod stats;
 mod sysinfo;
 mod tcp_graph;
@@ -30,6 +32,10 @@ pub use flow::{FlowEvent, FlowEvents, FlowFlags, FlowSel, MAX_FLOW_EVENTS};
 pub use intel::{Fingerprint, Indicator, ThreatIntel};
 pub use io_graph::{CaptureProperties, DeltaStat, InterfaceInfo, IoGraph, IoSeries, IoSpec};
 pub use packet::{Direction, FlowKey, PacketRow, Transport, is_encrypted_protocol};
+pub use procmap::{
+    ProcessInfo, ProcessMap, SockProto, SocketEntry, parse_proc_net, socket_inode, summarize,
+};
+pub use remote_target::RemoteTarget;
 pub use stats::{
     ConversationStat, HostEdge, HostStat, ProtocolStat, RatePoint, StatsSnapshot, rebin,
 };

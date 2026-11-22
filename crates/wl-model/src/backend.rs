@@ -32,6 +32,12 @@ pub enum CaptureSource {
     File(PathBuf),
 }
 
+impl CaptureSource {
+    pub fn is_remote(&self) -> bool {
+        matches!(self, CaptureSource::Capture(o) if o.remote.enabled)
+    }
+}
+
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum CaptureError {
     #[error("tshark not found: {0}")]

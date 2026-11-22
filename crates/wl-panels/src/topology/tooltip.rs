@@ -9,6 +9,7 @@ use super::card::{DIR_W, kv, kv_w};
 use super::model::Graph;
 use super::state::Resolved;
 use crate::overview::NameResolver;
+use wl_model::summarize;
 
 const WIDTH: f32 = 250.0;
 
@@ -44,6 +45,10 @@ fn node(ui: &mut Ui, g: &Graph, i: usize, r: &dyn NameResolver) {
         if let Some(c) = &geo.country {
             ui.label(RichText::new(&**c).color(Palette::muted()));
         }
+    }
+    let procs = r.processes(&n.addr);
+    if !procs.is_empty() {
+        kv(ui, "Process", &summarize(&procs));
     }
     ui.add_space(spacing::XS);
     kv(ui, "Total", &format::bytes(n.bytes));

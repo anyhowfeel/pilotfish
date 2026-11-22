@@ -2,6 +2,8 @@
 
 use std::sync::Arc;
 
+use wl_model::{FlowKey, ProcessInfo};
+
 pub trait NameResolver {
     /// Cached name for `addr`, if known. Must not block.
     fn name(&self, addr: &str) -> Option<Arc<str>>;
@@ -18,6 +20,21 @@ pub trait NameResolver {
 
     /// True when threat lists are loaded (the Hosts table then shows a Threat column).
     fn has_threats(&self) -> bool {
+        false
+    }
+
+    /// Local processes holding a connection to `addr`. Must not block.
+    fn processes(&self, _addr: &str) -> Vec<ProcessInfo> {
+        Vec::new()
+    }
+
+    /// Local process that owns the socket of this conversation. Must not block.
+    fn flow_process(&self, _key: &FlowKey) -> Option<ProcessInfo> {
+        None
+    }
+
+    /// True once any socket owner is known (the Process columns appear only then).
+    fn has_processes(&self) -> bool {
         false
     }
 
@@ -64,3 +81,11 @@ impl NameResolver for NoNames {
 
 /// Maps a flow to its tshark stream index, when the app knows it (enables "Follow").
 pub type StreamLookup = Box<dyn Fn(&wl_model::FlowKey) -> Option<u32>>;
+
+/// One "name (pid)" per line, for tooltips.
+pub fn process_lines(list: &[ProcessInfo]) -> String {
+    list.iter()
+        .map(ProcessInfo::label)
+        .collect::<Vec<_>>()
+        .join("\n")
+}

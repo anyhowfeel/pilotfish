@@ -7,11 +7,11 @@ use wl_kit::format;
 use wl_kit::table::{HEADER_H, TableCols, cell_pad, num_cell, text_cell};
 use wl_kit::theme::{Palette, row_h, spacing};
 use wl_kit::widgets::{PillStyle, centered_row, empty_state, pill};
-use wl_model::StatsSnapshot;
+use wl_model::{StatsSnapshot, summarize};
 
 use super::actions::OverviewAction;
 use super::hosts_sort::{HostCol, host_filter, total_bytes, visible};
-use super::resolver::{NameResolver, NoNames};
+use super::resolver::{NameResolver, NoNames, process_lines};
 use super::sort::SortState;
 use super::table_cells::{filter_box, share_bar, sort_header};
 
@@ -111,6 +111,7 @@ impl HostsPanel {
         let (sort, max, resolver) = (self.sort, self.max_total, &self.resolver);
         let geo = resolver.geo_hint().is_none();
         let threats = resolver.has_threats();
+        let procs = resolver.has_processes();
         let mut picked = None;
         let selected = self.selected.clone();
         let avail_w = ui.available_width();
@@ -128,6 +129,9 @@ impl HostsPanel {
                     }
                     if threats {
                         cols = cols.fixed(THREAT_COL_W);
+                    }
+                    if procs {
+                        cols = cols.flex(130.0);
                     }
                     cols.num(74.0)
                         .num(74.0)
@@ -161,6 +165,16 @@ impl HostsPanel {
                                             });
                                         }
                                     }
+                                }
+                                if i == 2 && procs {
+                                    h.col(|ui| {
+                                        ui.label(
+                                            egui::RichText::new("Process")
+                                                .small()
+                                                .strong()
+                                                .color(Palette::muted()),
+                                        );
+                                    });
                                 }
                                 h.col(|ui| {
                                     if sort_header(ui, t, c, &sort, right) {
@@ -205,6 +219,15 @@ impl HostsPanel {
                                         if let Some(list) = resolver.threat(&host.addr) {
                                             let style = PillStyle::column(THREAT_PILL_W);
                                             pill(ui, &list, Palette::danger(), style);
+                                        }
+                                    });
+                                }
+                                if procs {
+                                    row.col(|ui| {
+                                        let list = resolver.processes(&host.addr);
+                                        let r = text_cell(ui, &summarize(&list));
+                                        if list.len() > 1 {
+                                            r.on_hover_text(process_lines(&list));
                                         }
                                     });
                                 }

@@ -10,16 +10,18 @@ use wl_model::{FlowKey, StatsSnapshot};
 use super::actions::OverviewAction;
 use super::conversations_sort::{FlowCol, duration, flow_filter, service, visible};
 use super::endpoint_cell::endpoints_cell;
-use super::resolver::StreamLookup;
+use super::resolver::{NameResolver, NoNames, StreamLookup};
 use super::sort::SortState;
 use super::table_cells::{filter_box, sort_header};
 
 const MIN_TABLE_W: f32 = 720.0;
+const PROCESS_HEAD: &str = "Process";
 
 pub struct ConversationsPanel {
     filter: String,
     sort: SortState<FlowCol>,
     streams: Option<StreamLookup>,
+    resolver: Box<dyn NameResolver>,
     selected: Option<FlowKey>,
     key: Option<(u64, u64, usize)>,
     key_filter: String,
@@ -33,6 +35,7 @@ impl Default for ConversationsPanel {
             filter: String::new(),
             sort: SortState::new(FlowCol::Bytes, true),
             streams: None,
+            resolver: Box::new(NoNames),
             selected: None,
             key: None,
             key_filter: String::new(),
@@ -46,6 +49,10 @@ impl ConversationsPanel {
     /// Inject the flow -> stream index lookup; without it no "Follow" button is shown.
     pub fn set_stream_lookup(&mut self, l: StreamLookup) {
         self.streams = Some(l);
+    }
+
+    pub fn set_resolver(&mut self, r: Box<dyn NameResolver>) {
+        self.resolver = r;
     }
 
     fn refresh(&mut self, s: &StatsSnapshot) {
@@ -90,6 +97,7 @@ impl ConversationsPanel {
         ui.add_space(spacing::SM);
         let (sort, rows, convs) = (self.sort, &self.rows, &stats.conversations);
         let (streams, selected) = (&self.streams, self.selected.clone());
+        let (resolver, procs) = (&self.resolver, self.resolver.has_processes());
         let (mut clicked_sort, mut picked, mut follow) = (None, None, None);
         let mut flow = None;
         let avail_h = ui.available_height().max(HEADER_H + row_h());
@@ -100,10 +108,11 @@ impl ConversationsPanel {
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 ui.allocate_ui(vec2(table_w, avail_h), |ui| {
-                    TableCols::new()
-                        .flex(190.0)
-                        .fixed(88.0)
-                        .fixed(PROTOCOL_COL_W)
+                    let mut cols = TableCols::new().flex(190.0).fixed(88.0);
+                    if procs {
+                        cols = cols.flex(120.0);
+                    }
+                    cols.fixed(PROTOCOL_COL_W)
                         .num(72.0)
                         .num(86.0)
                         .num(78.0)
@@ -115,6 +124,7 @@ impl ConversationsPanel {
                             let heads = [
                                 ("Endpoints", Some(FlowCol::Endpoints), false),
                                 ("Service", Some(FlowCol::Service), false),
+                                (PROCESS_HEAD, None, false),
                                 ("Protocol", Some(FlowCol::Protocol), false),
                                 ("Packets", Some(FlowCol::Packets), true),
                                 ("Bytes", Some(FlowCol::Bytes), true),
@@ -122,11 +132,22 @@ impl ConversationsPanel {
                                 ("", None, false),
                             ];
                             for (t, c, right) in heads {
-                                h.col(|ui| {
-                                    if let Some(c) = c
-                                        && sort_header(ui, t, c, &sort, right)
-                                    {
-                                        clicked_sort = Some(c);
+                                if t == PROCESS_HEAD && !procs {
+                                    continue;
+                                }
+                                h.col(|ui| match c {
+                                    Some(c) => {
+                                        if sort_header(ui, t, c, &sort, right) {
+                                            clicked_sort = Some(c);
+                                        }
+                                    }
+                                    None => {
+                                        ui.label(
+                                            egui::RichText::new(t)
+                                                .small()
+                                                .strong()
+                                                .color(Palette::muted()),
+                                        );
                                     }
                                 });
                             }
@@ -153,6 +174,12 @@ impl ConversationsPanel {
                                         );
                                     }
                                 });
+                                if procs {
+                                    row.col(|ui| {
+                                        let p = resolver.flow_process(&c.key);
+                                        text_cell(ui, &p.map(|p| p.label()).unwrap_or_default());
+                                    });
+                                }
                                 row.col(|ui| {
                                     cell_pad(ui);
                                     protocol_pill(ui, &c.protocol, PROTOCOL_PILL_W);

@@ -39,6 +39,8 @@ mod metrics;
 mod missing;
 mod page;
 mod prefs;
+mod proc_scan;
+mod proc_watch;
 mod props_hub;
 mod setup_io;
 mod shell;

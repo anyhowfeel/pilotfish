@@ -111,6 +111,10 @@ impl App {
         hosts.set_resolver(Box::new(resolver.clone()));
         let mut map = TopologyView::default();
         map.set_resolver(Box::new(resolver.clone()));
+        let mut convs = ConversationsPanel::default();
+        convs.set_resolver(Box::new(resolver.clone()));
+        let mut flows = FlowsPanel::default();
+        flows.set_resolver(Box::new(resolver.clone()));
         let setup_io = SetupIo::new(backend.clone(), cc.egui_ctx.clone());
         let mut rules = prefs.decode_as.clone();
         for r in cli.decode_rules() {
@@ -127,14 +131,14 @@ impl App {
             packets: PacketsView::default(),
             dashboard: Dashboard::default(),
             hosts,
-            convs: ConversationsPanel::default(),
+            convs,
             map,
             demo_map: cli.demo_map.then(|| demo_snapshot(40, 120)),
             values_key: None,
             diff: crate::diff_hub::DiffHub::new(backend.clone()),
             web: WebPanel::default(),
             web_link: WebLink::new(cli.demo_web),
-            flows: FlowsPanel::default(),
+            flows,
             flows_link: FlowsLink::new(backend.clone(), cc.egui_ctx.clone()),
             setup: CaptureSetup::default(),
             setup_io,

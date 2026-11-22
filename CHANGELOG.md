@@ -24,6 +24,15 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - **The filter box suggests names.** After `ip.addr ==` typing a domain offers the addresses it resolved to in the DNS
   log or the TLS handshake, and each suggested address shows its name. `http.host`, `dns.qry.name` and the TLS server
   name field suggest the names seen in the capture.
+- **Live captures name the process behind each connection (Linux).** While a local capture runs, the sockets listed in
+  `/proc/net` are matched with the file descriptors of running processes every two seconds. Hosts and Conversations get a
+  Process column, the Flows list shows the process name and the Map tooltip a Process line, all only once a process is
+  known. Processes of other users cannot be inspected and stay unnamed.
+- **Capture over SSH.** Capture options has a Remote capture (SSH) section: host, user, port, interface and an optional
+  `sudo -n`, with the capture filter field as the filter. Pilotfish runs `tcpdump` on the remote host through the system
+  `ssh` (never asking for a password, so a key or agent is needed) and feeds the stream to the same live view as a local
+  capture. Every value is quoted for the remote shell, and failures such as a refused login, a missing `tcpdump` or a
+  sudo that wants a password are reported in plain words. Stop ends the ssh process.
 
 ### Changed
 - **New screenshots in the README.** It shows nine pages instead of six (Hosts with its locations, Insights and the
