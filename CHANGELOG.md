@@ -5,6 +5,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **The README screenshots show pilotfish 0.5.0**, in both themes, with three new views: the Capture Diff page, the
+  Streams tab and the masked credentials of Insights. They are taken on invented captures only.
+
 ## [0.5.0] - 2026-11-22
 
 ### Added
