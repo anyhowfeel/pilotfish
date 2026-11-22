@@ -1,6 +1,7 @@
 //! TLS key log support: `-o tls.keylog_file:<path>` for every dissection when configured,
 //! and detection of key log files (for drag and drop).
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 /// `SSLKEYLOGFILE` (the variable browsers and curl honour), if set and non-empty.
@@ -45,6 +46,52 @@ pub fn looks_like_keylog(head: &[u8]) -> bool {
         .is_some_and(|l| LABELS.iter().any(|p| l.starts_with(p)))
 }
 
+/// Lowercase hex identifiers of the sessions of a capture: ClientHello randoms and the leading
+/// bytes of RSA-encrypted pre-master secrets.
+#[derive(Default)]
+pub struct SessionIds {
+    pub randoms: HashSet<String>,
+    pub epms: HashSet<String>,
+}
+
+fn hex(v: &str) -> String {
+    v.chars()
+        .filter(char::is_ascii_hexdigit)
+        .collect::<String>()
+        .to_ascii_lowercase()
+}
+
+impl SessionIds {
+    pub fn add(&mut self, randoms: &str, epms: &str) {
+        for r in randoms.split(',').map(hex).filter(|r| !r.is_empty()) {
+            self.randoms.insert(r);
+        }
+        for e in epms.split(',').map(hex).filter(|e| e.len() >= 16) {
+            self.epms.insert(e[..16].to_owned());
+        }
+    }
+
+    fn matches(&self, line: &str) -> bool {
+        let mut parts = line.split_whitespace();
+        match (parts.next(), parts.next()) {
+            (Some("RSA"), Some(id)) => self.epms.contains(&id.to_ascii_lowercase()),
+            (Some(label), Some(id)) if LABELS.contains(&label) => {
+                self.randoms.contains(&id.to_ascii_lowercase())
+            }
+            _ => false,
+        }
+    }
+
+    /// The lines of a key log that belong to these sessions; comments and others are dropped.
+    pub fn filter(&self, keylog: &str) -> String {
+        keylog
+            .lines()
+            .filter(|l| self.matches(l.trim()))
+            .flat_map(|l| [l.trim(), "\n"])
+            .collect()
+    }
+}
+
 /// Reads the start of `path` and tells whether it is a TLS key log.
 pub fn is_keylog_file(path: &Path) -> bool {
     use std::io::Read;
@@ -64,6 +111,18 @@ mod tests {
         assert_eq!(
             options(Some(Path::new("/tmp/k.log"))),
             ["-o", "tls.keylog_file:/tmp/k.log"]
+        );
+    }
+
+    #[test]
+    fn keeps_only_the_lines_of_known_sessions() {
+        let mut ids = SessionIds::default();
+        ids.add("AA:bb,cc", "0102030405060708090a");
+        let log = "# c\nCLIENT_RANDOM aabb 11\nCLIENT_RANDOM dead 22\nSERVER_TRAFFIC_SECRET_0 CC 33\n\
+                   RSA 0102030405060708 44\nRSA ffffffffffffffff 55\n";
+        assert_eq!(
+            ids.filter(log),
+            "CLIENT_RANDOM aabb 11\nSERVER_TRAFFIC_SECRET_0 CC 33\nRSA 0102030405060708 44\n"
         );
     }
 
