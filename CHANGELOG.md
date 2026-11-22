@@ -5,6 +5,8 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-22
+
 ### Added
 - **Offline threat lists.** Files dropped in the `intel` folder (opened from Settings > Locations, where files can also
   be added) are matched against the capture without any network call. A JA4DB `.json` export names the application
@@ -48,6 +50,25 @@ and the project follows [Semantic Versioning](https://semver.org/).
   lists each bookmarked packet with its time, addresses, protocol and info next to your comment.
 
 ### Changed
+- **The app is now called pilotfish.** The binary, the window title, the packages, the icons and the environment
+  variables (`PILOTFISH_CONFIG_DIR`, `PILOTFISH_GEO_DIR`, `PILOTFISH_INTEL_DIR`) carry the new name. The `wirelens`
+  folders of your configuration and data are moved to `pilotfish` the first time it starts, and the `WIRELENS_*`
+  variables are still read. The packages are called `pilotfish`, so remove an installed `wirelens` package yourself.
+- **A new logo**: a fin and a school of pilot fish on a rounded tile, as the window icon, in the packages and in the
+  README, with a new GitHub social preview image. The sidebar now shows only the name.
+- **The Flows list is easier to read.** Each conversation shows its endpoints with the ports dimmed, the protocol as a
+  pill, aligned packet, byte and duration figures (the least useful one is dropped first in a narrow pane) and a thin bar
+  for its share of the traffic. Top talkers and Top services on the Overview use the same bar style.
+- **Narrow windows behave.** The Capture Diff page has Before, After and Change columns and scrolls sideways instead of
+  clipping, the Web TLS keys line keeps its buttons on one line, the Hosts table keeps a visible sideways scroll bar and
+  the status bar hides the rate and the elapsed time first.
+- **Insights says what it leaves out.** When a kind of finding is capped, for example to three cards per behaviour, a
+  note tells how many more are not shown.
+- **Opening a capture runs fewer `tshark` passes.** The TLS, HTTP, DNS and credential scans are shared between Web,
+  Insights, Diff and the filter suggestions and run once per file version.
+- **Releases follow a written convention.** Pull requests are squash-merged with a Conventional Commits title,
+  versions follow Semantic Versioning, and `tools/check-version.sh` makes the CI fail when `Cargo.toml`,
+  `Cargo.lock`, the Arch PKGBUILD, the changelog and the tag disagree. CONTRIBUTING.md describes the steps.
 - **The Locations page writes your home folder as `~`**, so the folder of the databases reads
   `~/.local/share/pilotfish/geo` instead of a full path.
 - **A richer demo capture.** `tests/fixtures/demo.pcap` now also holds a visitor scanning the NAS, a phone calling an
@@ -57,6 +78,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
   the tag, instead of a list of pull request titles.
 - **New screenshots in the README.** It shows nine pages instead of six (Hosts with its locations, Insights and the
   Locations settings were added), in both themes, all taken on an invented home network.
+
+### Fixed
+- **The quick filters No broadcast and Not multicast** also work on captures taken with `tcpdump -i any`.
+- **The long DNS name finding** gives a filter that matches the names that triggered it, including a single very long
+  label.
 
 ## [0.4.0] - 2026-11-21
 
@@ -162,7 +188,8 @@ First public prototype of wirelens, a desktop packet viewer written in Rust with
 - **Release binaries** built by the CI for Linux (`x86_64`, `aarch64`, Arch Linux), macOS (`arm64`, `x86_64`) and
   Windows (`x86_64`).
 
-[Unreleased]: https://github.com/anyhowfeel/pilotfish/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/anyhowfeel/pilotfish/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/anyhowfeel/pilotfish/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/anyhowfeel/pilotfish/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/anyhowfeel/pilotfish/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/anyhowfeel/pilotfish/compare/v0.1.0...v0.2.0
