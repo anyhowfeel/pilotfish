@@ -13,7 +13,7 @@ use crate::process::{Proc, StderrTap, Tools, spawn};
 /// permission) fails the whole capture with dumpcap's message.
 pub fn start(tools: &Tools, o: &CaptureOptions) -> Result<Option<Proc>, CaptureError> {
     let base = Path::new(o.save_to.trim());
-    let Some(args) = ring_args(o, base) else {
+    let Some(args) = ring_args(o, base).filter(|_| !o.remote.enabled) else {
         return Ok(None);
     };
     if let Some(dir) = base.parent().filter(|d| !d.as_os_str().is_empty()) {

@@ -1,7 +1,7 @@
 //! Per-frame event pump: capture rows, background jobs, selection and layout persistence.
 use eframe::egui;
 
-use wl_model::CaptureError;
+use wl_model::{CaptureError, CaptureSource};
 
 use crate::app::App;
 use crate::dispatch::Command;
@@ -74,6 +74,9 @@ impl App {
             self.packets.resort();
         }
         self.was_running = running;
+        let remote = self.ctrl.source().is_some_and(CaptureSource::is_remote);
+        let local_live = self.ctrl.is_live() && !remote;
+        self.resolver.procs().set_active(running && local_live);
         let web_shown = self.shows(Page::Web);
         if self.web_link.tick(&mut self.ctrl, web_shown) {
             ctx.request_repaint();

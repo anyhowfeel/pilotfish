@@ -22,6 +22,7 @@ impl App {
                 self.reset_extras();
                 self.hub.clear_capture();
                 self.dashboard.clear_window_stats();
+                self.resolver.procs().clear();
                 self.ctrl.start(CaptureSource::File(p.clone()), None);
                 self.hub.refresh_insights(p.clone(), ctx.clone());
                 self.packets.filter_bar.set_text("");
@@ -29,6 +30,7 @@ impl App {
                 self.prefs.save();
             }
             Command::StartLive(options) => {
+                self.resolver.procs().clear();
                 self.streams.borrow_mut().clear();
                 self.packets.clear();
                 self.packets.set_follow(self.prefs.settings.auto_scroll);

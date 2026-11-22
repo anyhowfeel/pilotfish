@@ -3,7 +3,7 @@
 
 use wl_kit::egui::Ui;
 use wl_kit::widgets::{number_row, settings_card, text_row, toggle_row};
-use wl_model::{CaptureOptions, SNAPLEN_MAX};
+use wl_model::{CaptureOptions, RemoteTarget, SNAPLEN_MAX};
 
 /// Draws the option cards. Returns true when anything changed.
 pub fn capture_options(ui: &mut Ui, o: &mut CaptureOptions) -> bool {
@@ -42,6 +42,7 @@ pub fn capture_options(ui: &mut Ui, o: &mut CaptureOptions) -> bool {
             " MB",
         );
     });
+    remote_card(ui, &mut o.remote, &mut changed);
     settings_card(ui, "Output", |ui| {
         changed |= text_row(
             ui,
@@ -94,6 +95,46 @@ pub fn capture_options(ui: &mut Ui, o: &mut CaptureOptions) -> bool {
     changed
 }
 
+fn remote_card(ui: &mut Ui, r: &mut RemoteTarget, changed: &mut bool) {
+    settings_card(ui, "Remote capture (SSH)", |ui| {
+        *changed |= toggle_row(
+            ui,
+            true,
+            "Capture on a remote host",
+            "Runs tcpdump over ssh (key or agent login only) and streams it here. Uses the capture filter field.",
+            &mut r.enabled,
+        );
+        if !r.enabled {
+            return;
+        }
+        *changed |= text_row(ui, false, "Host", "", &mut r.host, "192.0.2.10");
+        *changed |= text_row(
+            ui,
+            false,
+            "User",
+            "Empty = your ssh config default.",
+            &mut r.user,
+            "root",
+        );
+        *changed |= number_row(ui, false, "Port", "", &mut r.port, 1..=65_535, "");
+        *changed |= text_row(
+            ui,
+            false,
+            "Interface",
+            "Name on the remote host; \"any\" captures all.",
+            &mut r.interface,
+            "eth0",
+        );
+        *changed |= toggle_row(
+            ui,
+            false,
+            "Use sudo",
+            "Runs `sudo -n tcpdump`; the account needs passwordless sudo for it.",
+            &mut r.sudo,
+        );
+    });
+}
+
 fn ring_rows(ui: &mut Ui, o: &mut CaptureOptions) -> bool {
     let r = &mut o.ring;
     let mut changed = number_row(
@@ -126,6 +167,9 @@ pub fn summary(o: &CaptureOptions) -> String {
     } else {
         "non-promiscuous".into()
     });
+    if o.remote.enabled {
+        parts.push(format!("ssh {}", o.remote.destination()));
+    }
     if o.monitor {
         parts.push("monitor".into());
     }

@@ -5,9 +5,11 @@ use std::sync::{Arc, Mutex};
 
 use crossbeam_channel::{Receiver, Sender, bounded};
 use eframe::egui;
+use wl_model::{FlowKey, ProcessInfo};
 use wl_panels::overview::{GeoInfo, NameResolver};
 
 use crate::geo::GeoDb;
+use crate::proc_watch::ProcWatch;
 
 const MAX_CACHE: usize = 4096;
 const QUEUE_CAP: usize = 256;
@@ -27,6 +29,7 @@ pub struct AsyncResolver {
     /// Settings > Names > "Resolve DNS names": off = no lookups (cached names still show).
     enabled: Arc<std::sync::atomic::AtomicBool>,
     geo: Arc<std::sync::RwLock<Option<Arc<GeoDb>>>>,
+    procs: ProcWatch,
 }
 
 impl AsyncResolver {
@@ -35,6 +38,7 @@ impl AsyncResolver {
         let (req_tx, req_rx) = bounded::<String>(QUEUE_CAP);
         let (done_tx, done_rx) = bounded::<()>(8);
         let bg_cache = cache.clone();
+        let bg_ctx = ctx.clone();
         std::thread::spawn(move || {
             while let Ok(addr) = req_rx.recv() {
                 let name = resolve_ip(&addr);
@@ -45,7 +49,7 @@ impl AsyncResolver {
                     }
                 }
                 let _ = done_tx.try_send(());
-                ctx.request_repaint();
+                bg_ctx.request_repaint();
             }
         });
         Self {
@@ -54,6 +58,7 @@ impl AsyncResolver {
             done_rx,
             enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             geo: Arc::new(std::sync::RwLock::new(GeoDb::discover())),
+            procs: ProcWatch::spawn(ctx),
         }
     }
 
@@ -72,9 +77,13 @@ impl AsyncResolver {
         self.enabled.store(on, std::sync::atomic::Ordering::Relaxed);
     }
 
-    /// Returns true if at least one new name finished resolving since the last poll.
+    pub fn procs(&self) -> &ProcWatch {
+        &self.procs
+    }
+
+    /// Returns true if a new name or process table arrived since the last poll.
     pub fn take_updated(&self) -> bool {
-        let mut any = false;
+        let mut any = self.procs.take_updated();
         while self.done_rx.try_recv().is_ok() {
             any = true;
         }
@@ -83,6 +92,18 @@ impl AsyncResolver {
 }
 
 impl NameResolver for AsyncResolver {
+    fn processes(&self, addr: &str) -> Vec<ProcessInfo> {
+        self.procs.for_host(addr)
+    }
+
+    fn flow_process(&self, key: &FlowKey) -> Option<ProcessInfo> {
+        self.procs.for_flow(key)
+    }
+
+    fn has_processes(&self) -> bool {
+        self.procs.has_any()
+    }
+
     fn geo(&self, addr: &str) -> Option<GeoInfo> {
         self.geo_db()?.lookup(addr)
     }

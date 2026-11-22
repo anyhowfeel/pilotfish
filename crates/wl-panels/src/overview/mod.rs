@@ -42,7 +42,7 @@ pub use activity::{Activity, ActivityMap};
 pub use conversations::ConversationsPanel;
 pub use dashboard::Dashboard;
 pub use hosts::HostsPanel;
-pub use resolver::{GeoInfo, NameResolver, NoNames, StreamLookup};
+pub use resolver::{GeoInfo, NameResolver, NoNames, StreamLookup, process_lines};
 pub use setup::{CaptureSetup, SetupData};
 pub use setup_bar::FilterStatus;
 pub(crate) use sort::SortState;

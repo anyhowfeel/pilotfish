@@ -45,6 +45,7 @@ mod pdml;
 pub mod phs;
 mod process;
 mod pump;
+mod remote_args;
 mod ring;
 mod row_parser;
 mod tcp_scan;

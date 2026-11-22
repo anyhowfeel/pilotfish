@@ -90,6 +90,54 @@ pub fn from_dumpcap(stderr: &str) -> CaptureError {
     }
 }
 
+/// Failure of the `ssh ... tcpdump` pipeline: names the layer that broke.
+pub fn from_ssh(stderr: &str) -> CaptureError {
+    let msg = clean_stderr(stderr);
+    let lower = msg.to_lowercase();
+    let has = |needles: &[&str]| needles.iter().any(|n| lower.contains(n));
+    let tcpdump = lower.contains("tcpdump");
+    if has(&["permission denied (", "host key verification failed"]) {
+        CaptureError::Permission(format!(
+            "SSH authentication failed. Pilotfish never asks for a password: load your key into \
+             ssh-agent or configure key login, and make sure the host is in known_hosts.\n{msg}"
+        ))
+    } else if has(&[
+        "a password is required",
+        "may not run sudo",
+        "a terminal is required",
+    ]) {
+        CaptureError::Permission(format!(
+            "sudo on the remote host needs a password. Allow tcpdump without one (NOPASSWD) \
+             or log in as root.\n{msg}"
+        ))
+    } else if tcpdump && has(&["not found", "no such file"]) {
+        CaptureError::Other(format!(
+            "tcpdump is not installed on the remote host.\n{msg}"
+        ))
+    } else if tcpdump && has(&["syntax error"]) {
+        CaptureError::BadFilter(msg)
+    } else if tcpdump && has(&["no such device"]) {
+        CaptureError::Other(format!("Interface not found on the remote host.\n{msg}"))
+    } else if has(&[
+        "operation not permitted",
+        "don't have permission",
+        "permission denied",
+    ]) {
+        CaptureError::Permission(format!(
+            "The remote user may not capture packets. Enable sudo for it or run as root.\n{msg}"
+        ))
+    } else if has(&[
+        "could not resolve",
+        "connection refused",
+        "timed out",
+        "no route to host",
+    ]) {
+        CaptureError::Other(format!("Cannot reach the remote host.\n{msg}"))
+    } else {
+        from_stderr(stderr)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -155,5 +203,59 @@ mod tests {
     fn missing_binary() {
         let e = spawn_error("tshark", &io::Error::from(io::ErrorKind::NotFound));
         assert!(matches!(e, CaptureError::ToolMissing(_)));
+    }
+
+    fn ssh_kind(stderr: &str) -> (&'static str, String) {
+        match from_ssh(stderr) {
+            CaptureError::Permission(m) => ("permission", m),
+            CaptureError::BadFilter(m) => ("filter", m),
+            CaptureError::Other(m) => ("other", m),
+            CaptureError::ToolMissing(m) => ("tool", m),
+        }
+    }
+
+    #[test]
+    fn ssh_failures_name_the_broken_layer() {
+        let cases = [
+            (
+                "ops@h: Permission denied (publickey,password).",
+                "permission",
+                "authentication",
+            ),
+            ("Host key verification failed.", "permission", "known_hosts"),
+            ("sudo: a password is required", "permission", "NOPASSWD"),
+            ("bash: tcpdump: command not found", "other", "not installed"),
+            ("sh: 1: tcpdump: not found", "other", "not installed"),
+            (
+                "tcpdump: eth9: No such device exists",
+                "other",
+                "Interface not found",
+            ),
+            (
+                "tcpdump: eth0: You don't have permission to perform this capture",
+                "permission",
+                "sudo",
+            ),
+            (
+                "tcpdump: syntax error in filter expression: syntax error",
+                "filter",
+                "syntax error",
+            ),
+            (
+                "ssh: Could not resolve hostname nope: Name or service not known",
+                "other",
+                "Cannot reach",
+            ),
+            (
+                "ssh: connect to host h port 22: Connection refused",
+                "other",
+                "Cannot reach",
+            ),
+        ];
+        for (stderr, kind, text) in cases {
+            let (k, m) = ssh_kind(stderr);
+            assert_eq!(k, kind, "{stderr}");
+            assert!(m.contains(text), "{stderr}: {m}");
+        }
     }
 }

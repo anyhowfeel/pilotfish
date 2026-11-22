@@ -13,8 +13,8 @@ use wl_kit::widgets::{empty_state, segmented_w};
 use wl_model::{FlowSel, HostStat, StatsSnapshot};
 
 use super::paint::{label_font, mono_font};
-use crate::overview::SortState;
 use crate::overview::conversations_sort::{FlowCol, duration, endpoints, visible};
+use crate::overview::{NameResolver, SortState};
 
 pub const ROW: f32 = 48.0;
 const MAX_HOSTS: usize = 12;
@@ -33,6 +33,7 @@ pub struct List {
     picked: Vec<Arc<str>>,
     key: Option<(u64, usize, String, Mode)>,
     rows: Vec<usize>,
+    resolver: Option<Box<dyn NameResolver>>,
 }
 
 /// Painted two-line row: `title` over `sub`, optional leading marker rect drawn by `lead`.
@@ -81,6 +82,10 @@ pub fn host_rows(hosts: &[HostStat], needle: &str) -> Vec<usize> {
 }
 
 impl List {
+    pub fn set_resolver(&mut self, r: Box<dyn NameResolver>) {
+        self.resolver = Some(r);
+    }
+
     /// Full-width filter field; Escape clears it.
     fn filter_field(&mut self, ui: &mut Ui, w: f32) {
         let edit = ui.add(
@@ -172,12 +177,14 @@ impl List {
                 let c = &s.conversations[idx];
                 let sel = FlowSel::Conversation(c.key.clone());
                 // Fixed-width fields so the figures line up from one row to the next.
+                let who = self.resolver.as_ref().and_then(|r| r.flow_process(&c.key));
                 let sub = format!(
-                    "{:<6}{:>6}  {:>10}  {:>8}",
+                    "{:<6}{:>6}  {:>10}  {:>8}{}",
                     c.protocol,
                     format::count(c.packets),
                     format::bytes(c.bytes),
-                    format::duration(duration(c))
+                    format::duration(duration(c)),
+                    who.map(|p| format!("  {}", p.name)).unwrap_or_default()
                 );
                 let dot = protocol_color(&c.protocol);
                 if item(ui, current == Some(&sel), &endpoints(c), &sub, dot) {

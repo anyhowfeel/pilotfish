@@ -127,7 +127,10 @@ Environment variables:
 ## What it does
 
 - **Capture**: interface list grouped by type with live rates, capture options (filter,
-  promiscuous, snap length, ring buffer, auto-stop), recent files.
+  promiscuous, snap length, ring buffer, auto-stop), recent files. A remote host can be captured
+  over `ssh` (key or agent login, `tcpdump` on the other side, optional `sudo -n`). During a local
+  live capture on Linux, Hosts, Conversations, Flows and the Map name the process behind each socket
+  (read from `/proc`; processes of other users stay unnamed).
 - **Packets**: virtualized packet list that stays responsive with about a million rows, display
   filter bar with field completion (and, after an operator, the hosts and ports of the capture)
   plus quick-filter chips, find (string, regex, hex),
