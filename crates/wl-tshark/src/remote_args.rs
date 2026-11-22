@@ -25,7 +25,8 @@ pub fn remote_command(o: &CaptureOptions) -> String {
     c.extend(["-w".into(), "-".into()]);
     let filter = o.capture_filter.trim();
     if !filter.is_empty() {
-        c.push(shell_quote(filter));
+        // `--`: a filter such as `-w/path` must not be read as a tcpdump option.
+        c.extend(["--".into(), shell_quote(filter)]);
     }
     c.join(" ")
 }
@@ -34,9 +35,19 @@ pub fn remote_command(o: &CaptureOptions) -> String {
 /// starts with a dash from being read as an option.
 pub fn ssh_args(o: &CaptureOptions) -> Vec<String> {
     let r = &o.remote;
-    let mut a: Vec<String> = ["-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
-        .map(String::from)
-        .to_vec();
+    let mut a: Vec<String> = [
+        "-T",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=10",
+        "-o",
+        "ServerAliveInterval=15",
+        "-o",
+        "ServerAliveCountMax=3",
+    ]
+    .map(String::from)
+    .to_vec();
     a.extend(["-p".into(), r.port.to_string()]);
     a.extend(["--".into(), r.destination(), remote_command(o)]);
     a
@@ -65,11 +76,15 @@ mod tests {
                 "BatchMode=yes",
                 "-o",
                 "ConnectTimeout=10",
+                "-o",
+                "ServerAliveInterval=15",
+                "-o",
+                "ServerAliveCountMax=3",
                 "-p",
                 "22",
                 "--",
                 "ops@10.0.0.7",
-                "tcpdump -U -n -i 'eth0' -w - 'port 53'"
+                "tcpdump -U -n -i 'eth0' -w - -- 'port 53'"
             ]
         );
     }
@@ -83,7 +98,7 @@ mod tests {
         o.stop.packets = 50;
         o.capture_filter.clear();
         let a = ssh_args(&o);
-        assert_eq!(a[5..7], ["-p", "2222"]);
+        assert_eq!(a[9..11], ["-p", "2222"]);
         assert_eq!(
             a.last().map(String::as_str),
             Some("sudo -n tcpdump -U -n -i 'eth0' -s 96 -c 50 -w -")
@@ -105,8 +120,15 @@ mod tests {
         let cmd = remote_command(&o);
         assert_eq!(
             cmd,
-            r#"tcpdump -U -n -i 'eth0' -w - 'port 1'\'' ; rm -rf ~ ; echo '\''$(reboot)'"#
+            r#"tcpdump -U -n -i 'eth0' -w - -- 'port 1'\'' ; rm -rf ~ ; echo '\''$(reboot)'"#
         );
+    }
+
+    #[test]
+    fn option_looking_filter_follows_double_dash() {
+        let mut o = opts();
+        o.capture_filter = "-w/etc/cron.d/x".into();
+        assert!(remote_command(&o).ends_with("-w - -- '-w/etc/cron.d/x'"));
     }
 
     #[test]
@@ -124,8 +146,8 @@ mod tests {
         o.remote.host = "-oProxyCommand=touch x".into();
         o.remote.user = String::new();
         let a = ssh_args(&o);
-        assert_eq!(a[7], "--");
-        assert_eq!(a[8], "-oProxyCommand=touch x");
-        assert_eq!(a.len(), 10);
+        assert_eq!(a[11], "--");
+        assert_eq!(a[12], "-oProxyCommand=touch x");
+        assert_eq!(a.len(), 14);
     }
 }

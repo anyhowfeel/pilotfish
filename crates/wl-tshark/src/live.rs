@@ -51,6 +51,9 @@ fn producer(tools: &Tools, o: &CaptureOptions) -> Result<Producer, CaptureError>
             classify: from_dumpcap,
         });
     }
+    if let Some(problem) = o.remote.problem() {
+        return Err(CaptureError::Other(problem.into()));
+    }
     Ok(Producer {
         program: find_in_path("ssh").ok_or_else(|| CaptureError::ToolMissing("ssh".into()))?,
         args: ssh_args(o),
@@ -209,6 +212,21 @@ mod tests {
             sink.is_empty(),
             "nothing is forwarded after the file failed"
         );
+    }
+
+    #[test]
+    fn hostile_remote_target_is_refused_before_spawning() {
+        let tools = Tools {
+            tshark: PathBuf::new(),
+            dumpcap: PathBuf::new(),
+            editcap: None,
+            mergecap: None,
+        };
+        let mut o = CaptureOptions::single("ignored", None);
+        o.remote.enabled = true;
+        o.remote.host = "-oProxyCommand=touch x".into();
+        o.remote.interface = "eth0".into();
+        assert!(matches!(producer(&tools, &o), Err(CaptureError::Other(_))));
     }
 
     #[test]

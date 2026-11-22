@@ -1,5 +1,7 @@
 //! Capture Diff page: what changed between the open capture and a second one.
 
+#[cfg(test)]
+mod layout_tests;
 mod section;
 #[cfg(test)]
 mod tests;
@@ -13,7 +15,7 @@ use wl_kit::widgets::{empty_state, segmented, stat_card};
 use wl_model::Rcode;
 use wl_stats::{CaptureDiff, Micros, Traffic};
 
-use section::{Show, section};
+use section::{MIN_WIDTH, Show, section};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DiffAction {
@@ -89,7 +91,7 @@ impl DiffPanel {
     }
 
     fn toolbar(&mut self, ui: &mut Ui, data: &DiffData, out: &mut Vec<DiffAction>) {
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             ui.label(mono(if data.base.is_empty() {
                 "No capture"
             } else {
@@ -114,26 +116,40 @@ impl DiffPanel {
     }
 
     fn report(&self, ui: &mut Ui, d: &CaptureDiff) {
+        let width = (ui.available_width() - ui.spacing().scroll.allocated_width()).max(MIN_WIDTH);
         ScrollArea::vertical()
             .auto_shrink([false; 2])
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.columns(2, |c| {
-                        stat_card(&mut c[0], "First capture", &traffic(&d.before), None);
-                        stat_card(&mut c[1], "Second capture", &traffic(&d.after), None);
-                    });
+                ui.columns(2, |c| {
+                    for (col, title, t) in [
+                        (0, "First capture", &d.before),
+                        (1, "Second capture", &d.after),
+                    ] {
+                        let pkts = format!("{} pkts", format::count(t.packets));
+                        stat_card(&mut c[col], title, &format::bytes(t.bytes), Some(&pkts));
+                    }
                 });
-                let s = self.show;
-                section(ui, "Hosts", &d.hosts, traffic, s);
-                section(ui, "Services", &d.services, traffic, s);
-                section(ui, "Latency (mean)", &d.latency, micros, s);
-                section(ui, "HTTP hosts (requests)", &d.http_hosts, count, s);
-                section(ui, "HTTP status codes", &d.statuses, count, s);
-                section(ui, "TLS server names (sessions)", &d.tls_names, count, s);
-                section(ui, "Unanswered requests", &d.unanswered, count, s);
-                section(ui, "Status per URL", &d.url_statuses, count, s);
-                section(ui, "DNS response codes", &d.dns_rcodes, rcode, s);
-                section(ui, "DNS answers", &d.dns_answers, count, s);
+                ScrollArea::horizontal().show(ui, |ui| {
+                    ui.set_min_width(width);
+                    let s = self.show;
+                    section(ui, width, "Hosts", &d.hosts, traffic, s);
+                    section(ui, width, "Services", &d.services, traffic, s);
+                    section(ui, width, "Latency (mean)", &d.latency, micros, s);
+                    section(ui, width, "HTTP hosts (requests)", &d.http_hosts, count, s);
+                    section(ui, width, "HTTP status codes", &d.statuses, count, s);
+                    section(
+                        ui,
+                        width,
+                        "TLS server names (sessions)",
+                        &d.tls_names,
+                        count,
+                        s,
+                    );
+                    section(ui, width, "Unanswered requests", &d.unanswered, count, s);
+                    section(ui, width, "Status per URL", &d.url_statuses, count, s);
+                    section(ui, width, "DNS response codes", &d.dns_rcodes, rcode, s);
+                    section(ui, width, "DNS answers", &d.dns_answers, count, s);
+                });
             });
     }
 }

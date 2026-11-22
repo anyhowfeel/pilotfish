@@ -158,6 +158,11 @@ fn nav_entry(
     }
 }
 
+/// Status bar widths from which the lower-priority counters appear; below, the source name and
+/// the packet count keep their room.
+const RATE_FROM: f32 = 500.0;
+const ELAPSED_FROM: f32 = 640.0;
+
 /// Top status bar: state dot, source, packets, rate, elapsed, filter. Returns true when the
 /// source name was clicked (open the capture file properties).
 pub fn status_bar(ui: &mut egui::Ui, s: &StatusInfo) -> bool {
@@ -173,8 +178,13 @@ pub fn status_bar(ui: &mut egui::Ui, s: &StatusInfo) -> bool {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.spacing_mut().item_spacing.x = spacing::SM;
                 let rate = format!("{} pkt/s", format::count(s.rate_pps.round() as u64));
-                metric(ui, "Elapsed", &format::duration(s.elapsed), "00 h 00 m");
-                metric(ui, "Rate", &rate, "000,000 pkt/s");
+                let width = ui.available_width();
+                if width >= ELAPSED_FROM {
+                    metric(ui, "Elapsed", &format::duration(s.elapsed), "00 h 00 m");
+                }
+                if width >= RATE_FROM {
+                    metric(ui, "Rate", &rate, "000,000 pkt/s");
+                }
                 metric(ui, "Packets", &format::count(s.packets), "000,000,000");
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                     ui.spacing_mut().item_spacing.x = spacing::SM;

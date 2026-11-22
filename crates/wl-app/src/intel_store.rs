@@ -140,17 +140,20 @@ fn summary(intel: &ThreatIntel) -> String {
     if intel.is_empty() {
         return "No lists found".to_owned();
     }
-    let ranges = if ranges > 0 {
-        format!("{} ranges, ", format::count(ranges as u64))
-    } else {
-        String::new()
+    let item = |n: usize, one: &str, many: &str| {
+        format!(
+            "{} {}",
+            format::count(n as u64),
+            if n == 1 { one } else { many }
+        )
     };
-    format!(
-        "{} addresses, {ranges}{} domains, {} fingerprints",
-        format::count(ips as u64),
-        format::count(domains as u64),
-        format::count(prints as u64)
-    )
+    let mut parts = vec![item(ips, "address", "addresses")];
+    if ranges > 0 {
+        parts.push(item(ranges, "range", "ranges"));
+    }
+    parts.push(item(domains, "domain", "domains"));
+    parts.push(item(prints, "fingerprint", "fingerprints"));
+    parts.join(", ")
 }
 
 /// Reads every regular file of `dir`: `.json` and JA4DB CSV exports as JA4DB, anything else as

@@ -28,7 +28,7 @@ pub fn card(ui: &mut Ui, info: &IntelInfo) -> Option<IntelAction> {
         } else {
             &info.summary
         };
-        info_row(ui, true, "Loaded", status);
+        settings_row(ui, true, "Loaded", status, |_| {});
         for e in &info.errors {
             ui.label(RichText::new(e).small().color(Palette::danger()));
         }

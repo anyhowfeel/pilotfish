@@ -16,6 +16,11 @@ use super::sort::SortState;
 use super::table_cells::{filter_box, share_bar, sort_header};
 
 const MIN_TABLE_W: f32 = 700.0;
+const GEO_COL_W: f32 = 130.0;
+const PROC_COL_W: f32 = 130.0;
+const FILTER_W: f32 = 260.0;
+/// Room the count and hint beside the filter box keep when the window is narrow.
+const FILTER_SIDE_W: f32 = 110.0;
 const SCOPE_PILL_W: f32 = 68.0;
 const THREAT_COL_W: f32 = 110.0;
 const THREAT_PILL_W: f32 = 96.0;
@@ -84,18 +89,26 @@ impl HostsPanel {
             return out;
         }
         self.refresh(stats);
+        let filter_w = (ui.available_width() - FILTER_SIDE_W).clamp(120.0, FILTER_W);
         centered_row(ui, 30.0, |ui| {
             if filter_box(
                 ui,
                 &mut self.filter,
                 "Filter by address or name\u{2026}",
-                260.0,
+                filter_w,
             ) {
                 self.invalidate();
             }
-            ui.label(
-                egui::RichText::new(format!("{} / {} hosts", self.rows.len(), stats.hosts.len()))
+            ui.add(
+                egui::Label::new(
+                    egui::RichText::new(format!(
+                        "{} / {} hosts",
+                        self.rows.len(),
+                        stats.hosts.len()
+                    ))
                     .color(Palette::muted()),
+                )
+                .truncate(),
             );
             if let Some(hint) = self.resolver.geo_hint() {
                 ui.add(
@@ -115,8 +128,18 @@ impl HostsPanel {
         let mut picked = None;
         let selected = self.selected.clone();
         let avail_w = ui.available_width();
-        let avail_h = ui.available_height().max(HEADER_H + row_h());
-        let table_w = avail_w.max(MIN_TABLE_W);
+        let min_w = MIN_TABLE_W
+            + if geo { GEO_COL_W } else { 0.0 }
+            + if threats { THREAT_COL_W } else { 0.0 }
+            + if procs { PROC_COL_W } else { 0.0 };
+        let table_w = avail_w.max(min_w);
+        // The sideways scrollbar sits below the table, so it must not push it out of view.
+        let bar = if table_w > avail_w {
+            ui.spacing().scroll.allocated_width() + 1.0
+        } else {
+            0.0
+        };
+        let avail_h = (ui.available_height() - bar).max(HEADER_H + row_h());
         ui.style_mut().interaction.selectable_labels = false;
         ScrollArea::horizontal()
             .id_salt("hosts_hscroll")
@@ -125,13 +148,13 @@ impl HostsPanel {
                 ui.allocate_ui(vec2(table_w, avail_h), |ui| {
                     let mut cols = TableCols::new().flex(150.0).fixed(90.0);
                     if geo {
-                        cols = cols.flex(130.0);
+                        cols = cols.flex(GEO_COL_W);
                     }
                     if threats {
                         cols = cols.fixed(THREAT_COL_W);
                     }
                     if procs {
-                        cols = cols.flex(130.0);
+                        cols = cols.flex(PROC_COL_W);
                     }
                     cols.num(74.0)
                         .num(74.0)

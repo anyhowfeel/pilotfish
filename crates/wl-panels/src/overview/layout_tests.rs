@@ -252,3 +252,22 @@ fn process_columns_fit_when_data_exists() {
         }
     }
 }
+
+#[test]
+fn hosts_table_scrolls_sideways_instead_of_clipping_when_narrow() {
+    let stats = snapshot();
+    let mut hosts = HostsPanel::default();
+    for mode in [Mode::Dark, Mode::Light] {
+        for width in [390.0, 600.0] {
+            run(width, 640.0, 1.0, mode, |ui| {
+                let area = ui.max_rect();
+                hosts.ui(ui, &stats);
+                assert!(
+                    area.expand(1.0).contains_rect(ui.min_rect()),
+                    "{mode:?} {width}: {:?} outside {area:?}",
+                    ui.min_rect()
+                );
+            });
+        }
+    }
+}
