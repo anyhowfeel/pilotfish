@@ -61,10 +61,12 @@ impl App {
                 }
             }
             Page::Web => {
-                let data = self.web_link.data();
+                let keys = self.keys.info();
+                let data = self.web_link.data(&keys);
                 let acts = self.web.ui(ui, &data);
+                let ctx = ui.ctx().clone();
                 for a in acts {
-                    self.web_action(a, &mut cmds);
+                    self.web_action(a, &mut cmds, &ctx);
                 }
             }
             Page::Insights => {

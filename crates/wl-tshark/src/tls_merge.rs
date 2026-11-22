@@ -89,6 +89,7 @@ impl Merger {
                     cipher: None,
                     alpn: None,
                     cert_subject: None,
+                    certs: Vec::new(),
                     ja3: None,
                     ja4: None,
                     ja3s: None,

@@ -5,6 +5,7 @@ mod analysis;
 mod backend;
 mod behavior;
 mod capture_options;
+mod cert;
 mod detail;
 mod extras;
 mod flow;
@@ -21,6 +22,7 @@ pub use backend::{
 };
 pub use behavior::{BehaviorData, Channel, ChannelKind, Proto};
 pub use capture_options::{AutoStop, CaptureOptions, RingBuffer, SNAPLEN_MAX};
+pub use cert::{CertFinding, CertInfo, CertWarning, date_label, evaluate as evaluate_chain};
 pub use detail::{DetailNode, FrameDetail};
 pub use extras::{DecodeAs, DnsQuery, ExportObject, ObjectSet, Rcode, sanitize_filename};
 pub use flow::{FlowEvent, FlowEvents, FlowFlags, FlowSel, MAX_FLOW_EVENTS};

@@ -3,7 +3,7 @@ use wl_kit::egui::{self, Context, Rect, pos2, vec2};
 use wl_kit::theme::Mode;
 
 use super::model::Sel;
-use super::{WebAction, WebData, WebPanel, WebStatus, demo_data, demo_detail};
+use super::{KeysInfo, WebAction, WebData, WebPanel, WebStatus, demo_data, demo_detail};
 
 fn run(width: f32, height: f32, scale: f32, mode: Mode, mut f: impl FnMut(&mut egui::Ui)) {
     let ctx = Context::default();
@@ -46,6 +46,7 @@ fn page_stays_inside_its_area_at_all_widths_and_scales() {
                             tls: &tls,
                             detail: Some(&detail),
                             status: WebStatus::Ready,
+                            keys: &KeysInfo::default(),
                         };
                         panel.ui(ui, &d);
                         assert!(
@@ -75,6 +76,7 @@ fn empty_loading_and_error_states_render() {
                 tls: &[],
                 detail: None,
                 status,
+                keys: &KeysInfo::default(),
             };
             assert!(panel.ui(ui, &d).is_empty());
         }
@@ -96,6 +98,7 @@ fn selecting_a_row_requests_its_detail_once() {
             tls: &tls,
             detail: None,
             status: WebStatus::Ready,
+            keys: &KeysInfo::default(),
         };
         loads += panel
             .ui(ui, &d)

@@ -6,6 +6,7 @@ mod actions;
 mod body;
 mod card;
 mod cells;
+mod cert_card;
 mod columns;
 mod curl;
 mod demo;
@@ -14,6 +15,7 @@ mod detail_header;
 mod dock;
 mod headers;
 mod html_text;
+mod keys_bar;
 #[cfg(test)]
 mod layout_tests;
 mod message_card;
@@ -26,7 +28,7 @@ mod table;
 mod table_cells;
 mod timing;
 
-pub use actions::{WebAction, WebData, WebStatus};
+pub use actions::{KeysInfo, WebAction, WebData, WebStatus};
 pub use demo::{demo_data, demo_detail};
 pub use objects::{
     ObjectsAction, ObjectsPanel, ObjectsState, PREVIEW_IMAGE_MAX, PREVIEW_TEXT_BYTES, Preview,
@@ -130,15 +132,15 @@ impl WebPanel {
         let tabs = [(Tab::Exchanges, "Exchanges"), (Tab::Files, "Files")];
         segmented_w(ui, &mut self.tab, &tabs, 220.0);
         ui.add_space(spacing::SM);
+        let mut out = Vec::new();
+        keys_bar::keys_bar(ui, d.keys, &mut out);
+        ui.add_space(spacing::SM);
         if self.tab == Tab::Files {
-            return self
-                .objects
-                .ui(ui)
-                .into_iter()
-                .map(WebAction::Objects)
-                .collect();
+            out.extend(self.objects.ui(ui).into_iter().map(WebAction::Objects));
+            return out;
         }
-        self.exchanges_ui(ui, d)
+        out.extend(self.exchanges_ui(ui, d));
+        out
     }
 
     fn exchanges_ui(&mut self, ui: &mut Ui, d: &WebData) -> Vec<WebAction> {

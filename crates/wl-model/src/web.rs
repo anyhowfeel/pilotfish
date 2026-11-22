@@ -4,6 +4,8 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
+use crate::CertInfo;
+
 /// One HTTP request paired with its response (when seen). Built from tshark `http` fields.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HttpExchange {
@@ -74,6 +76,8 @@ pub struct TlsSession {
     /// Negotiated ALPN protocol ("h2", "http/1.1", "h3"), if any.
     pub alpn: Option<Arc<str>>,
     pub cert_subject: Option<Arc<str>>,
+    /// Certificate chain sent by the server, leaf first (empty when encrypted or not seen).
+    pub certs: Vec<CertInfo>,
     /// Client / server TLS fingerprints (JA3 MD5, JA4, JA3S), when tshark computes them.
     pub ja3: Option<Arc<str>>,
     pub ja4: Option<Arc<str>>,

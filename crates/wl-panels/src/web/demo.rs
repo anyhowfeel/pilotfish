@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use wl_model::{HttpDetail, HttpExchange, HttpMessage, TlsSession};
+use wl_model::{CertInfo, HttpDetail, HttpExchange, HttpMessage, TlsSession};
 
 /// One synthetic exchange (just the fields tests care about).
 pub fn exchange(
@@ -43,6 +43,7 @@ pub fn session(frame: u64, sni: &str) -> TlsSession {
         cipher: Some("TLS_AES_128_GCM_SHA256".into()),
         alpn: Some("h2".into()),
         cert_subject: Some(format!("CN={sni}, O=Example Inc, C=US").into()),
+        certs: demo_chain(sni),
         ja3: Some("e7d705a3286e19ea42f587b344ee6865".into()),
         ja4: Some("t13d1516h2_8daaf6152771_02713d6af862".into()),
         ja3s: Some("eb1d94daa7e0344597e756a1fb6e7054".into()),
@@ -50,6 +51,34 @@ pub fn session(frame: u64, sni: &str) -> TlsSession {
         dst: "93.184.216.34".into(),
         bytes: 48_000 + frame * 1300,
     }
+}
+
+fn demo_chain(sni: &str) -> Vec<CertInfo> {
+    let cert = |subject: String, issuer: &str, sans: Vec<String>, is_ca| CertInfo {
+        subject,
+        issuer: issuer.into(),
+        not_before: 1_735_689_600,
+        not_after: 2_051_222_400,
+        sans,
+        key: if is_ca { "RSA 4096 bit" } else { "EC P-256" }.into(),
+        sig_alg: "sha256WithRSA".into(),
+        serial: "0a1b2c3d4e5f".into(),
+        is_ca,
+    };
+    vec![
+        cert(
+            format!("CN={sni}"),
+            "CN=Example CA R3, O=Example Inc",
+            vec![sni.into()],
+            false,
+        ),
+        cert(
+            "CN=Example CA R3, O=Example Inc".into(),
+            "CN=Example Root",
+            Vec::new(),
+            true,
+        ),
+    ]
 }
 
 fn reason(code: u16) -> &'static str {

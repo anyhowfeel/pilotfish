@@ -2,8 +2,9 @@
 
 use std::time::{Duration, Instant};
 
+use eframe::egui;
 use wl_model::{HttpDetail, HttpExchange, TlsSession};
-use wl_panels::web::{WebAction, WebData, WebStatus, demo_data, demo_detail};
+use wl_panels::web::{KeysInfo, WebAction, WebData, WebStatus, demo_data, demo_detail};
 
 use crate::app::App;
 use crate::dispatch::Command;
@@ -59,7 +60,7 @@ impl WebLink {
         }
     }
 
-    pub fn data(&self) -> WebData<'_> {
+    pub fn data<'a>(&'a self, keys: &'a KeysInfo) -> WebData<'a> {
         let status = if self.unavailable {
             WebStatus::Error("Web analysis is not available in this build.")
         } else if self.loading && self.exchanges.is_empty() && self.tls.is_empty() {
@@ -73,6 +74,7 @@ impl WebLink {
             tls: &self.tls,
             detail: self.detail.as_ref(),
             status,
+            keys,
         }
     }
 
@@ -153,7 +155,12 @@ impl WebLink {
 
 impl App {
     /// Executes what the Web page asked for.
-    pub(crate) fn web_action(&mut self, a: WebAction, cmds: &mut Vec<Command>) {
+    pub(crate) fn web_action(
+        &mut self,
+        a: WebAction,
+        cmds: &mut Vec<Command>,
+        ctx: &egui::Context,
+    ) {
         match a {
             WebAction::LoadDetail(ex) => self.web_link.request_detail(&mut self.ctrl, &ex),
             WebAction::ShowInPackets(n) => {
@@ -166,6 +173,9 @@ impl App {
             WebAction::ApplyFilter(f) => {
                 cmds.push(Command::ApplyFilter(f));
                 self.page = Page::Packets;
+            }
+            keys @ (WebAction::PickKeylog | WebAction::ClearKeylog | WebAction::EmbedKeys) => {
+                self.keys_action(keys, ctx);
             }
         }
     }

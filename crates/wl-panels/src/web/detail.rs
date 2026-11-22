@@ -9,6 +9,7 @@ use wl_model::{HttpDetail, HttpExchange, TlsSession};
 use super::actions::WebAction;
 use super::card::card;
 use super::cells::{cert_cn, cipher_short};
+use super::cert_card::cert_card;
 use super::curl::curl_command;
 use super::detail_header::{http_header, tls_header};
 use super::headers::headers_table;
@@ -105,6 +106,9 @@ pub fn tls_detail(ui: &mut Ui, t: &TlsSession, out: &mut Vec<WebAction>) {
                 |_| {},
                 |ui| headers_table(ui, &tls_rows(t)),
             );
+            if !t.certs.is_empty() {
+                cert_card(ui, t);
+            }
             card(
                 ui,
                 "",
@@ -116,8 +120,8 @@ pub fn tls_detail(ui: &mut Ui, t: &TlsSession, out: &mut Vec<WebAction>) {
                         ui.add(
                             egui::Label::new(
                                 RichText::new(
-                                    "Content is encrypted. Provide an SSLKEYLOGFILE in \
-                                 Settings > Capture to decrypt.",
+                                    "Content is encrypted. Load a TLS key log above, or drop \
+                                 one on the window, to decrypt.",
                                 )
                                 .color(Palette::muted()),
                             )
