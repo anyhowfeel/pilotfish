@@ -2,21 +2,17 @@
 
 use std::sync::Arc;
 
-use wl_kit::egui::{
-    CornerRadius, CursorIcon, ScrollArea, Sense, Stroke, StrokeKind, Ui, pos2, vec2,
-};
+use wl_kit::egui::{ScrollArea, Ui};
 use wl_kit::format;
 use wl_kit::text::contains_ci;
 use wl_kit::theme::{Palette, protocol_color, spacing};
-use wl_kit::widgets::text::elided_galley;
 use wl_kit::widgets::{empty_state, segmented_w};
 use wl_model::{FlowSel, HostStat, StatsSnapshot};
 
-use super::paint::{label_font, mono_font};
-use crate::overview::conversations_sort::{FlowCol, duration, endpoints, visible};
+use super::list_row::{Cell, Lead, ROW, Row, item};
+use crate::overview::conversations_sort::{FlowCol, duration, endpoint_parts, visible};
 use crate::overview::{NameResolver, SortState};
 
-pub const ROW: f32 = 48.0;
 const MAX_HOSTS: usize = 12;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -36,38 +32,12 @@ pub struct List {
     resolver: Option<Box<dyn NameResolver>>,
 }
 
-/// Painted two-line row: `title` over `sub`, optional leading marker rect drawn by `lead`.
-fn item(ui: &mut Ui, selected: bool, title: &str, sub: &str, dot: wl_kit::egui::Color32) -> bool {
-    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), ROW), Sense::click());
-    let p = ui.painter().with_clip_rect(rect);
-    let inner = rect.shrink2(vec2(0.0, 2.0));
-    let radius = CornerRadius::same(6);
-    if selected {
-        p.rect_filled(inner, radius, Palette::selection_bg());
-        p.rect_stroke(
-            inner,
-            radius,
-            Stroke::new(1.0, Palette::accent()),
-            StrokeKind::Inside,
-        );
-    } else if resp.hovered() {
-        p.rect_filled(inner, radius, Palette::surface_hi());
+fn share(bytes: u64, top: u64) -> f32 {
+    if top == 0 {
+        0.0
+    } else {
+        bytes as f32 / top as f32
     }
-    let x0 = inner.left() + spacing::MD;
-    let text_l = x0 + 14.0;
-    let w = inner.right() - spacing::SM - text_l;
-    let t = elided_galley(&p, title, label_font(), Palette::text(), w);
-    let s = elided_galley(&p, sub, mono_font(), Palette::muted(), w);
-    let top = inner.center().y - (t.size().y + 2.0 + s.size().y) / 2.0;
-    // The marker sits on the vertical middle of the title line, whatever the font height.
-    p.circle_filled(pos2(x0 + 3.0, (top + t.size().y / 2.0).round()), 3.5, dot);
-    p.galley(pos2(text_l, top.round()), t.clone(), Palette::text());
-    p.galley(
-        pos2(text_l, (top + t.size().y + 2.0).round()),
-        s,
-        Palette::muted(),
-    );
-    resp.on_hover_cursor(CursorIcon::PointingHand).clicked()
 }
 
 /// Hosts ordered by traffic, filtered by substring.
@@ -171,45 +141,62 @@ impl List {
         range: std::ops::Range<usize>,
     ) -> Option<FlowSel> {
         let mut chosen = None;
+        let top = self.rows.first().map_or(0, |&i| match self.mode {
+            Mode::Conversations => s.conversations[i].bytes,
+            Mode::Hosts => s.hosts[i].bytes_in + s.hosts[i].bytes_out,
+        });
         for r in range {
             let idx = self.rows[r];
             if self.mode == Mode::Conversations {
                 let c = &s.conversations[idx];
                 let sel = FlowSel::Conversation(c.key.clone());
-                // Fixed-width fields so the figures line up from one row to the next.
                 let who = self.resolver.as_ref().and_then(|r| r.flow_process(&c.key));
-                let sub = format!(
-                    "{:<6}{:>6}  {:>10}  {:>8}{}",
-                    c.protocol,
-                    format::count(c.packets),
-                    format::bytes(c.bytes),
-                    format::duration(duration(c)),
-                    who.map(|p| format!("  {}", p.name)).unwrap_or_default()
-                );
-                let dot = protocol_color(&c.protocol);
-                if item(ui, current == Some(&sel), &endpoints(c), &sub, dot) {
+                let mut title = endpoint_parts(c);
+                if let Some(p) = who {
+                    title.push((format!("  {}", p.name), true));
+                }
+                let cells = [
+                    Cell::new(format!("{} pkts", format::count(c.packets)), 64.0, 2),
+                    Cell::new(format::bytes(c.bytes), 68.0, 0),
+                    Cell::new(format::duration(duration(c)), 56.0, 1),
+                ];
+                let row = Row {
+                    selected: current == Some(&sel),
+                    title: &title,
+                    lead: Lead::Protocol(&c.protocol, protocol_color(&c.protocol)),
+                    cells: &cells,
+                    share: share(c.bytes, top),
+                };
+                if item(ui, &row) {
                     chosen = Some(sel);
                 }
             } else {
-                chosen = chosen.or(self.host_row(ui, &s.hosts[idx]));
+                chosen = chosen.or(self.host_row(ui, &s.hosts[idx], top));
             }
         }
         chosen
     }
 
-    fn host_row(&mut self, ui: &mut Ui, h: &HostStat) -> Option<FlowSel> {
+    fn host_row(&mut self, ui: &mut Ui, h: &HostStat, top: u64) -> Option<FlowSel> {
         let on = self.picked.contains(&h.addr);
-        let sub = format!(
-            "{} in  {} out",
-            format::bytes(h.bytes_in),
-            format::bytes(h.bytes_out)
-        );
         let dot = if on {
             Palette::accent()
         } else {
             Palette::muted()
         };
-        if !item(ui, on, &h.addr, &sub, dot) {
+        let cells = [
+            Cell::new(format!("{} in", format::bytes(h.bytes_in)), 88.0, 0),
+            Cell::new(format!("{} out", format::bytes(h.bytes_out)), 96.0, 1),
+        ];
+        let title = [(h.addr.to_string(), false)];
+        let row = Row {
+            selected: on,
+            title: &title,
+            lead: Lead::Dot(dot),
+            cells: &cells,
+            share: share(h.bytes_in + h.bytes_out, top),
+        };
+        if !item(ui, &row) {
             return None;
         }
         if on {

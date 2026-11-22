@@ -89,47 +89,64 @@ pub fn proportion_bar(ui: &mut Ui, items: &[(String, f64, Color32)], height: f32
     });
 }
 
-/// Ranked list: each row is a tinted bar (relative to the max value) with the label on the left
-/// (elided) and the value text right-aligned in monospace. Rows are expected sorted by caller.
+const RANKED_ROW_H: f32 = 34.0;
+const RANKED_BAR_H: f32 = 4.0;
+
+/// Splits "http \u{00B7} 80/TCP" into the name and its muted detail.
+fn split_detail(label: &str) -> (&str, Option<&str>) {
+    match label.split_once(" \u{00B7} ") {
+        Some((name, rest)) => (name, Some(rest)),
+        None => (label, None),
+    }
+}
+
+/// Ranked list: label on the left and value (right-aligned, monospace) on one line, a thin bar
+/// relative to the max underneath. A " \u{00B7} detail" suffix of the label is muted.
+/// Rows are expected sorted by caller.
 pub fn ranked_bars(ui: &mut Ui, rows: &[(String, f64, String)], color: Color32) {
     let max = rows.iter().map(|r| r.1).fold(0.0, f64::max);
     let font = FontId::proportional(13.0);
     let vfont = FontId::monospace(12.5);
     let w = ui.available_width();
     let prev = ui.spacing().item_spacing.y;
-    ui.spacing_mut().item_spacing.y = 3.0;
-    let (bg_a, bar_a) = bar_alphas();
+    ui.spacing_mut().item_spacing.y = spacing::XS;
+    let (track_a, _) = bar_alphas();
     let vw = rows
         .iter()
         .map(|r| text::text_width(ui, &r.2, vfont.clone()))
         .fold(0.0, f32::max);
     for (label, v, vt) in rows {
-        let (rect, resp) = ui.allocate_exact_size(vec2(w, row_h()), Sense::hover());
+        let (rect, resp) = ui.allocate_exact_size(vec2(w, RANKED_ROW_H), Sense::hover());
         let p = ui.painter().with_clip_rect(rect);
-        let r = CornerRadius::same(5);
-        p.rect_filled(rect, r, tint(color, bg_a));
-        let bar = Rect::from_min_size(
-            rect.min,
-            vec2((rect.width() * fraction(*v, max)).max(2.0), row_h()),
-        );
-        p.rect_filled(bar, r, tint(color, bar_a));
-        let inner = rect.shrink2(vec2(spacing::SM, 0.0));
-        let val_rect = Rect::from_min_max(pos2(inner.right() - vw, inner.top()), inner.max);
-        let lab_rect = Rect::from_min_max(
+        let inner = rect.shrink2(vec2(spacing::XS, 0.0));
+        let line = Rect::from_min_size(
             inner.min,
-            pos2(
-                (val_rect.left() - spacing::MD).max(inner.left()),
-                inner.bottom(),
-            ),
+            vec2(inner.width(), RANKED_ROW_H - RANKED_BAR_H - 6.0),
         );
-        let cut = text::paint_in(
+        let val_rect = Rect::from_min_max(pos2(line.right() - vw, line.top()), line.max);
+        let room = (val_rect.left() - spacing::MD - line.left()).max(0.0);
+        let (name, detail) = split_detail(label);
+        let name_w = text::text_width(ui, name, font.clone()).min(room);
+        let name_rect = Rect::from_min_size(line.min, vec2(name_w, line.height()));
+        let mut cut = text::paint_in(
             &p,
-            lab_rect,
-            label,
+            name_rect,
+            name,
             font.clone(),
             Palette::text(),
             Align::Min,
         );
+        if let Some(d) = detail {
+            let left = name_rect.right() + spacing::SM;
+            let rest = Rect::from_min_max(
+                pos2(left, line.top()),
+                pos2(
+                    (left + (room - name_w - spacing::SM).max(0.0)).max(left),
+                    line.bottom(),
+                ),
+            );
+            cut |= text::paint_in(&p, rest, d, font.clone(), Palette::muted(), Align::Min);
+        }
         text::paint_in(
             &p,
             val_rect,
@@ -138,6 +155,17 @@ pub fn ranked_bars(ui: &mut Ui, rows: &[(String, f64, String)], color: Color32) 
             Palette::muted(),
             Align::Max,
         );
+        let track = Rect::from_min_size(
+            pos2(inner.left(), rect.bottom() - RANKED_BAR_H - 2.0),
+            vec2(inner.width(), RANKED_BAR_H),
+        );
+        let r = CornerRadius::same((RANKED_BAR_H / 2.0) as u8);
+        p.rect_filled(track, r, tint(color, track_a));
+        let fill = Rect::from_min_size(
+            track.min,
+            vec2((track.width() * fraction(*v, max)).max(2.0), RANKED_BAR_H),
+        );
+        p.rect_filled(fill, r, tint(color, 210));
         if cut {
             resp.on_hover_text(label);
         }
@@ -193,4 +221,18 @@ pub fn protocol_ranked_bars(ui: &mut Ui, rows: &[(String, f64, String)]) {
         );
     }
     ui.spacing_mut().item_spacing.y = prev;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_detail;
+
+    #[test]
+    fn detail_suffix_is_split_off_the_label() {
+        assert_eq!(
+            split_detail("http \u{00B7} 80/TCP"),
+            ("http", Some("80/TCP"))
+        );
+        assert_eq!(split_detail("10.0.0.1"), ("10.0.0.1", None));
+    }
 }

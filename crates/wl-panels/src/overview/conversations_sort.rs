@@ -36,6 +36,29 @@ pub fn endpoints(c: &ConversationStat) -> String {
     )
 }
 
+/// Address and port of both ends as styled parts: `(text, muted)`.
+pub fn endpoint_parts(c: &ConversationStat) -> Vec<(String, bool)> {
+    let mut out = Vec::new();
+    for (i, (addr, port)) in [(&c.key.a, c.key.a_port), (&c.key.b, c.key.b_port)]
+        .into_iter()
+        .enumerate()
+    {
+        if i == 1 {
+            out.push(("  <->  ".to_owned(), true));
+        }
+        let host = if port.is_some() && addr.contains(':') {
+            format!("[{addr}]")
+        } else {
+            addr.to_string()
+        };
+        out.push((host, false));
+        if let Some(p) = port {
+            out.push((format!(":{p}"), true));
+        }
+    }
+    out
+}
+
 fn end(addr: &str, port: Option<u16>) -> String {
     match port {
         Some(p) if addr.contains(':') => format!("[{addr}]:{p}"),
@@ -136,6 +159,11 @@ mod tests {
             "ip.addr == 10.0.0.1 && ip.addr == 1.1.1.1 && tcp.port == 5000 && tcp.port == 443"
         );
         assert_eq!(endpoints(&v[0]), "10.0.0.1:5000 <-> 1.1.1.1:443");
+        let parts: String = endpoint_parts(&v[0]).into_iter().map(|p| p.0).collect();
+        assert_eq!(
+            parts.split_whitespace().collect::<Vec<_>>().join(" "),
+            "10.0.0.1:5000 <-> 1.1.1.1:443"
+        );
     }
 
     #[test]

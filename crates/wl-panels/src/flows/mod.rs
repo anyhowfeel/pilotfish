@@ -8,6 +8,7 @@ mod grip;
 mod header;
 mod lanes;
 mod list;
+mod list_row;
 mod marks;
 mod paint;
 mod parts;
