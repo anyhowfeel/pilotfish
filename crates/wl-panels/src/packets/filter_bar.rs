@@ -7,7 +7,9 @@ use eframe::egui::{self, CursorIcon, Key, RichText, Sense, Ui, Vec2};
 use crate::features::{FieldCatalog, FilterAutocomplete, ValueIndex};
 use crate::packets::actions::PacketsAction;
 use crate::packets::filter_history::History;
+use crate::packets::filter_presets::{Presets, SavedFilter};
 use crate::packets::kit::{Palette, danger, ok, spacing, warn};
+use crate::packets::presets_menu::{self, MenuEdit};
 use crate::packets::quick_bar;
 use crate::packets::quick_filter::QuickChip;
 
@@ -27,6 +29,8 @@ pub struct FilterBar {
     /// Time of the last edit that still needs validation.
     edited_at: Option<f64>,
     history: History,
+    presets: Presets,
+    presets_edit: MenuEdit,
     autocomplete: FilterAutocomplete,
 }
 
@@ -37,6 +41,8 @@ impl Default for FilterBar {
             status: FilterStatus::Empty,
             edited_at: None,
             history: History::default(),
+            presets: Presets::default(),
+            presets_edit: MenuEdit::default(),
             autocomplete: FilterAutocomplete::default(),
         }
     }
@@ -75,6 +81,14 @@ impl FilterBar {
 
     pub fn set_history(&mut self, items: Vec<String>) {
         self.history.set(items);
+    }
+
+    pub fn presets(&self) -> &[SavedFilter] {
+        self.presets.items()
+    }
+
+    pub fn set_presets(&mut self, items: Vec<SavedFilter>) {
+        self.presets.set(items);
     }
 
     /// Programmatic change (context menu, chips): starts validation immediately.
@@ -134,6 +148,11 @@ impl FilterBar {
                     .button("Apply")
                     .on_hover_cursor(CursorIcon::PointingHand)
                     .on_hover_text("Apply display filter (Enter)");
+                if let Some(expr) =
+                    presets_menu::menu(ui, &mut self.presets, &self.text, &mut self.presets_edit)
+                {
+                    chosen = Some(expr);
+                }
                 let hist = self.history.items().to_vec();
                 ui.add_enabled_ui(!hist.is_empty(), |ui| {
                     ui.menu_button("History", |ui| {

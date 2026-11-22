@@ -146,6 +146,9 @@ Environment variables:
   extracted objects.
 - **Insights**: plain-language findings (including port scans, sweeps, beaconing and odd DNS
   names), expert info, protocol hierarchy, DNS log.
+- **Diff**: compares the open capture with a second one (`--diff FILE` or the Choose capture
+  button): new, missing and changed hosts, services, mean latencies, HTTP hosts, status codes and
+  TLS server names.
 - Command palette (`Ctrl+K`), settings (`Ctrl+,`), dark and light themes.
 
 Shift+click on a sidebar entry opens that page in a separate window.
@@ -197,7 +200,9 @@ Tests that need `tshark` or loopback capture rights skip themselves when those a
 - Everything depends on the installed Wireshark version; field names follow `tshark` 4.x.
 - Files over a few hundred thousand packets load quickly but `tshark` itself uses a lot of
   memory on them.
-- The filter suggestions after an operator cover addresses and ports, not names.
+- Name suggestions in the filter (DNS log, SNI, HTTP Host) appear once the background scan of an
+  opened file has finished, and only for the names the capture itself contains; there is no
+  reverse lookup.
 - The findings in Insights are heuristics with thresholds you can tune in Settings > Insights (by default 20
   ports for a scan, 8 connections for a steady rhythm); expect false positives from polling and keep-alives.
 - Threat lists are matched offline from files you provide; they match exact addresses and domains (and their parent

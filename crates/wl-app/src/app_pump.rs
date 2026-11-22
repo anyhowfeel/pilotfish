@@ -31,6 +31,13 @@ impl App {
         }
     }
 
+    pub(crate) fn save_presets(&mut self) {
+        if self.packets.filter_presets() != self.prefs.filter_presets && self.shot.is_none() {
+            self.prefs.filter_presets = self.packets.filter_presets().to_vec();
+            self.prefs.save();
+        }
+    }
+
     pub(crate) fn save_layout(&mut self) {
         let t = self.packets.table_prefs();
         if t != self.prefs.table {
@@ -47,15 +54,20 @@ impl App {
         }
     }
 
-    /// Feeds the filter boxes with the hosts and ports of the capture, when they changed.
+    /// Feeds the filter boxes with the hosts, ports and names of the capture, when they changed.
     fn refresh_filter_values(&mut self) {
         let stats = self.ctrl.snapshot();
-        let key = (stats.hosts.len(), stats.conversations.len());
+        let key = (
+            stats.hosts.len(),
+            stats.conversations.len(),
+            self.hub.names.1,
+        );
         if self.values_key == Some(key) {
             return;
         }
         self.values_key = Some(key);
-        let values = std::sync::Arc::new(wl_panels::features::ValueIndex::from_stats(stats));
+        let index = wl_panels::features::ValueIndex::from_stats(stats);
+        let values = std::sync::Arc::new(index.with_names(self.hub.names.0.clone()));
         self.gh.panel.set_values(values.clone());
         self.packets.set_filter_values(values);
     }

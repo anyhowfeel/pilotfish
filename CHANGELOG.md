@@ -16,6 +16,14 @@ and the project follows [Semantic Versioning](https://semver.org/).
   secrets, but the exported reports always mask them.
 - **Tunable Insights.** Settings > Insights sets the thresholds of the port scan, sweep, steady rhythm and long DNS name
   findings. Right-clicking a finding mutes a host or a kind of finding, and the muted list is managed on the same page.
+- **Capture Diff page.** It compares the open capture with a second one, picked from the page or given with `--diff`.
+  It lists the hosts, services (endpoints and server port, so changing client ports do not count), mean HTTP and DNS
+  latencies, HTTP hosts, status codes and TLS server names that are new, missing or changed, biggest change first.
+- **Saved filters.** The filter bar has a Saved menu to keep the current filter under a name, apply it again, rename it
+  or delete it. They are remembered between sessions.
+- **The filter box suggests names.** After `ip.addr ==` typing a domain offers the addresses it resolved to in the DNS
+  log or the TLS handshake, and each suggested address shows its name. `http.host`, `dns.qry.name` and the TLS server
+  name field suggest the names seen in the capture.
 
 ### Changed
 - **New screenshots in the README.** It shows nine pages instead of six (Hosts with its locations, Insights and the

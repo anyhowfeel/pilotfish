@@ -44,7 +44,8 @@ pub struct App {
     pub(crate) map: TopologyView,
     pub(crate) demo_map: Option<wl_model::StatsSnapshot>,
     /// Size of the stats the filter value suggestions were last built from.
-    pub(crate) values_key: Option<(usize, usize)>,
+    pub(crate) values_key: Option<(usize, usize, u64)>,
+    pub(crate) diff: crate::diff_hub::DiffHub,
     pub(crate) web: WebPanel,
     pub(crate) web_link: WebLink,
     pub(crate) flows: FlowsPanel,
@@ -130,6 +131,7 @@ impl App {
             map,
             demo_map: cli.demo_map.then(|| demo_snapshot(40, 120)),
             values_key: None,
+            diff: crate::diff_hub::DiffHub::new(backend.clone()),
             web: WebPanel::default(),
             web_link: WebLink::new(cli.demo_web),
             flows: FlowsPanel::default(),
@@ -170,6 +172,8 @@ impl App {
         app.packets.set_table_prefs(app.prefs.table.clone());
         app.packets
             .set_filter_history(app.prefs.filter_history.clone());
+        app.packets
+            .set_filter_presets(app.prefs.filter_presets.clone());
         let lookup = app.streams.clone();
         app.convs
             .set_stream_lookup(Box::new(move |k| lookup.borrow().get(k).copied()));
@@ -178,6 +182,9 @@ impl App {
         }
         if let Some(a) = &cli.map_select {
             app.map.select_host(a);
+        }
+        if let Some(f) = &cli.diff {
+            app.diff.set_other(f.clone());
         }
         if let Some(f) = cli.file() {
             app.execute(Command::OpenFile(f.clone()), &cc.egui_ctx);

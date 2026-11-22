@@ -9,8 +9,8 @@ use wl_model::{
     SecurityData, StatsSnapshot, StreamConversation, StreamFormat, StreamProtocol, ThreatIntel,
 };
 use wl_panels::features::{
-    BookmarkStore, CommandPalette, FieldCatalog, InsightsPanel, PaletteAction, PalettePage,
-    StreamView, StreamViewAction,
+    BookmarkStore, CommandPalette, FieldCatalog, InsightsAction, InsightsPanel, NameBook,
+    PaletteAction, PalettePage, StreamView, StreamViewAction, synthesize_insights,
 };
 use wl_panels::insights::InsightRules;
 
@@ -21,7 +21,7 @@ enum Msg {
     Fields(Arc<FieldCatalog>),
     Stream(Result<StreamConversation, CaptureError>),
     Insights(Option<ExpertReport>, Option<ProtocolHierarchy>),
-    Behavior(BehaviorData),
+    Behavior(BehaviorData, NameBook),
     Security(SecurityData),
     ExportDone(Result<String, String>),
 }
@@ -63,6 +63,8 @@ pub struct FeaturesHub {
     pub security: Option<SecurityData>,
     pub intel: Arc<ThreatIntel>,
     pub rules: InsightRules,
+    /// Names for the filter suggestions and how many times they were rebuilt.
+    pub names: (Arc<NameBook>, u64),
     tx: Sender<Msg>,
     rx: Receiver<Msg>,
     pub notice: Option<String>,
@@ -96,6 +98,7 @@ impl FeaturesHub {
             security: None,
             intel: Arc::default(),
             rules: InsightRules::default(),
+            names: (Arc::default(), 0),
             tx,
             rx,
             notice: None,
@@ -108,6 +111,7 @@ impl FeaturesHub {
         self.phs = None;
         self.behavior = None;
         self.security = None;
+        self.names = (Arc::default(), self.names.1 + 1);
         self.stream_view.close();
     }
 
@@ -134,12 +138,20 @@ impl FeaturesHub {
             )
         });
         self.spawn_job(&file, &ctx, |b, f| {
-            let (channels, dns) = std::thread::scope(|s| {
+            let (channels, dns, tls, http) = std::thread::scope(|s| {
                 let c = s.spawn(|| b.behavior_channels(f).unwrap_or_default());
+                let t = s.spawn(|| b.tls_sessions(f).unwrap_or_default());
+                let h = s.spawn(|| b.http_exchanges(f).unwrap_or_default());
                 let d = b.dns_queries(f).unwrap_or_default();
-                (c.join().unwrap_or_default(), d)
+                (
+                    c.join().unwrap_or_default(),
+                    d,
+                    t.join().unwrap_or_default(),
+                    h.join().unwrap_or_default(),
+                )
             });
-            Msg::Behavior(BehaviorData { channels, dns })
+            let names = NameBook::build(&dns, &tls, &http);
+            Msg::Behavior(BehaviorData { channels, dns }, names)
         });
         self.spawn_security(&file, &ctx);
     }
@@ -179,8 +191,11 @@ impl FeaturesHub {
                     self.expert = e;
                     self.phs = p;
                 }
-                Msg::Behavior(b) => self.behavior = Some(b),
                 Msg::Security(s) => self.security = Some(s),
+                Msg::Behavior(b, names) => {
+                    self.behavior = Some(b);
+                    self.names = (Arc::new(names), self.names.1 + 1);
+                }
                 Msg::ExportDone(Ok(n)) => self.notice = Some(n),
                 Msg::ExportDone(Err(e)) => self.error = Some(e),
             }

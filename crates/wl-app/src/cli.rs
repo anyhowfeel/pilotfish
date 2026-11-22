@@ -21,7 +21,7 @@ pub struct Cli {
     #[arg(hide = true, long, value_name = "PNG")]
     pub screenshot: Option<PathBuf>,
     /// Page to open: capture, overview, graphs, packets, hosts, map, conversations, flows, web,
-    /// insights.
+    /// insights, diff.
     #[arg(long, value_name = "NAME")]
     pub page: Option<String>,
     /// UI scale factor, e.g. 1.25.
@@ -48,6 +48,9 @@ pub struct Cli {
     /// Open a page in its own window (repeatable), like Shift+click in the sidebar.
     #[arg(long, value_name = "PAGE")]
     pub detach: Vec<String>,
+    /// Second capture to compare with the opened one on the Diff page.
+    #[arg(long, value_name = "FILE")]
+    pub diff: Option<PathBuf>,
     /// Display filter applied to the opened capture (like typing it in the filter bar).
     #[arg(long, value_name = "EXPR")]
     pub filter: Option<String>,
@@ -115,6 +118,7 @@ impl Cli {
         self.page
             .as_deref()
             .and_then(Page::parse)
+            .or(self.diff.is_some().then_some(Page::Diff))
             .or(self.demo_map.then_some(Page::Map))
             .or(self.demo_web.then_some(Page::Web))
             .or(self.flow_select.is_some().then_some(Page::Flows))
