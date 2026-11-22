@@ -223,3 +223,41 @@ fn saving_replaces_existing_comments_and_refuses_the_original() {
     assert!(b.save_with_comments(&one, &[bm(1, "x")], &one).is_err());
     assert_eq!(b.packet_comments(&one).expect("intact").len(), 2);
 }
+
+#[test]
+fn embedding_leaves_out_keys_of_other_sessions() {
+    let Some(b) = backend() else { return };
+    let pcap = fixture("web-tls.pcapng");
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut text = std::fs::read_to_string(fixture("web-tls.keylog")).expect("keylog");
+    let bogus = format!("CLIENT_RANDOM {} {}", "ab".repeat(32), "cd".repeat(48));
+    text.push_str(&format!("{bogus}\n"));
+    let keylog = dir.path().join("extra.keylog");
+    std::fs::write(&keylog, text).expect("write");
+    let out = dir.path().join("with-keys.pcapng");
+
+    b.set_tls_keylog(Some(keylog));
+    b.embed_tls_keys(&pcap, &out).expect("embed");
+    b.set_tls_keylog(None);
+
+    let bytes = std::fs::read(&out).expect("read");
+    assert!(!bytes.windows(bogus.len()).any(|w| w == bogus.as_bytes()));
+    assert!(!bytes.windows(32).any(|w| w == "ab".repeat(16).as_bytes()));
+    assert_eq!(b.http_exchanges(&out).expect("embedded").len(), 2);
+}
+
+#[test]
+fn embedding_fails_when_no_key_belongs_to_the_capture() {
+    let Some(b) = backend() else { return };
+    let dir = tempfile::tempdir().expect("tempdir");
+    let keylog = dir.path().join("other.keylog");
+    std::fs::write(
+        &keylog,
+        format!("CLIENT_RANDOM {} {}\n", "ab".repeat(32), "cd".repeat(48)),
+    )
+    .expect("write");
+    b.set_tls_keylog(Some(keylog));
+    let out = dir.path().join("out.pcapng");
+    assert!(b.embed_tls_keys(&fixture("web-tls.pcapng"), &out).is_err());
+    assert!(!out.exists());
+}

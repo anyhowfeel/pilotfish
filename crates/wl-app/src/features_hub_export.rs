@@ -16,7 +16,7 @@ impl FeaturesHub {
                 .add_filter(ext, &[ext])
                 .save_file()
             {
-                let _ = tx.try_send(Msg::ExportDone(write_fn(&p)));
+                let _ = tx.try_send((None, Msg::ExportDone(write_fn(&p))));
                 ctx.request_repaint();
             }
         });

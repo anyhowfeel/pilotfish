@@ -131,7 +131,7 @@ impl App {
         }
         if let Some(p) = ctx.input(|i| i.raw.dropped_files.first().map(|f| f.path().to_path_buf()))
         {
-            self.dropped_file(p, ctx);
+            self.keys.probe_dropped(p, ctx);
         }
         self.pump_keys(ctx);
         let gh_changed = self.gh.pump(&mut self.dashboard);

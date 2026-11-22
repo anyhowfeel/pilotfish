@@ -18,6 +18,9 @@ use wl_panels::insights::InsightRules;
 use crate::export_data::{write_html_report, write_packets_csv, write_stats_json};
 use crate::page::Page;
 
+/// Results of scans that belong to one capture carry its generation: `None` means valid for any.
+type Tagged = (Option<u64>, Msg);
+
 enum Msg {
     Fields(Arc<FieldCatalog>),
     Stream(Result<StreamConversation, CaptureError>),
@@ -67,8 +70,9 @@ pub struct FeaturesHub {
     pub rules: InsightRules,
     /// Names for the filter suggestions and how many times they were rebuilt.
     pub names: (Arc<NameBook>, u64),
-    tx: Sender<Msg>,
-    rx: Receiver<Msg>,
+    generation: u64,
+    tx: Sender<Tagged>,
+    rx: Receiver<Tagged>,
     pub notice: Option<String>,
     pub error: Option<String>,
 }
@@ -81,7 +85,7 @@ impl FeaturesHub {
             std::thread::spawn(move || {
                 if let Ok(fields) = b.filter_fields(None) {
                     let catalog = Arc::new(FieldCatalog::from_fields(fields));
-                    let _ = tx2.try_send(Msg::Fields(catalog));
+                    let _ = tx2.try_send((None, Msg::Fields(catalog)));
                     ctx.request_repaint();
                 }
             });
@@ -101,6 +105,7 @@ impl FeaturesHub {
             intel: Arc::default(),
             rules: InsightRules::default(),
             names: (Arc::default(), 0),
+            generation: 0,
             tx,
             rx,
             notice: None,
@@ -114,7 +119,11 @@ impl FeaturesHub {
         self.behavior = None;
         self.security = None;
         self.names = (Arc::default(), self.names.1 + 1);
+        self.bookmarks.clear();
+        self.bookmark_comment.clear();
+        self.bookmark_frame = None;
         self.stream_view.close();
+        self.generation += 1;
     }
 
     fn spawn_job<F>(&self, file: &Arc<PathBuf>, ctx: &egui::Context, job: F)
@@ -123,8 +132,9 @@ impl FeaturesHub {
     {
         let Some(b) = self.tshark.clone() else { return };
         let (file, tx, ctx) = (file.clone(), self.tx.clone(), ctx.clone());
+        let generation = Some(self.generation);
         std::thread::spawn(move || {
-            let _ = tx.try_send(job(&b, &file));
+            let _ = tx.try_send((generation, job(&b, &file)));
             ctx.request_repaint();
         });
     }
@@ -175,10 +185,11 @@ impl FeaturesHub {
                 .set_error("tshark backend unavailable".into());
             return;
         };
-        let tx = self.tx.clone();
+        let (tx, generation) = (self.tx.clone(), Some(self.generation));
         std::thread::spawn(move || {
-            let _ = tx.try_send(Msg::Stream(
-                b.follow_stream(&file, protocol, stream_id, format),
+            let _ = tx.try_send((
+                generation,
+                Msg::Stream(b.follow_stream(&file, protocol, stream_id, format)),
             ));
             ctx.request_repaint();
         });
@@ -186,7 +197,10 @@ impl FeaturesHub {
 
     pub fn poll(&mut self) -> (Option<Arc<FieldCatalog>>, bool) {
         let (mut fields, mut changed) = (None, false);
-        while let Ok(msg) = self.rx.try_recv() {
+        while let Ok((generation, msg)) = self.rx.try_recv() {
+            if generation.is_some_and(|g| g != self.generation) {
+                continue;
+            }
             changed = true;
             match msg {
                 Msg::Fields(f) => fields = Some(f),
@@ -203,7 +217,9 @@ impl FeaturesHub {
                 }
                 Msg::Comments(list) => {
                     for c in list {
-                        self.bookmarks.set(c.frame_no, c.comment);
+                        if self.bookmarks.comment(c.frame_no).is_none_or(str::is_empty) {
+                            self.bookmarks.set(c.frame_no, c.comment);
+                        }
                     }
                 }
                 Msg::ExportDone(Ok(n)) => self.notice = Some(n),
@@ -265,3 +281,7 @@ fn map_page(p: PalettePage) -> Page {
         PalettePage::Insights => Page::Insights,
     }
 }
+
+#[cfg(test)]
+#[path = "features_hub_tests.rs"]
+mod tests;
