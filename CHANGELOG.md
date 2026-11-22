@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to wirelens are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+All notable changes to pilotfish (formerly wirelens) are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
@@ -155,8 +155,8 @@ First public prototype of wirelens, a desktop packet viewer written in Rust with
 - **Release binaries** built by the CI for Linux (`x86_64`, `aarch64`, Arch Linux), macOS (`arm64`, `x86_64`) and
   Windows (`x86_64`).
 
-[Unreleased]: https://github.com/anyhowfeel/wirelens/compare/v0.4.0...HEAD
-[0.4.0]: https://github.com/anyhowfeel/wirelens/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/anyhowfeel/wirelens/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/anyhowfeel/wirelens/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/anyhowfeel/wirelens/releases/tag/v0.1.0
+[Unreleased]: https://github.com/anyhowfeel/pilotfish/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/anyhowfeel/pilotfish/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/anyhowfeel/pilotfish/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/anyhowfeel/pilotfish/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/anyhowfeel/pilotfish/releases/tag/v0.1.0

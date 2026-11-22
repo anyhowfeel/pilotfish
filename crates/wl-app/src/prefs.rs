@@ -81,10 +81,10 @@ impl Prefs {
     }
 
     pub fn path() -> Option<PathBuf> {
-        // WIRELENS_CONFIG_DIR redirects the file (screenshots / tests must not touch real prefs).
-        let dir = std::env::var_os("WIRELENS_CONFIG_DIR")
+        // PILOTFISH_CONFIG_DIR redirects the file (screenshots / tests must not touch real prefs).
+        let dir = crate::app_paths::env_override("CONFIG_DIR")
             .map(PathBuf::from)
-            .or_else(|| dirs::config_dir().map(|d| d.join("wirelens")))?;
+            .or_else(|| dirs::config_dir().map(|d| d.join("pilotfish")))?;
         Some(dir.join("prefs.json"))
     }
 

@@ -18,7 +18,7 @@ pub fn brand(ui: &mut egui::Ui, labels: bool) {
             rect.center().y,
         ),
         Align2::LEFT_CENTER,
-        "wirelens",
+        "pilotfish",
         FontId::proportional(19.0),
         Palette::text(),
     );

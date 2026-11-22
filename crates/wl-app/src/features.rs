@@ -100,7 +100,7 @@ impl Default for SessionState {
 
 impl SessionState {
     pub fn default_path() -> Option<PathBuf> {
-        dirs::config_dir().map(|d| d.join("wirelens").join("session.json"))
+        dirs::config_dir().map(|d| d.join("pilotfish").join("session.json"))
     }
 
     /// Loads session JSON from `path`, gracefully falling back to defaults if missing or corrupt.

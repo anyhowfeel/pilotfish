@@ -1,4 +1,4 @@
-//! Location databases managed from Settings: downloads proposed by wirelens and files added by
+//! Location databases managed from Settings: downloads proposed by pilotfish and files added by
 //! the user, all kept in one folder that `GeoDb` reads first.
 use std::collections::{HashMap, HashSet};
 use std::io;
@@ -13,7 +13,7 @@ use wl_panels::settings::{GeoDbInfo, GeoDbRow, GeoDbState};
 
 use crate::geo::GeoDb;
 
-/// A database wirelens can download. DB-IP publishes a new "Lite" file every month.
+/// A database pilotfish can download. DB-IP publishes a new "Lite" file every month.
 pub struct Source {
     pub id: &'static str,
     pub title: &'static str,
@@ -249,7 +249,7 @@ fn download_gz(url: &str, dir: &Path, file: &str) -> Result<(), String> {
         .into();
     let response = agent
         .get(url)
-        .header("User-Agent", "wirelens")
+        .header("User-Agent", "pilotfish")
         .call()
         .map_err(|e| format!("{e}"))?;
     let body = response

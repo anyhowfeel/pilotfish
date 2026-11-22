@@ -42,9 +42,9 @@ impl Default for IntelStore {
 }
 
 fn primary_dir() -> PathBuf {
-    std::env::var_os("WIRELENS_INTEL_DIR")
+    crate::app_paths::env_override("INTEL_DIR")
         .map(PathBuf::from)
-        .or_else(|| dirs::data_dir().map(|d| d.join("wirelens").join("intel")))
+        .or_else(|| dirs::data_dir().map(|d| d.join("pilotfish").join("intel")))
         .unwrap_or_default()
 }
 

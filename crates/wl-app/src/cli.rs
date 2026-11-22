@@ -7,7 +7,7 @@ use crate::page::Page;
 
 #[derive(Parser, Debug, Clone, Default)]
 #[command(
-    name = "wirelens",
+    name = "pilotfish",
     version,
     about = "Packet capture viewer built on tshark"
 )]

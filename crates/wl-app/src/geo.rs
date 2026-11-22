@@ -18,15 +18,15 @@ pub struct GeoDb {
 impl GeoDb {
     pub fn search_dirs() -> Vec<PathBuf> {
         let mut v = Vec::new();
-        if let Some(d) = std::env::var_os("WIRELENS_GEO_DIR") {
+        if let Some(d) = crate::app_paths::env_override("GEO_DIR") {
             v.push(PathBuf::from(d));
         }
         if let Some(d) = dirs::data_dir() {
-            v.push(d.join("wirelens").join("geo"));
+            v.push(d.join("pilotfish").join("geo"));
             v.push(d.join("qBittorrent").join("GeoDB"));
         }
         if let Some(d) = dirs::config_dir() {
-            v.push(d.join("wirelens").join("geo"));
+            v.push(d.join("pilotfish").join("geo"));
         }
         for d in [
             "/usr/share/GeoIP",
@@ -42,7 +42,7 @@ impl GeoDb {
     pub fn primary_dir() -> PathBuf {
         Self::search_dirs()
             .into_iter()
-            .find(|d| d.ends_with("wirelens/geo"))
+            .find(|d| d.ends_with("pilotfish/geo"))
             .unwrap_or_default()
     }
 

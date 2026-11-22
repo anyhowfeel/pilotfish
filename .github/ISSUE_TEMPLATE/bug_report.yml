@@ -22,8 +22,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: wirelens version or commit
-      description: Output of `wirelens --version`, or the commit you built.
+      label: pilotfish version or commit
+      description: Output of `pilotfish --version`, or the commit you built.
     validations:
       required: true
   - type: input

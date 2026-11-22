@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use eframe::egui;
 
-const WINDOW_PNG: &[u8] = include_bytes!("../../../assets/logo/wirelens-256.png");
+const WINDOW_PNG: &[u8] = include_bytes!("../../../assets/logo/pilotfish-256.png");
 
 fn decode(png: &[u8]) -> Option<image::RgbaImage> {
     image::load_from_memory(png)

@@ -134,9 +134,9 @@ jobs:
       - name: Package
         shell: bash
         run: |
-          name="wirelens-${GITHUB_REF_NAME//\//-}-${{ matrix.name }}"
+          name="pilotfish-${GITHUB_REF_NAME//\//-}-${{ matrix.name }}"
           mkdir -p "dist/$name"
-          bin="target/${{ matrix.target }}/release/wirelens"
+          bin="target/${{ matrix.target }}/release/pilotfish"
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             cp "$bin.exe" "dist/$name/"
             cp README.md LICENSE CHANGELOG.md "dist/$name/"
@@ -156,25 +156,25 @@ jobs:
         if: startsWith(matrix.name, 'macos')
         run: |
           ver=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
-          app=dmg/wirelens.app
+          app=dmg/pilotfish.app
           mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-          cp assets/logo/wirelens.icns "$app/Contents/Resources/wirelens.icns"
-          cp "target/${{ matrix.target }}/release/wirelens" "$app/Contents/MacOS/"
+          cp assets/logo/pilotfish.icns "$app/Contents/Resources/pilotfish.icns"
+          cp "target/${{ matrix.target }}/release/pilotfish" "$app/Contents/MacOS/"
           sed "s/@VERSION@/$ver/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
           ln -s /Applications dmg/Applications
           cp LICENSE dmg/
-          hdiutil create -volname wirelens -srcfolder dmg -ov -format UDZO \
-            "dist/wirelens-$ver-${{ matrix.name }}.dmg"
+          hdiutil create -volname pilotfish -srcfolder dmg -ov -format UDZO \
+            "dist/pilotfish-$ver-${{ matrix.name }}.dmg"
       - name: Windows installer
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
           choco install innosetup -y --no-progress
           $ver = (Select-String -Path Cargo.toml -Pattern '^version' | Select-Object -First 1).Line.Split('"')[1]
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$ver" packaging\windows\wirelens.iss
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$ver" packaging\windows\pilotfish.iss
       - uses: actions/upload-artifact@v7
         with:
-          name: wirelens-${{ matrix.name }}
+          name: pilotfish-${{ matrix.name }}
           path: dist/*
 
   arch:
@@ -193,9 +193,9 @@ jobs:
         run: cargo build --release --locked
       - name: Package
         run: |
-          name="wirelens-${GITHUB_REF_NAME//\//-}-linux-x86_64-arch"
+          name="pilotfish-${GITHUB_REF_NAME//\//-}-linux-x86_64-arch"
           mkdir -p "dist/$name"
-          cp target/release/wirelens README.md LICENSE CHANGELOG.md "dist/$name/"
+          cp target/release/pilotfish README.md LICENSE CHANGELOG.md "dist/$name/"
           tar -C dist -czf "dist/$name.tar.gz" "$name"
           rm -rf "dist/$name"
       - name: Arch package
@@ -203,7 +203,7 @@ jobs:
           ver=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
           git config --global --add safe.directory "$PWD"
           mkdir /build
-          git archive --prefix="wirelens-$ver/" -o "/build/wirelens-$ver.tar.gz" HEAD
+          git archive --prefix="pilotfish-$ver/" -o "/build/pilotfish-$ver.tar.gz" HEAD
           cp packaging/arch/PKGBUILD /build/
           useradd -m builder
           chown -R builder /build
@@ -212,7 +212,7 @@ jobs:
           cp /build/*.pkg.tar.zst dist/
       - uses: actions/upload-artifact@v7
         with:
-          name: wirelens-linux-x86_64-arch
+          name: pilotfish-linux-x86_64-arch
           path: dist/*
 
   release:

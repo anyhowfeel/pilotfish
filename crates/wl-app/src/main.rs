@@ -1,4 +1,4 @@
-//! wirelens desktop entry point.
+//! pilotfish desktop entry point.
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 mod app;
 mod app_banner;
@@ -6,6 +6,7 @@ mod app_cmd;
 mod app_demo;
 mod app_icon;
 mod app_panes;
+mod app_paths;
 mod app_pump;
 mod app_settings;
 mod app_ui;
@@ -68,11 +69,12 @@ use eframe::egui;
 fn main() -> eframe::Result {
     signals::install();
     let cli = cli::Cli::parse();
+    app_paths::migrate_legacy_dirs();
     let prefs = prefs::Prefs::load();
     let [w, h] = cli.size().unwrap_or([1280.0, 800.0]);
     let mut viewport = egui::ViewportBuilder::default()
-        .with_title("wirelens")
-        .with_app_id("wirelens")
+        .with_title("pilotfish")
+        .with_app_id("pilotfish")
         .with_inner_size([w, h])
         .with_min_inner_size([1000.0, 640.0]);
     if let Some(icon) = app_icon::window_icon() {
@@ -83,7 +85,7 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
     eframe::run_native(
-        "wirelens",
+        "pilotfish",
         options,
         Box::new(move |cc| Ok(Box::new(app::App::new(cc, cli, prefs)))),
     )

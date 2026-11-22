@@ -1,10 +1,10 @@
 [Desktop Entry]
 Type=Application
-Name=wirelens
+Name=pilotfish
 GenericName=Packet viewer
 Comment=Prototype packet viewer on top of tshark
-Exec=wirelens %f
-Icon=wirelens
+Exec=pilotfish %f
+Icon=pilotfish
 Terminal=false
 Categories=Network;Monitor;
 MimeType=application/vnd.tcpdump.pcap;application/x-pcapng;

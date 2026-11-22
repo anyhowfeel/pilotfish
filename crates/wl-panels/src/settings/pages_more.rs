@@ -56,7 +56,7 @@ pub fn shortcuts(ui: &mut Ui) {
 
 pub fn about(ui: &mut Ui, info: &AboutInfo) -> AboutAction {
     let mut act = AboutAction::None;
-    settings_card(ui, "wirelens", |ui| {
+    settings_card(ui, "pilotfish", |ui| {
         let build = if cfg!(debug_assertions) {
             "debug"
         } else {

@@ -1,6 +1,6 @@
 # Contributing
 
-wirelens is a prototype and a personal project; issues and small pull requests are welcome,
+pilotfish is a prototype and a personal project; issues and small pull requests are welcome,
 but there is no promise of fast replies.
 
 ## Building

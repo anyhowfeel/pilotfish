@@ -6,7 +6,7 @@ impl TsharkBackend {
     pub fn new() -> Result<Self, CaptureError> {
         let tools = Tools::locate()?;
         let scratch = tempfile::Builder::new()
-            .prefix("wirelens-")
+            .prefix("pilotfish-")
             .tempdir()
             .map_err(|e| error::io_error("create scratch dir", &e))?;
         let empty_pcap = scratch.path().join("empty.pcap");

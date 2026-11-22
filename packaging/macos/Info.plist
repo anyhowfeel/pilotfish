@@ -2,11 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>wirelens</string>
-  <key>CFBundleDisplayName</key><string>wirelens</string>
-  <key>CFBundleIdentifier</key><string>io.github.anyhowfeel.wirelens</string>
-  <key>CFBundleExecutable</key><string>wirelens</string>
-  <key>CFBundleIconFile</key><string>wirelens</string>
+  <key>CFBundleName</key><string>pilotfish</string>
+  <key>CFBundleDisplayName</key><string>pilotfish</string>
+  <key>CFBundleIdentifier</key><string>io.github.anyhowfeel.pilotfish</string>
+  <key>CFBundleExecutable</key><string>pilotfish</string>
+  <key>CFBundleIconFile</key><string>pilotfish</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>@VERSION@</string>
   <key>CFBundleVersion</key><string>@VERSION@</string>
