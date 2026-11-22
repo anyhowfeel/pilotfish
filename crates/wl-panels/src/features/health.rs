@@ -198,7 +198,7 @@ fn analyze_expert(rep: &ExpertReport, total_packets: u64, out: &mut Findings) {
                 "{n} TCP recovery events (retransmissions/lost segments/dup ACKs) stall throughput."
             ),
             Some(
-                "tcp.analysis.retransmission || tcp.analysis.lost_segment || tcp.analysis.dup_ack",
+                "tcp.analysis.retransmission || tcp.analysis.lost_segment || tcp.analysis.duplicate_ack",
             ),
             format!("{n} TCP events"),
         );

@@ -50,6 +50,12 @@ fn flags_retransmissions_dns_errors_and_dominant_talker() {
             .any(|i| i.severity == InsightSeverity::Critical)
     );
     assert!(insights.iter().any(|i| i.title.contains("retransmissions")));
+    assert!(
+        insights
+            .iter()
+            .filter_map(|i| i.suggested_filter.as_deref())
+            .any(|f| f.contains("tcp.analysis.duplicate_ack"))
+    );
     assert!(insights.iter().any(|i| i.title.contains("DNS")));
     assert!(insights.iter().any(|i| i.title.contains("ICMP")));
     assert!(insights.iter().any(|i| i.title.contains("10.0.0.5")));
