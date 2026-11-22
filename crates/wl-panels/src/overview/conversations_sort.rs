@@ -115,6 +115,7 @@ mod tests {
             first_rel: 0.0,
             last_rel: bytes as f64,
             protocol: proto.into(),
+            server_port: None,
         }
     }
 

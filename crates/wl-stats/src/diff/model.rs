@@ -114,6 +114,14 @@ pub struct CaptureDiff {
     pub http_hosts: Vec<Row<u64>>,
     pub statuses: Vec<Row<u64>>,
     pub tls_names: Vec<Row<u64>>,
+    /// Requests that never got a response, counted per `METHOD host/uri`.
+    pub unanswered: Vec<Row<u64>>,
+    /// Status code per URL, only for URLs seen in both captures.
+    pub url_statuses: Vec<Row<u64>>,
+    /// DNS response code per query (0 = unanswered, else code + 1), only for queries in both.
+    pub dns_rcodes: Vec<Row<u64>>,
+    /// DNS answers of the queries seen in both captures.
+    pub dns_answers: Vec<Row<u64>>,
 }
 
 impl CaptureDiff {
@@ -124,5 +132,9 @@ impl CaptureDiff {
             && self.http_hosts.is_empty()
             && self.statuses.is_empty()
             && self.tls_names.is_empty()
+            && self.unanswered.is_empty()
+            && self.url_statuses.is_empty()
+            && self.dns_rcodes.is_empty()
+            && self.dns_answers.is_empty()
     }
 }

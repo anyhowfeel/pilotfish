@@ -10,6 +10,7 @@ use wl_kit::egui::{RichText, ScrollArea, Ui};
 use wl_kit::format;
 use wl_kit::theme::{Palette, mono, spacing};
 use wl_kit::widgets::{empty_state, segmented, stat_card};
+use wl_model::Rcode;
 use wl_stats::{CaptureDiff, Micros, Traffic};
 
 use section::{Show, section};
@@ -53,6 +54,13 @@ fn micros(m: &Micros) -> String {
 
 fn count(n: &u64) -> String {
     format::count(*n)
+}
+
+fn rcode(n: &u64) -> String {
+    match n.checked_sub(1) {
+        Some(code) => Rcode::from_code(code as u8).label(),
+        None => "no response".to_owned(),
+    }
 }
 
 impl DiffPanel {
@@ -122,6 +130,10 @@ impl DiffPanel {
                 section(ui, "HTTP hosts (requests)", &d.http_hosts, count, s);
                 section(ui, "HTTP status codes", &d.statuses, count, s);
                 section(ui, "TLS server names (sessions)", &d.tls_names, count, s);
+                section(ui, "Unanswered requests", &d.unanswered, count, s);
+                section(ui, "Status per URL", &d.url_statuses, count, s);
+                section(ui, "DNS response codes", &d.dns_rcodes, rcode, s);
+                section(ui, "DNS answers", &d.dns_answers, count, s);
             });
     }
 }

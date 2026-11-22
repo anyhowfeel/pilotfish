@@ -32,6 +32,7 @@ fn conv(a: &str, a_port: u16, b: &str, b_port: u16, bytes: u64) -> ConversationS
         first_rel: 0.0,
         last_rel: 1.0,
         protocol: "TCP".into(),
+        server_port: None,
     }
 }
 
@@ -203,4 +204,54 @@ fn web_names_and_status_codes_are_compared() {
         [("200", Presence::Changed), ("404", Presence::Added)]
     );
     assert_eq!(diff.tls_names.len(), 2);
+}
+
+#[test]
+fn service_side_comes_from_the_handshake_not_the_port_order() {
+    let mut c = conv("10.0.0.1", 40001, "10.0.0.9", 50051, 500);
+    c.server_port = Some(50051);
+    let before = data(vec![], vec![c.clone()]);
+    c.key.a_port = Some(40002);
+    let after = data(vec![], vec![c]);
+    let diff = CaptureDiff::compute(&before, &after);
+    assert!(diff.services.is_empty());
+}
+
+#[test]
+fn unanswered_requests_status_swaps_and_dns_changes_are_listed() {
+    let unanswered = |uri: &str| {
+        let mut e = http("h.test", 200, 1.0);
+        e.uri = uri.into();
+        e.status = None;
+        e.time_ms = None;
+        e
+    };
+    let mut ok = http("h.test", 200, 1.0);
+    ok.uri = "/a".into();
+    let mut bad = ok.clone();
+    bad.status = Some(500);
+    let mut before = CaptureData::default();
+    let mut after = CaptureData::default();
+    before.http = vec![ok];
+    after.http = vec![bad, unanswered("/b")];
+    let mut q = dns("a.test", 1.0);
+    q.rcode = Some(wl_model::Rcode::NoError);
+    q.answers = vec!["1.1.1.1".into()];
+    let mut q2 = q.clone();
+    q2.rcode = Some(wl_model::Rcode::NxDomain);
+    q2.answers = vec!["2.2.2.2".into()];
+    before.dns = vec![q];
+    after.dns = vec![q2];
+    let diff = CaptureDiff::compute(&before, &after);
+    let one = |rows: &[super::Row<u64>]| {
+        assert_eq!(rows.len(), 1);
+        (rows[0].label.clone(), rows[0].before, rows[0].after)
+    };
+    assert_eq!(one(&diff.unanswered).0, "GET h.test/b");
+    assert_eq!(
+        one(&diff.url_statuses),
+        ("GET h.test/a".into(), Some(200), Some(500))
+    );
+    assert_eq!(one(&diff.dns_rcodes), ("a.test A".into(), Some(1), Some(4)));
+    assert_eq!(diff.dns_answers.len(), 2);
 }

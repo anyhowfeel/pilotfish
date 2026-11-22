@@ -30,6 +30,8 @@ pub struct ConversationStat {
     pub last_rel: f64,
     /// Most frequent protocol seen in the flow.
     pub protocol: Arc<str>,
+    /// Port that answered the TCP handshake, when the SYN-ACK was captured.
+    pub server_port: Option<u16>,
 }
 
 /// Host-to-host traffic (all ports/protocols merged), the edge of the topology graph.

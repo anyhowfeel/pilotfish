@@ -78,9 +78,9 @@ impl ValueIndex {
             .map(|h| h.addr.clone())
             .partition(|a| a.contains(':'));
         let mut by_port: HashMap<u16, u64> = HashMap::new();
+        let servers = wl_stats::ServerPorts::of(&s.conversations);
         for c in &s.conversations {
-            // The lower port is the service; the other end is usually an ephemeral client port.
-            if let Some(p) = [c.key.a_port, c.key.b_port].into_iter().flatten().min() {
+            if let Some(p) = servers.pick(c) {
                 *by_port.entry(p).or_default() += c.packets;
             }
         }
@@ -211,6 +211,7 @@ mod tests {
             first_rel: 0.0,
             last_rel: 0.0,
             protocol: "TCP".into(),
+            server_port: None,
         }
     }
 
