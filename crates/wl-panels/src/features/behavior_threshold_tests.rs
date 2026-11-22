@@ -79,3 +79,10 @@ fn dns_length_thresholds_are_applied_and_quoted() {
         Some("dns.qry.name.len >= 30 || dns.qry.name matches \"[^.]{20,}\"")
     );
 }
+
+#[test]
+fn the_long_dns_filter_is_valid_for_tshark() {
+    let name = format!("{}.example.com", "a".repeat(45));
+    let out = run(Vec::new(), vec![dns(&name)]);
+    crate::test_util::assert_tshark_accepts(out[0].suggested_filter.as_deref().unwrap());
+}

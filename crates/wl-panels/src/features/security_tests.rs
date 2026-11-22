@@ -229,5 +229,39 @@ fn repeated_logins_report_their_count() {
     assert_eq!(out[0].metric, "4 found");
 }
 
+#[test]
+fn an_empty_password_is_only_a_warning() {
+    let out = creds(
+        vec![
+            cred(CredKind::HttpBasic, 1, Some("token123"), Some("")),
+            cred(CredKind::HttpBasic, 2, Some("alice"), Some("s3cretPass")),
+        ],
+        false,
+    );
+    let by_title = |t: &str| out.iter().find(|f| f.title.contains(t)).unwrap().severity;
+    assert_eq!(
+        by_title("HTTP Basic login without password"),
+        InsightSeverity::Warning
+    );
+    assert_eq!(
+        by_title("Cleartext HTTP Basic login:"),
+        InsightSeverity::Critical
+    );
+}
+
+#[test]
+fn generated_filters_are_valid_for_tshark() {
+    let c: Vec<_> = [4, 10, 15]
+        .into_iter()
+        .map(|f| cred(CredKind::Ftp, f, Some("bob"), Some("pw12345")))
+        .collect();
+    let out = creds(c, false);
+    assert_eq!(
+        out[0].suggested_filter.as_deref(),
+        Some("frame.number in {4,10,15}")
+    );
+    crate::test_util::assert_tshark_accepts(out[0].suggested_filter.as_deref().unwrap());
+}
+
 #[path = "security_intel_tests.rs"]
 mod intel_matches;

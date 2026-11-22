@@ -57,7 +57,11 @@ fn ip_filter(addr: &str) -> String {
     format!("{field} == {addr}")
 }
 
-fn severity(kind: CredKind) -> InsightSeverity {
+/// A login without a secret to steal (an empty password) is only a warning.
+fn severity(kind: CredKind, filled: bool) -> InsightSeverity {
+    if !filled {
+        return InsightSeverity::Warning;
+    }
     match kind {
         CredKind::HttpBasic | CredKind::Ftp | CredKind::Smtp | CredKind::Pop3 => {
             InsightSeverity::Critical
@@ -95,13 +99,24 @@ fn frames_filter(frames: &[u64]) -> String {
 }
 
 fn credentials(all: &[Credential], reveal: bool, out: &mut Findings) {
-    let mut groups: BTreeMap<(CredKind, &str, &str), Vec<&Credential>> = BTreeMap::new();
+    let mut groups: BTreeMap<(CredKind, bool, &str, &str), Vec<&Credential>> = BTreeMap::new();
     for c in all {
-        groups.entry((c.kind, &c.src, &c.dst)).or_default().push(c);
+        let filled = c.secret.as_deref() != Some("");
+        groups
+            .entry((c.kind, filled, &c.src, &c.dst))
+            .or_default()
+            .push(c);
     }
     let mut groups: Vec<_> = groups.into_iter().collect();
-    groups.sort_by_key(|((kind, ..), v)| (severity(*kind), std::cmp::Reverse(v.len())));
-    for ((kind, src, dst), found) in groups {
+    groups.sort_by_key(|((kind, filled, ..), v)| {
+        (severity(*kind, *filled), std::cmp::Reverse(v.len()))
+    });
+    for ((kind, filled, src, dst), found) in groups {
+        let label = if filled {
+            kind.label().to_owned()
+        } else {
+            format!("{} without password", kind.label())
+        };
         let samples: Vec<String> = found
             .iter()
             .take(MAX_SAMPLES)
@@ -117,11 +132,10 @@ fn credentials(all: &[Credential], reveal: bool, out: &mut Findings) {
         push_capped(
             out,
             Some(LOGINS),
-            severity(kind),
-            format!("Cleartext {}: {src} to {dst}", kind.label()),
+            severity(kind, filled),
+            format!("Cleartext {label}: {src} to {dst}"),
             format!(
-                "{src} sent {} unencrypted to {dst} ({}{tail}). Anyone on the path can read it: use TLS, and change the secret if it is real.",
-                kind.label(),
+                "{src} sent {label} unencrypted to {dst} ({}{tail}). Anyone on the path can read it: use TLS, and change the secret if it is real.",
                 samples.join("; "),
             ),
             Some(&frames_filter(&frames)),
