@@ -9,7 +9,7 @@ use wl_model::{CredKind, Credential};
 
 use crate::tsv_pass::{columns, opt};
 
-pub const FIELDS: [&str; 19] = [
+pub const FIELDS: [&str; 21] = [
     "frame.number",
     "ip.src",
     "ipv6.src",
@@ -29,6 +29,8 @@ pub const FIELDS: [&str; 19] = [
     "ntlmssp.messagetype",
     "ntlmssp.auth.username",
     "ntlmssp.auth.domain",
+    "http.proxy_authorization",
+    "tcp.stream",
 ];
 
 pub const FILTER: &str = "http.request || ftp.request || smtp.req || smtp.auth.username \
@@ -43,29 +45,46 @@ const SECRET_HEADERS: [&str; 7] = [
     "x-api-token",
     "private-token",
 ];
-const SECRET_PARAMS: [&str; 10] = [
+/// Names that clearly hold a secret; a bare `key` or `token` is too often a plain identifier.
+const SECRET_PARAMS: [&str; 15] = [
     "api_key",
     "apikey",
     "api-key",
     "access_token",
     "auth_token",
-    "token",
-    "key",
+    "session_token",
+    "refresh_token",
+    "id_token",
+    "private_key",
     "secret",
     "client_secret",
     "password",
+    "passwd",
+    "pwd",
+    "x-api-key",
 ];
+/// Request signatures and challenge schemes carry no replayable secret.
+const SIGNED_SCHEMES: [&str; 5] = [
+    "digest",
+    "ntlm",
+    "negotiate",
+    "kerberos",
+    "aws4-hmac-sha256",
+];
+/// Half-finished USER commands kept at once; a hostile capture cannot grow the map beyond it.
+const MAX_PENDING_USERS: usize = 4_096;
 const MIN_SECRET_LEN: usize = 4;
 const ANONYMOUS: [&str; 2] = ["anonymous", "ftp"];
 /// tshark joins repeated header lines with a comma after the literal `\r\n`.
 const LINE_SEP: &str = "\\r\\n,";
 const LINE_END: &str = "\\r\\n";
 
-type Pair = (Arc<str>, Arc<str>);
+/// A user name waits for its password in the same connection and protocol.
+type Pending = (CredKind, String);
 
 #[derive(Default)]
 pub struct Parser {
-    users: HashMap<Pair, String>,
+    users: HashMap<Pending, String>,
 }
 
 struct Packet<'a> {
@@ -85,6 +104,7 @@ impl Packet<'_> {
             user,
             secret,
             field: opt(field).map(str::to_owned),
+            count: 1,
         });
     }
 }
@@ -112,30 +132,33 @@ impl Parser {
             ntlm_type,
             ntlm_user,
             ntlm_domain,
+            proxy_auth,
+            stream,
         ] = f;
         let (Ok(frame), Some(src), Some(dst)) = (
             frame.trim().parse(),
-            opt(ip_src).or(opt(ip6_src)),
-            opt(ip_dst).or(opt(ip6_dst)),
+            opt(first(ip_src)).or(opt(first(ip6_src))),
+            opt(first(ip_dst)).or(opt(first(ip6_dst))),
         ) else {
             return;
         };
-        let pair: Pair = (Arc::from(src), Arc::from(dst));
+        let conn = opt(first(stream)).map_or_else(|| format!("{src}>{dst}"), str::to_owned);
         let mut pkt = Packet {
             frame,
-            src: pair.0.clone(),
-            dst: pair.1.clone(),
+            src: Arc::from(src),
+            dst: Arc::from(dst),
             out,
         };
-        authorization(&mut pkt, auth);
+        authorization(&mut pkt, auth, "Authorization");
+        authorization(&mut pkt, proxy_auth, "Proxy-Authorization");
         for (name, value) in header_secrets(lines).chain(query_secrets(uri)) {
             pkt.push(CredKind::ApiKey, None, Some(value), &name);
         }
-        self.login(&mut pkt, pair.clone(), CredKind::Ftp, (ftp_cmd, ftp_arg));
-        self.login(&mut pkt, pair.clone(), CredKind::Pop3, (pop_cmd, pop_arg));
+        self.login(&mut pkt, &conn, CredKind::Ftp, (ftp_cmd, ftp_arg));
+        self.login(&mut pkt, &conn, CredKind::Pop3, (pop_cmd, pop_arg));
         self.smtp(
             &mut pkt,
-            pair,
+            &conn,
             (smtp_cmd, smtp_param),
             (smtp_user, smtp_pass),
         );
@@ -149,13 +172,22 @@ impl Parser {
         }
     }
 
-    fn login(&mut self, pkt: &mut Packet, pair: Pair, kind: CredKind, (cmd, arg): (&str, &str)) {
+    fn remember(&mut self, kind: CredKind, conn: &str, user: String) {
+        if self.users.len() >= MAX_PENDING_USERS {
+            self.users.clear();
+        }
+        self.users.insert((kind, conn.to_owned()), user);
+    }
+
+    fn take(&mut self, kind: CredKind, conn: &str) -> Option<String> {
+        self.users.remove(&(kind, conn.to_owned()))
+    }
+
+    fn login(&mut self, pkt: &mut Packet, conn: &str, kind: CredKind, (cmd, arg): (&str, &str)) {
         match cmd.to_ascii_uppercase().as_str() {
-            "USER" => {
-                self.users.insert(pair, arg.to_owned());
-            }
+            "USER" => self.remember(kind, conn, arg.to_owned()),
             "PASS" => {
-                let user = self.users.remove(&pair);
+                let user = self.take(kind, conn);
                 if !user.as_deref().is_some_and(is_anonymous) {
                     pkt.push(kind, user, Some(arg.to_owned()), "");
                 }
@@ -164,19 +196,42 @@ impl Parser {
         }
     }
 
-    fn smtp(&mut self, pkt: &mut Packet, pair: Pair, cmd: (&str, &str), auth: (&str, &str)) {
-        if cmd.0.eq_ignore_ascii_case("AUTH")
-            && let Some((user, pass)) = cmd.1.strip_prefix("PLAIN ").and_then(sasl_plain)
-        {
-            pkt.push(CredKind::Smtp, Some(user), Some(pass), "");
+    fn smtp(&mut self, pkt: &mut Packet, conn: &str, cmd: (&str, &str), auth: (&str, &str)) {
+        if cmd.0.eq_ignore_ascii_case("AUTH") {
+            let mut words = cmd.1.split_whitespace();
+            let mechanism = words.next().unwrap_or_default().to_ascii_uppercase();
+            let initial = words.next();
+            match (mechanism.as_str(), initial) {
+                ("PLAIN", Some(b64)) => {
+                    if let Some((user, pass)) = sasl_plain(b64) {
+                        pkt.push(CredKind::Smtp, Some(user), Some(pass), "");
+                    }
+                }
+                ("LOGIN", Some(b64)) => {
+                    if let Some(user) = decode_text(b64) {
+                        self.remember(CredKind::Smtp, conn, user);
+                    }
+                }
+                _ => {}
+            }
         }
         if let Some(user) = decode_text(auth.0) {
-            self.users.insert(pair.clone(), user);
+            self.remember(CredKind::Smtp, conn, user);
         }
         if let Some(pass) = decode_text(auth.1) {
-            pkt.push(CredKind::Smtp, self.users.remove(&pair), Some(pass), "");
+            pkt.push(
+                CredKind::Smtp,
+                self.take(CredKind::Smtp, conn),
+                Some(pass),
+                "",
+            );
         }
     }
+}
+
+/// With `occurrence=a` a tunnelled packet lists outer and inner values: `a,b`.
+fn first(value: &str) -> &str {
+    value.split(',').next().unwrap_or_default().trim()
 }
 
 fn is_anonymous(user: &str) -> bool {
@@ -196,7 +251,7 @@ fn sasl_plain(b64: &str) -> Option<(String, String)> {
     Some((user.to_owned(), pass.to_owned()))
 }
 
-fn authorization(pkt: &mut Packet, value: &str) {
+fn authorization(pkt: &mut Packet, value: &str, header: &str) {
     let Some((scheme, token)) = value.trim().split_once(' ') else {
         return;
     };
@@ -206,22 +261,12 @@ fn authorization(pkt: &mut Packet, value: &str) {
             if let Some((user, pass)) = decode_text(token)
                 .and_then(|t| t.split_once(':').map(|(u, p)| (u.to_owned(), p.to_owned())))
             {
-                pkt.push(CredKind::HttpBasic, Some(user), Some(pass), "Authorization");
+                pkt.push(CredKind::HttpBasic, Some(user), Some(pass), header);
             }
         }
-        "bearer" => pkt.push(
-            CredKind::HttpBearer,
-            None,
-            Some(token.to_owned()),
-            "Authorization",
-        ),
-        "digest" | "ntlm" | "negotiate" | "kerberos" => {}
-        _ => pkt.push(
-            CredKind::ApiKey,
-            None,
-            Some(token.to_owned()),
-            "Authorization",
-        ),
+        "bearer" => pkt.push(CredKind::HttpBearer, None, Some(token.to_owned()), header),
+        s if SIGNED_SCHEMES.contains(&s) => {}
+        _ => pkt.push(CredKind::ApiKey, None, Some(token.to_owned()), header),
     }
 }
 
@@ -239,10 +284,36 @@ fn query_secrets(uri: &str) -> impl Iterator<Item = (String, String)> + '_ {
     let query = uri.split_once('?').map_or("", |(_, q)| q);
     query.split('&').filter_map(|pair| {
         let (name, value) = pair.split_once('=')?;
+        let value = percent_decode(value);
         (SECRET_PARAMS.contains(&name.to_ascii_lowercase().as_str())
             && value.len() >= MIN_SECRET_LEN)
-            .then(|| (name.to_owned(), value.to_owned()))
+            .then(|| (name.to_owned(), value))
     })
+}
+
+/// Form decoding of a query value: `%XX` bytes and `+` as a space.
+fn percent_decode(value: &str) -> String {
+    let bytes = value.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let hex = (bytes[i] == b'%')
+            .then(|| bytes.get(i + 1..i + 3))
+            .flatten()
+            .filter(|h| h.iter().all(u8::is_ascii_hexdigit))
+            .and_then(|h| u8::from_str_radix(std::str::from_utf8(h).ok()?, 16).ok());
+        match hex {
+            Some(byte) => {
+                out.push(byte);
+                i += 3;
+            }
+            None => {
+                out.push(if bytes[i] == b'+' { b' ' } else { bytes[i] });
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 #[cfg(test)]

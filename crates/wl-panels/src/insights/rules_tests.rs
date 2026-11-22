@@ -56,10 +56,32 @@ fn old_prefs_without_rules_load_with_defaults() {
 fn rules_round_trip_through_json() {
     let mut r = InsightRules::default();
     r.mute("10.0.0.9");
-    r.reveal_secrets = true;
     r.thresholds.scan_min_ports = 7;
     let back: InsightRules = serde_json::from_str(&serde_json::to_string(&r).unwrap()).unwrap();
     assert_eq!(back, r);
+}
+
+#[test]
+fn revealing_secrets_is_never_saved() {
+    let r = InsightRules {
+        reveal_secrets: true,
+        ..InsightRules::default()
+    };
+    let json = serde_json::to_string(&r).unwrap();
+    assert!(!json.contains("reveal"), "{json}");
+    let back: InsightRules = serde_json::from_str(r#"{"reveal_secrets":true}"#).unwrap();
+    assert!(!back.reveal_secrets);
+}
+
+#[test]
+fn short_patterns_cannot_hide_everything() {
+    let mut r = InsightRules::default();
+    assert!(!r.mute("a"));
+    assert!(!r.mute("ab"));
+    assert!(r.mute("::1"));
+    r.muted.push("e".into());
+    assert!(!r.hides(&finding("Regular connections: 10.0.0.5")));
+    assert!(r.clone().clamped().muted == ["::1"]);
 }
 
 #[test]
@@ -74,12 +96,12 @@ fn muted_patterns_hide_matching_titles_case_insensitively() {
 }
 
 #[test]
-fn clamping_drops_blank_patterns() {
+fn clamping_drops_blank_and_too_short_patterns() {
     let r = InsightRules {
-        muted: vec!["a".into(), " ".into(), String::new()],
+        muted: vec!["a".into(), " ".into(), String::new(), "scan".into()],
         ..InsightRules::default()
     };
-    assert_eq!(r.clamped().muted, ["a"]);
+    assert_eq!(r.clamped().muted, ["scan"]);
 }
 
 #[test]

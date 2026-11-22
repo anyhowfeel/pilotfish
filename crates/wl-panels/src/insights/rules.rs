@@ -52,7 +52,16 @@ pub struct InsightRules {
     pub thresholds: Thresholds,
     /// Findings naming one of these hosts, or whose title contains one of these words, are hidden.
     pub muted: Vec<String>,
+    /// Session only: never written to the settings file.
+    #[serde(skip)]
     pub reveal_secrets: bool,
+}
+
+/// Shorter text patterns would match nearly every title.
+const MIN_PATTERN_LEN: usize = 3;
+
+fn is_valid_pattern(p: &str) -> bool {
+    p.parse::<std::net::IpAddr>().is_ok() || p.chars().count() >= MIN_PATTERN_LEN
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -64,14 +73,14 @@ pub struct MuteChoice {
 impl InsightRules {
     pub fn clamped(mut self) -> Self {
         self.thresholds = self.thresholds.clamped();
-        self.muted.retain(|p| !p.trim().is_empty());
+        self.muted.retain(|p| is_valid_pattern(p.trim()));
         self.muted.dedup();
         self
     }
 
     pub fn hides(&self, f: &HealthInsight) -> bool {
         let hosts = title_hosts(&f.title);
-        self.muted.iter().any(|p| {
+        self.muted.iter().filter(|p| is_valid_pattern(p)).any(|p| {
             if p.parse::<std::net::IpAddr>().is_ok() {
                 hosts.contains(p)
             } else {
@@ -80,10 +89,10 @@ impl InsightRules {
         })
     }
 
-    /// Adds a pattern; false when it was empty or already muted.
+    /// Adds a pattern; false when it was too short to be specific or already muted.
     pub fn mute(&mut self, pattern: &str) -> bool {
         let pattern = pattern.trim();
-        let new = !pattern.is_empty() && !self.muted.iter().any(|p| p == pattern);
+        let new = is_valid_pattern(pattern) && !self.muted.iter().any(|p| p == pattern);
         if new {
             self.muted.push(pattern.to_owned());
         }
@@ -96,7 +105,7 @@ impl InsightRules {
 pub fn mute_choices(f: &HealthInsight) -> Vec<MuteChoice> {
     let mut out: Vec<MuteChoice> = Vec::new();
     let mut add = |label: String, pattern: &str| {
-        if !pattern.is_empty() && !out.iter().any(|c| c.pattern == pattern) {
+        if is_valid_pattern(pattern) && !out.iter().any(|c| c.pattern == pattern) {
             out.push(MuteChoice {
                 label,
                 pattern: pattern.to_owned(),

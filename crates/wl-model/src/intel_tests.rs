@@ -78,7 +78,7 @@ fn blocklist_matches_addresses_and_parent_domains() {
     assert_eq!(intel.domain("C2.Bad.Example.Net."), Some("feodo"));
     assert_eq!(intel.domain("example.net"), None);
     assert_eq!(intel.domain("net"), None);
-    assert_eq!(intel.counts(), (1, 1, 0));
+    assert_eq!(intel.counts(), (1, 0, 1, 0));
 }
 
 #[test]
@@ -189,4 +189,100 @@ fn tls_sessions_are_annotated() {
             (None, Some("sslbl")),
         ]
     );
+}
+
+#[test]
+fn hosts_file_placeholder_addresses_are_never_indicators() {
+    for l in [
+        "255.255.255.255 broadcasthost",
+        "::1 localhost ip6-loopback",
+        "fe00::0 ip6-localnet",
+        "ff00::0 ip6-mcastprefix",
+        "ff02::1 ip6-allnodes",
+        "ff02::2 ip6-allrouters",
+        "127.0.0.53",
+        "224.0.0.251",
+        "127.0.0.1:8080",
+        "::",
+    ] {
+        assert_eq!(ind(l), None, "{l}");
+    }
+    let mut intel = ThreatIntel::default();
+    intel.add_blocklist("hosts", "255.255.255.255 broadcasthost\n::1 localhost\n");
+    assert!(intel.is_empty());
+}
+
+#[test]
+fn a_byte_order_mark_does_not_hide_the_first_entry() {
+    let mut intel = ThreatIntel::default();
+    intel.add_blocklist("bom", "\u{feff}198.51.100.7\n");
+    assert_eq!(intel.ip("198.51.100.7"), Some("bom"));
+    let mut intel = ThreatIntel::default();
+    let json = "\u{feff}[{\"application\":\"Chrome\",\"ja4_fingerprint\":\"abcd\"}]";
+    assert_eq!(intel.add_ja4db(json), Ok(1));
+}
+
+#[test]
+fn cidr_lines_match_every_address_of_the_range() {
+    let mut intel = ThreatIntel::default();
+    intel.add_blocklist(
+        "drop",
+        "; Spamhaus\n10.0.0.0/8\n1.10.16.0/20 ; SBL256894\n2001:db8::/32\n203.0.113.9/32\n0.0.0.0/0\n",
+    );
+    assert_eq!(intel.ip("10.200.3.4"), Some("drop"));
+    assert_eq!(intel.ip("1.10.31.255"), Some("drop"));
+    assert_eq!(intel.ip("1.10.32.0"), None);
+    assert_eq!(intel.ip("2001:db8:ffff::1"), Some("drop"));
+    assert_eq!(intel.ip("2001:db9::1"), None);
+    assert_eq!(intel.ip("203.0.113.9"), Some("drop"));
+    assert_eq!(intel.ip("8.8.8.8"), None);
+    assert_eq!(intel.counts(), (1, 3, 0, 0));
+}
+
+const JA4DB_CSV: &str = "\u{feff}application,library,device,os,user_agent_string,certificate_authority,observation_count,verified,notes,ja4_fingerprint,ja4_fingerprint_string,ja4s_fingerprint\n\
+Chrome,BoringSSL,,Windows,\"Mozilla/5.0 (Windows NT 10.0; Win64; x64), AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari.com\",,12,true,\"multi\nline\",t13d1516h2_8daaf6152771_02713d6af862,,\n\
+,,,,,,1,false,,t13d0000h2_000000000000_000000000000,,\n";
+
+#[test]
+fn ja4db_csv_is_parsed_not_read_as_a_blocklist() {
+    assert!(ThreatIntel::is_ja4db_csv(JA4DB_CSV));
+    assert!(!ThreatIntel::is_ja4db_csv("2024-01-01,198.51.100.7,443\n"));
+    let mut intel = ThreatIntel::default();
+    assert_eq!(intel.add_ja4db(JA4DB_CSV), Ok(1));
+    let fp = intel
+        .fingerprint("t13d1516h2_8daaf6152771_02713d6af862")
+        .unwrap();
+    assert_eq!((&*fp.label, fp.malicious), ("Chrome", false));
+    assert_eq!(intel.counts(), (0, 0, 0, 1));
+}
+
+#[test]
+fn json_lines_get_a_readable_error() {
+    let mut intel = ThreatIntel::default();
+    let err = intel
+        .add_ja4db("{\"application\":\"a\",\"ja4\":\"x\"}\n{\"application\":\"b\",\"ja4\":\"y\"}\n")
+        .unwrap_err();
+    assert!(err.contains("JSON Lines"), "{err}");
+    assert!(intel.add_ja4db("").is_err());
+}
+
+#[test]
+fn malicious_entries_win_over_benign_ones_in_any_order() {
+    let benign =
+        r#"[{"application":"Chrome","ja3_fingerprint":"aaaa0000aaaa0000aaaa0000aaaa0000"}]"#;
+    for order in [[true, false], [false, true]] {
+        let mut intel = ThreatIntel::default();
+        for malicious_first in order {
+            if malicious_first {
+                intel.add_blocklist("sslbl", "AAAA0000AAAA0000AAAA0000AAAA0000\n");
+            } else {
+                intel.add_ja4db(benign).unwrap();
+            }
+        }
+        let fp = intel
+            .fingerprint("aaaa0000aaaa0000aaaa0000aaaa0000")
+            .unwrap();
+        assert!(fp.malicious, "{order:?}");
+        assert_eq!(&*fp.label, "sslbl");
+    }
 }

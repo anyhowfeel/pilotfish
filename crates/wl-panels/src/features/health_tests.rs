@@ -50,6 +50,12 @@ fn flags_retransmissions_dns_errors_and_dominant_talker() {
             .any(|i| i.severity == InsightSeverity::Critical)
     );
     assert!(insights.iter().any(|i| i.title.contains("retransmissions")));
+    assert!(
+        insights
+            .iter()
+            .filter_map(|i| i.suggested_filter.as_deref())
+            .any(|f| f.contains("tcp.analysis.duplicate_ack"))
+    );
     assert!(insights.iter().any(|i| i.title.contains("DNS")));
     assert!(insights.iter().any(|i| i.title.contains("ICMP")));
     assert!(insights.iter().any(|i| i.title.contains("10.0.0.5")));
@@ -81,7 +87,7 @@ fn retrans_stats() -> (ExpertReport, StatsSnapshot) {
 }
 
 #[test]
-fn muted_findings_are_hidden_and_the_all_clear_takes_their_place() {
+fn muted_findings_are_counted_and_never_reported_as_healthy() {
     let (rep, stats) = retrans_stats();
     let intel = wl_model::ThreatIntel::default();
     let titles = |rules: &crate::insights::InsightRules| {
@@ -100,6 +106,5 @@ fn muted_findings_are_hidden_and_the_all_clear_takes_their_place() {
     rules.mute("packet loss");
     rules.mute("anomaly rate");
     let after = titles(&rules);
-    assert_eq!(after.len(), 1);
-    assert!(after[0].contains("healthy"), "{after:?}");
+    assert_eq!(after, ["2 findings hidden by mutes"]);
 }

@@ -88,7 +88,7 @@ fn api_key_headers_are_found_among_request_lines() {
 fn query_string_secrets_need_a_known_name_and_a_real_value() {
     let c = one(&[(
         "http.request.uri",
-        "/s?q=cats&api_key=KEY123456&page=2&Token=abcd",
+        "/s?q=cats&api_key=KEY123456&page=2&Access_Token=abcd",
     )]);
     let got: Vec<_> = c
         .iter()
@@ -98,7 +98,7 @@ fn query_string_secrets_need_a_known_name_and_a_real_value() {
         got,
         [
             (Some("api_key"), Some("KEY123456")),
-            (Some("Token"), Some("abcd"))
+            (Some("Access_Token"), Some("abcd"))
         ]
     );
     assert!(one(&[("http.request.uri", "/s?key=1&q=password")]).is_empty());
@@ -218,4 +218,164 @@ fn ipv6_endpoints_and_bad_rows() {
     let c = scan(&[cols.join("\t"), "garbage".into(), String::new()]);
     assert_eq!(c.len(), 1);
     assert_eq!((&*c[0].src, &*c[0].dst), ("fe80::1", "fe80::2"));
+}
+
+#[test]
+fn plain_identifiers_named_key_or_token_are_not_secrets() {
+    assert!(one(&[("http.request.uri", "/s?key=name&token=next_page_abc")]).is_empty());
+}
+
+#[test]
+fn password_parameters_are_decoded_before_they_are_kept() {
+    let c = one(&[(
+        "http.request.uri",
+        "/login?pwd=p%40ss+word&passwd=%zz1234&password=ab%2",
+    )]);
+    let got: Vec<_> = c
+        .iter()
+        .map(|c| (c.field.as_deref(), c.secret.as_deref()))
+        .collect();
+    assert_eq!(
+        got,
+        [
+            (Some("pwd"), Some("p@ss word")),
+            (Some("passwd"), Some("%zz1234")),
+            (Some("password"), Some("ab%2")),
+        ]
+    );
+}
+
+#[test]
+fn signed_aws_requests_are_not_api_keys() {
+    let auth = "AWS4-HMAC-SHA256 Credential=AKIA/20240101/us-east-1/s3/aws4_request, Signature=abc";
+    assert!(one(&[("http.authorization", auth)]).is_empty());
+}
+
+#[test]
+fn proxy_basic_credentials_are_found() {
+    let c = one(&[(
+        "http.proxy_authorization",
+        &format!("Basic {}", b64("proxyuser:proxypw")),
+    )]);
+    assert_eq!(c.len(), 1);
+    assert_eq!(c[0].kind, CredKind::HttpBasic);
+    assert_eq!(c[0].field.as_deref(), Some("Proxy-Authorization"));
+}
+
+#[test]
+fn an_empty_basic_password_is_kept_as_an_empty_secret() {
+    let c = one(&[("http.authorization", &format!("Basic {}", b64("token123:")))]);
+    assert_eq!(c[0].secret.as_deref(), Some(""));
+}
+
+fn on_stream(stream: &str, cols: &[(&str, &str)]) -> String {
+    let mut all = cols.to_vec();
+    all.push(("tcp.stream", stream));
+    line(&all)
+}
+
+#[test]
+fn users_wait_for_their_password_in_the_same_connection_only() {
+    let user = |s, n| {
+        on_stream(
+            s,
+            &[("ftp.request.command", "USER"), ("ftp.request.arg", n)],
+        )
+    };
+    let pass = |s, p| {
+        on_stream(
+            s,
+            &[("ftp.request.command", "PASS"), ("ftp.request.arg", p)],
+        )
+    };
+    let c = scan(&[
+        user("1", "bob"),
+        user("2", "carl"),
+        pass("1", "pw-one"),
+        pass("2", "pw-two"),
+    ]);
+    let got: Vec<_> = c
+        .iter()
+        .map(|c| (c.user.as_deref(), c.secret.as_deref()))
+        .collect();
+    assert_eq!(
+        got,
+        [
+            (Some("bob"), Some("pw-one")),
+            (Some("carl"), Some("pw-two"))
+        ]
+    );
+}
+
+#[test]
+fn a_user_of_one_protocol_is_not_paired_with_a_password_of_another() {
+    let c = scan(&[
+        on_stream(
+            "4",
+            &[("ftp.request.command", "USER"), ("ftp.request.arg", "bob")],
+        ),
+        on_stream(
+            "4",
+            &[
+                ("pop.request.command", "PASS"),
+                ("pop.request.parameter", "pw"),
+            ],
+        ),
+        on_stream("4", &[("smtp.auth.password", &b64("smtppw"))]),
+    ]);
+    assert_eq!(c.len(), 2);
+    assert!(c.iter().all(|c| c.user.is_none()));
+}
+
+#[test]
+fn smtp_auth_is_case_insensitive_and_accepts_an_initial_login_user() {
+    let plain = format!("plain {}", b64("\0carol\0mailpass1"));
+    let c = scan(&[
+        line(&[("smtp.req.command", "auth"), ("smtp.req.parameter", &plain)]),
+        on_stream(
+            "9",
+            &[
+                ("smtp.req.command", "AUTH"),
+                ("smtp.req.parameter", &format!("LOGIN {}", b64("dave"))),
+            ],
+        ),
+        on_stream("9", &[("smtp.auth.password", &b64("davepass"))]),
+    ]);
+    let got: Vec<_> = c
+        .iter()
+        .map(|c| (c.user.as_deref(), c.secret.as_deref()))
+        .collect();
+    assert_eq!(
+        got,
+        [
+            (Some("carol"), Some("mailpass1")),
+            (Some("dave"), Some("davepass"))
+        ]
+    );
+}
+
+#[test]
+fn pending_users_stay_bounded() {
+    let mut p = Parser::default();
+    let mut out = Vec::new();
+    for n in 0..MAX_PENDING_USERS * 3 {
+        let l = on_stream(
+            &n.to_string(),
+            &[("ftp.request.command", "USER"), ("ftp.request.arg", "bob")],
+        );
+        p.push_line(&l, &mut out);
+    }
+    assert!(p.users.len() <= MAX_PENDING_USERS);
+}
+
+#[test]
+fn tunnelled_packets_use_the_outer_addresses() {
+    let mut l = line(&[("http.authorization", "Bearer abcdefgh")]);
+    l = l.replacen("10.0.0.2", "10.0.0.2,192.168.1.2", 1).replacen(
+        "10.0.0.9",
+        "10.0.0.9,192.168.1.9",
+        1,
+    );
+    let c = scan(&[l]);
+    assert_eq!((&*c[0].src, &*c[0].dst), ("10.0.0.2", "10.0.0.9"));
 }

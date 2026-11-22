@@ -9,7 +9,7 @@ use wl_kit::format;
 use wl_model::ThreatIntel;
 use wl_panels::settings::IntelInfo;
 
-const MAX_FILE: u64 = 256 * 1024 * 1024;
+const MAX_FILE: u64 = 64 * 1024 * 1024;
 
 pub type IntelHandle = Arc<RwLock<Arc<ThreatIntel>>>;
 
@@ -20,7 +20,8 @@ struct Loaded {
 }
 
 enum Msg {
-    Loaded(Loaded),
+    /// The load numbered `.0`; only the most recently started one is applied.
+    Loaded(u64, Loaded),
     Picked(PathBuf),
 }
 
@@ -29,6 +30,7 @@ pub struct IntelStore {
     shared: IntelHandle,
     loaded: Loaded,
     loading: bool,
+    generation: u64,
     tx: Sender<Msg>,
     rx: Receiver<Msg>,
 }
@@ -54,6 +56,7 @@ impl IntelStore {
             shared: IntelHandle::default(),
             loaded: Loaded::default(),
             loading: false,
+            generation: 0,
             tx,
             rx,
         }
@@ -69,9 +72,11 @@ impl IntelStore {
 
     pub fn reload(&mut self, ctx: &egui::Context) {
         self.loading = true;
+        self.generation += 1;
+        let generation = self.generation;
         let (dir, tx, ctx) = (self.dir.clone(), self.tx.clone(), ctx.clone());
         std::thread::spawn(move || {
-            let _ = tx.send(Msg::Loaded(load_dir(&dir)));
+            let _ = tx.send(Msg::Loaded(generation, load_dir(&dir)));
             ctx.request_repaint();
         });
     }
@@ -102,7 +107,8 @@ impl IntelStore {
         let mut changed = false;
         while let Ok(msg) = self.rx.try_recv() {
             match msg {
-                Msg::Loaded(l) => {
+                Msg::Loaded(generation, _) if generation != self.generation => {}
+                Msg::Loaded(_, l) => {
                     if let Ok(mut g) = self.shared.write() {
                         *g = Arc::new(l.intel.clone());
                     }
@@ -130,20 +136,25 @@ impl IntelStore {
 }
 
 fn summary(intel: &ThreatIntel) -> String {
-    let (ips, domains, prints) = intel.counts();
+    let (ips, ranges, domains, prints) = intel.counts();
     if intel.is_empty() {
         return "No lists found".to_owned();
     }
+    let ranges = if ranges > 0 {
+        format!("{} ranges, ", format::count(ranges as u64))
+    } else {
+        String::new()
+    };
     format!(
-        "{} addresses, {} domains, {} fingerprints",
+        "{} addresses, {ranges}{} domains, {} fingerprints",
         format::count(ips as u64),
         format::count(domains as u64),
         format::count(prints as u64)
     )
 }
 
-/// Reads every regular file of `dir`: `.json` as a JA4DB export, anything else as a blocklist
-/// named after the file.
+/// Reads every regular file of `dir`: `.json` and JA4DB CSV exports as JA4DB, anything else as
+/// a blocklist named after the file.
 fn load_dir(dir: &Path) -> Loaded {
     let mut out = Loaded::default();
     let Ok(rd) = std::fs::read_dir(dir) else {
@@ -172,13 +183,13 @@ fn is_hidden(p: &Path) -> bool {
 fn load_file(path: &Path, intel: &mut ThreatIntel) -> Result<(), String> {
     let size = std::fs::metadata(path).map_err(|e| e.to_string())?.len();
     if size > MAX_FILE {
-        return Err("larger than 256 MiB".to_owned());
+        return Err("larger than 64 MiB".to_owned());
     }
     let text = std::fs::read_to_string(path).map_err(|_| "not a text file".to_owned())?;
-    if path
+    let json = path
         .extension()
-        .is_some_and(|x| x.eq_ignore_ascii_case("json"))
-    {
+        .is_some_and(|x| x.eq_ignore_ascii_case("json"));
+    if json || ThreatIntel::is_ja4db_csv(&text) {
         return intel.add_ja4db(&text).map(drop);
     }
     let list = path.file_stem().unwrap_or_default().to_string_lossy();
@@ -186,12 +197,39 @@ fn load_file(path: &Path, intel: &mut ThreatIntel) -> Result<(), String> {
     Ok(())
 }
 
+/// Copies `src` into `dir` under a name that is not taken, so no list is overwritten; a file
+/// already in `dir` is left alone.
 fn add_file(src: &Path, dir: &Path) -> Result<(), String> {
     let name = src.file_name().ok_or("no file name")?;
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    std::fs::copy(src, dir.join(name))
+    let target = dir.join(name);
+    if same_file(src, &target) {
+        return Ok(());
+    }
+    let target = free_name(&target);
+    std::fs::copy(src, &target)
         .map(drop)
         .map_err(|e| format!("Could not copy {}: {e}", src.display()))
+}
+
+fn same_file(a: &Path, b: &Path) -> bool {
+    matches!((a.canonicalize(), b.canonicalize()), (Ok(a), Ok(b)) if a == b)
+}
+
+fn free_name(target: &Path) -> PathBuf {
+    if !target.exists() {
+        return target.to_owned();
+    }
+    let stem = target.file_stem().unwrap_or_default().to_string_lossy();
+    let ext = target.extension().map(|e| e.to_string_lossy());
+    (1..)
+        .map(|n| match &ext {
+            Some(ext) => format!("{stem}-{n}.{ext}"),
+            None => format!("{stem}-{n}"),
+        })
+        .map(|name| target.with_file_name(name))
+        .find(|p| !p.exists())
+        .unwrap_or_else(|| target.to_owned())
 }
 
 #[cfg(test)]

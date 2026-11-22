@@ -29,7 +29,7 @@ impl CredKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Credential {
     pub kind: CredKind,
     pub frame: u64,
@@ -39,6 +39,23 @@ pub struct Credential {
     pub secret: Option<String>,
     /// Header or query parameter that carried the secret.
     pub field: Option<String>,
+    /// How many times the same login was seen (keep-alive and retry repeats are merged).
+    pub count: u32,
+}
+
+impl std::fmt::Debug for Credential {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Credential")
+            .field("kind", &self.kind)
+            .field("frame", &self.frame)
+            .field("src", &self.src)
+            .field("dst", &self.dst)
+            .field("user", &self.user)
+            .field("secret", &self.masked_secret())
+            .field("field", &self.field)
+            .field("count", &self.count)
+            .finish()
+    }
 }
 
 impl Credential {
@@ -99,9 +116,27 @@ mod tests {
             user: None,
             secret: None,
             field: None,
+            count: 1,
         };
         assert_eq!(c.masked_secret(), None);
         c.secret = Some("abc".into());
         assert_eq!(c.masked_secret().as_deref(), Some("**** (3 chars)"));
+    }
+
+    #[test]
+    fn debug_output_never_contains_the_secret() {
+        let c = Credential {
+            kind: CredKind::HttpBasic,
+            frame: 1,
+            src: "a".into(),
+            dst: "b".into(),
+            user: Some("alice".into()),
+            secret: Some("s3cretPass".into()),
+            field: None,
+            count: 1,
+        };
+        let text = format!("{c:?} {:?}", vec![c.clone()]);
+        assert!(!text.contains("s3cretPass"), "{text}");
+        assert!(text.contains("**** (10 chars)"));
     }
 }

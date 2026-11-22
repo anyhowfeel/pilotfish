@@ -109,6 +109,30 @@ def main(path: str) -> None:
     pop.send("c", b"PASS letmein99\r\n")
     pop.send("s", b"+OK logged in\r\n")
     pkts += pop.packets
+    pkts += http("10.0.0.6", "10.0.0.80", 41006, [
+        ("/ka", [f"Authorization: Basic {b64('ops:keepalive1')}"]),
+        ("/ka", [f"Authorization: Basic {b64('ops:keepalive1')}"]),
+        ("/ka", [f"Authorization: Basic {b64('ops:keepalive1')}"]),
+        ("/s?key=name&token=next_page_abc&password=p%40ss%20word", []),
+        ("/s3", ["Authorization: AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20240101/us-east-1/s3/aws4_request, Signature=abc123"]),
+        ("/proxy", [f"Proxy-Authorization: Basic {b64('proxy:proxypw')}"]),
+        ("/empty", [f"Authorization: Basic {b64('token123:')}"]),
+    ])
+    logins = []
+    for port, user, password in [(41007, "u1", "p1pass"), (41008, "u2", "p2pass")]:
+        ftp = Stream("10.0.0.3", "10.0.0.22", port, 21)
+        ftp.send("c", f"USER {user}\r\n".encode())
+        ftp.send("s", b"331 password\r\n")
+        ftp.send("c", f"PASS {password}\r\n".encode())
+        ftp.send("s", b"230 ok\r\n")
+        logins.append(ftp.packets)
+    for pair in zip(*logins):
+        pkts += pair
+    lower = Stream("10.0.0.7", "10.0.0.25", 41009, 25)
+    lower.send("s", b"220 mail ready\r\n")
+    lower.send("c", f"auth plain {b64(chr(0) + 'frank' + chr(0) + 'lowerpass')}\r\n".encode())
+    lower.send("s", b"235 ok\r\n")
+    pkts += lower.packets
     with open(path, "wb") as f:
         f.write(struct.pack("<IHHiIII", 0xA1B2C3D4, 2, 4, 0, 0, 65535, 101))
         for i, pkt in enumerate(pkts):

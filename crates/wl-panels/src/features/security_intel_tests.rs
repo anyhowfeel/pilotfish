@@ -140,6 +140,9 @@ fn synthesis_includes_security_cards_and_honours_mutes() {
     rules.mute("Blocklisted domain");
     assert_eq!(
         titles(&rules),
-        ["Blocklisted address: 198.51.100.7 (feodo)"]
+        [
+            "Blocklisted address: 198.51.100.7 (feodo)",
+            "2 findings hidden by mutes"
+        ]
     );
 }

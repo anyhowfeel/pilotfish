@@ -27,8 +27,19 @@ fn credentials_are_found_in_every_cleartext_protocol() {
         .expect("credentials");
     assert_eq!(
         of(&all, CredKind::HttpBasic),
-        [(Some("alice"), Some("s3cretPass"), "10.0.0.80")]
+        [
+            (Some("alice"), Some("s3cretPass"), "10.0.0.80"),
+            (Some("ops"), Some("keepalive1"), "10.0.0.80"),
+            (Some("proxy"), Some("proxypw"), "10.0.0.80"),
+            (Some("token123"), Some(""), "10.0.0.80"),
+        ]
     );
+    let repeats: Vec<_> = all
+        .iter()
+        .filter(|c| c.user.as_deref() == Some("ops"))
+        .map(|c| c.count)
+        .collect();
+    assert_eq!(repeats, [3]);
     let bearer = of(&all, CredKind::HttpBearer);
     assert_eq!(bearer[0].1, Some("eyJhbGciOiJIUzI1NiJ9.payload.signature"));
     let keys: Vec<_> = all
@@ -41,17 +52,23 @@ fn credentials_are_found_in_every_cleartext_protocol() {
         [
             (Some("X-API-Key"), Some("sk_live_abcdef123456")),
             (Some("api_key"), Some("KEY123456789")),
+            (Some("password"), Some("p@ss word")),
         ]
     );
     assert_eq!(
         of(&all, CredKind::Ftp),
-        [(Some("bob"), Some("hunter2"), "10.0.0.21")]
+        [
+            (Some("bob"), Some("hunter2"), "10.0.0.21"),
+            (Some("u1"), Some("p1pass"), "10.0.0.22"),
+            (Some("u2"), Some("p2pass"), "10.0.0.22"),
+        ]
     );
     assert_eq!(
         of(&all, CredKind::Smtp),
         [
             (Some("carol"), Some("mailpass1"), "10.0.0.25"),
             (Some("dave"), Some("davepass"), "10.0.0.25"),
+            (Some("frank"), Some("lowerpass"), "10.0.0.25"),
         ]
     );
     assert_eq!(
@@ -62,7 +79,7 @@ fn credentials_are_found_in_every_cleartext_protocol() {
         of(&all, CredKind::Ntlm),
         [(Some("CORP\\alice"), None, "10.0.0.80")]
     );
-    assert_eq!(all.len(), 9, "{all:#?}");
+    assert_eq!(all.len(), 16, "{all:#?}");
 }
 
 #[test]

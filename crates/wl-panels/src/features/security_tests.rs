@@ -5,9 +5,11 @@ use wl_model::{
     StatsSnapshot, ThreatIntel, TlsSession,
 };
 
+use super::super::health::collect;
 use super::*;
 use crate::features::{InsightContext, synthesize_insights};
 use crate::insights::InsightRules;
+use wl_model::HealthInsight;
 
 fn cred(kind: CredKind, frame: u64, user: Option<&str>, secret: Option<&str>) -> Credential {
     Credential {
@@ -18,6 +20,7 @@ fn cred(kind: CredKind, frame: u64, user: Option<&str>, secret: Option<&str>) ->
         user: user.map(Into::into),
         secret: secret.map(Into::into),
         field: None,
+        count: 1,
     }
 }
 
@@ -74,7 +77,7 @@ fn run(
     names: &[DnsQuery],
     reveal: bool,
 ) -> Vec<HealthInsight> {
-    let mut out = Vec::new();
+    let rules = InsightRules::default();
     let inp = Inputs {
         security: sec,
         intel,
@@ -82,8 +85,7 @@ fn run(
         dns: names,
         reveal_secrets: reveal,
     };
-    detect(&inp, &mut out);
-    out
+    collect(&rules, |out| detect(&inp, out))
 }
 
 fn creds(c: Vec<Credential>, reveal: bool) -> Vec<HealthInsight> {
@@ -141,7 +143,7 @@ fn same_kind_and_endpoints_share_one_card() {
     assert!(out[0].explanation.contains("and 2 more"));
     assert_eq!(
         out[0].suggested_filter.as_deref(),
-        Some("frame.number in {1 2 3 4 5}")
+        Some("frame.number in {1,2,3,4,5}")
     );
 }
 
@@ -171,7 +173,94 @@ fn many_frames_are_capped_in_the_filter() {
         .collect();
     let out = creds(c, false);
     let flt = out[0].suggested_filter.as_deref().unwrap();
-    assert_eq!(flt, "frame.number in {1 2 3 4 5 6 7 8 9 10}");
+    assert_eq!(flt, "frame.number in {1,2,3,4,5,6,7,8,9,10}");
+}
+
+fn cred_to(kind: CredKind, src: &str) -> Credential {
+    Credential {
+        src: src.into(),
+        ..cred(kind, 1, Some("u"), Some("password"))
+    }
+}
+
+#[test]
+fn credential_cap_is_applied_after_muting_and_announced() {
+    let all: Vec<_> = (1..=10)
+        .map(|i| cred_to(CredKind::Ftp, &format!("10.0.2.{i}")))
+        .collect();
+    let rules = |muted: &[&str]| InsightRules {
+        muted: muted.iter().map(|m| (*m).to_owned()).collect(),
+        ..InsightRules::default()
+    };
+    let titles = |rules: &InsightRules| -> Vec<String> {
+        let sec = SecurityData {
+            credentials: all.clone(),
+            tls: Vec::new(),
+        };
+        let inp = Inputs {
+            security: Some(&sec),
+            intel: &ThreatIntel::default(),
+            hosts: &[],
+            dns: &[],
+            reveal_secrets: false,
+        };
+        collect(rules, |out| detect(&inp, out))
+            .into_iter()
+            .map(|f| f.title)
+            .collect()
+    };
+    let none = titles(&rules(&[]));
+    assert_eq!(none.len(), 9);
+    assert_eq!(none[8], "2 more cleartext logins not shown");
+
+    let muted = titles(&rules(&["10.0.2.1", "10.0.2.2"]));
+    assert_eq!(muted.len(), 9, "{muted:?}");
+    assert!(muted.iter().any(|t| t.contains("10.0.2.9")));
+    assert!(muted.iter().any(|t| t.contains("10.0.2.10")));
+    assert_eq!(muted[8], "2 findings hidden by mutes");
+}
+
+#[test]
+fn repeated_logins_report_their_count() {
+    let mut c = cred(CredKind::HttpBasic, 3, Some("alice"), Some("s3cretPass"));
+    c.count = 4;
+    let out = creds(vec![c], false);
+    assert!(out[0].explanation.contains("seen 4 times"));
+    assert_eq!(out[0].metric, "4 found");
+}
+
+#[test]
+fn an_empty_password_is_only_a_warning() {
+    let out = creds(
+        vec![
+            cred(CredKind::HttpBasic, 1, Some("token123"), Some("")),
+            cred(CredKind::HttpBasic, 2, Some("alice"), Some("s3cretPass")),
+        ],
+        false,
+    );
+    let by_title = |t: &str| out.iter().find(|f| f.title.contains(t)).unwrap().severity;
+    assert_eq!(
+        by_title("HTTP Basic login without password"),
+        InsightSeverity::Warning
+    );
+    assert_eq!(
+        by_title("Cleartext HTTP Basic login:"),
+        InsightSeverity::Critical
+    );
+}
+
+#[test]
+fn generated_filters_are_valid_for_tshark() {
+    let c: Vec<_> = [4, 10, 15]
+        .into_iter()
+        .map(|f| cred(CredKind::Ftp, f, Some("bob"), Some("pw12345")))
+        .collect();
+    let out = creds(c, false);
+    assert_eq!(
+        out[0].suggested_filter.as_deref(),
+        Some("frame.number in {4,10,15}")
+    );
+    crate::test_util::assert_tshark_accepts(out[0].suggested_filter.as_deref().unwrap());
 }
 
 #[path = "security_intel_tests.rs"]

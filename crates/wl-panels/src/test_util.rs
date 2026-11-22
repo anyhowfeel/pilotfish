@@ -31,3 +31,22 @@ pub fn plain() -> crate::features::InsightContext<'static> {
         rules: &NO_EXTRAS.1,
     }
 }
+
+/// Asserts that tshark accepts `filter` (skipped where tshark is not installed).
+pub fn assert_tshark_accepts(filter: &str) {
+    let capture = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tests/fixtures/behavior.pcap"
+    );
+    let Ok(out) = std::process::Command::new("tshark")
+        .args(["-r", capture, "-c", "1", "-Y", filter])
+        .output()
+    else {
+        return;
+    };
+    assert!(
+        out.status.success(),
+        "tshark rejected {filter:?}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
