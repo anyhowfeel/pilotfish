@@ -130,10 +130,11 @@ impl WebPanel {
 
     pub fn ui(&mut self, ui: &mut Ui, d: &WebData) -> Vec<WebAction> {
         let tabs = [(Tab::Exchanges, "Exchanges"), (Tab::Files, "Files")];
-        segmented_w(ui, &mut self.tab, &tabs, 220.0);
-        ui.add_space(spacing::SM);
         let mut out = Vec::new();
-        keys_bar::keys_bar(ui, d.keys, &mut out);
+        ui.horizontal_wrapped(|ui| {
+            segmented_w(ui, &mut self.tab, &tabs, 220.0);
+            keys_bar::keys_bar(ui, d.keys, &mut out);
+        });
         ui.add_space(spacing::SM);
         if self.tab == Tab::Files {
             out.extend(self.objects.ui(ui).into_iter().map(WebAction::Objects));

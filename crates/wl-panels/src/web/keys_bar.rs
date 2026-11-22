@@ -8,7 +8,8 @@ use super::actions::{KeysInfo, WebAction};
 const NO_EDITCAP: &str = "editcap (Wireshark) was not found on PATH.";
 
 pub fn keys_bar(ui: &mut Ui, keys: &KeysInfo, out: &mut Vec<WebAction>) {
-    ui.horizontal_wrapped(|ui| {
+    ui.add_space(spacing::SM);
+    ui.scope(|ui| {
         ui.spacing_mut().item_spacing.x = spacing::SM;
         ui.label(RichText::new("TLS keys").small().color(Palette::muted()));
         match &keys.file {
