@@ -39,10 +39,21 @@ impl FeaturesHub {
         });
     }
 
-    pub fn export_html(&self, title: String, stats: Arc<StatsSnapshot>, ctx: egui::Context) {
+    pub fn export_html(
+        &self,
+        title: String,
+        stats: Arc<StatsSnapshot>,
+        file: Option<PathBuf>,
+        ctx: egui::Context,
+    ) {
         let insights = self.insights_for(&stats);
         let (phs, expert, bms) = (self.phs.clone(), self.expert.clone(), self.bookmarks.all());
+        let backend = self.tshark.clone();
         self.spawn_save("report.html", "html", ctx, move |p| {
+            let bms = match &backend {
+                Some(b) => crate::report_bookmarks::load(&**b, file.as_deref(), &bms),
+                None => crate::report_bookmarks::join(&bms, &[]),
+            };
             write_html_report(
                 p,
                 &title,
@@ -54,6 +65,17 @@ impl FeaturesHub {
             )
             .map(|()| format!("Saved report to {}", p.display()))
             .map_err(|e| e.to_string())
+        });
+    }
+
+    /// Saves a copy of `file` whose packet comments are the bookmark comments.
+    pub fn save_comments(&self, file: PathBuf, ctx: egui::Context) {
+        let Some(b) = self.tshark.clone() else { return };
+        let bms = self.bookmarks.all();
+        self.spawn_save("annotated.pcapng", "pcapng", ctx, move |p| {
+            b.save_with_comments(&file, &bms, p)
+                .map(|()| format!("Saved annotated capture to {}", p.display()))
+                .map_err(|e| e.to_string())
         });
     }
 }

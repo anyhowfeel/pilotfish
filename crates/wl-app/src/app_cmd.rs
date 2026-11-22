@@ -162,8 +162,9 @@ impl App {
                 .export_json(self.ctrl.snapshot().clone(), ctx.clone()),
             HubCommand::ExportHtml => {
                 let title = self.ctrl.status().source.clone();
+                let file = self.ctrl.backing();
                 self.hub
-                    .export_html(title, self.ctrl.snapshot().clone(), ctx.clone());
+                    .export_html(title, self.ctrl.snapshot().clone(), file, ctx.clone());
             }
         }
     }

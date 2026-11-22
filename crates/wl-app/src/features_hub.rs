@@ -5,8 +5,8 @@ use std::sync::Arc;
 use crossbeam_channel::{Receiver, Sender, bounded};
 use eframe::egui;
 use wl_model::{
-    BehaviorData, CaptureBackend, CaptureError, ExpertReport, HealthInsight, PacketRow,
-    ProtocolHierarchy, StatsSnapshot, StreamConversation, StreamFormat, StreamProtocol,
+    BehaviorData, CaptureBackend, CaptureError, ExpertReport, HealthInsight, PacketBookmark,
+    PacketRow, ProtocolHierarchy, StatsSnapshot, StreamConversation, StreamFormat, StreamProtocol,
 };
 use wl_panels::features::{
     BookmarkStore, CommandPalette, FieldCatalog, InsightsAction, InsightsPanel, PaletteAction,
@@ -21,6 +21,7 @@ enum Msg {
     Stream(Result<StreamConversation, CaptureError>),
     Insights(Option<ExpertReport>, Option<ProtocolHierarchy>),
     Behavior(BehaviorData),
+    Comments(Vec<PacketBookmark>),
     ExportDone(Result<String, String>),
 }
 
@@ -132,6 +133,9 @@ impl FeaturesHub {
             )
         });
         self.spawn_job(&file, &ctx, |b, f| {
+            Msg::Comments(b.packet_comments(f).unwrap_or_default())
+        });
+        self.spawn_job(&file, &ctx, |b, f| {
             let (channels, dns) = std::thread::scope(|s| {
                 let c = s.spawn(|| b.behavior_channels(f).unwrap_or_default());
                 let d = b.dns_queries(f).unwrap_or_default();
@@ -177,6 +181,11 @@ impl FeaturesHub {
                     self.phs = p;
                 }
                 Msg::Behavior(b) => self.behavior = Some(b),
+                Msg::Comments(list) => {
+                    for c in list {
+                        self.bookmarks.set(c.frame_no, c.comment);
+                    }
+                }
                 Msg::ExportDone(Ok(n)) => self.notice = Some(n),
                 Msg::ExportDone(Err(e)) => self.error = Some(e),
             }

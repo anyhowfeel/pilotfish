@@ -38,6 +38,7 @@ mod missing;
 mod page;
 mod prefs;
 mod props_hub;
+mod report_bookmarks;
 mod setup_io;
 mod shell;
 mod shot;

@@ -4,11 +4,10 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use wl_kit::format;
-use wl_model::{
-    ExpertReport, HealthInsight, InsightSeverity, PacketBookmark, ProtocolHierarchy, StatsSnapshot,
-};
+use wl_model::{ExpertReport, HealthInsight, InsightSeverity, ProtocolHierarchy, StatsSnapshot};
 
 use crate::export_data::ExportError;
+use crate::report_bookmarks::BookmarkedPacket;
 
 fn html_escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
@@ -45,7 +44,7 @@ pub fn build_html_report(
     insights: &[HealthInsight],
     phs: Option<&ProtocolHierarchy>,
     expert: Option<&ExpertReport>,
-    bookmarks: &[PacketBookmark],
+    bookmarks: &[BookmarkedPacket],
 ) -> String {
     let mut h = String::with_capacity(4096);
     let safe_title = html_escape(title);
@@ -139,12 +138,17 @@ pub fn build_html_report(
     }
 
     if !bookmarks.is_empty() {
-        h.push_str("<h2>Bookmarked Frames</h2><table><tr><th class=\"num\">Frame</th><th>Comment</th></tr>");
+        h.push_str("<h2>Bookmarked Packets</h2><table><tr><th class=\"num\">Frame</th><th class=\"num\">Time</th><th>Source</th><th>Destination</th><th>Protocol</th><th>Info</th><th>Comment</th></tr>");
         for b in bookmarks {
             let _ = write!(
                 h,
-                "<tr><td class=\"num\">#{}</td><td>{}</td></tr>",
+                "<tr><td class=\"num\">#{}</td><td class=\"num\">{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
                 b.frame_no,
+                html_escape(&b.time),
+                html_escape(&b.src),
+                html_escape(&b.dst),
+                html_escape(&b.protocol),
+                html_escape(&b.info),
                 html_escape(&b.comment),
             );
         }
@@ -161,7 +165,7 @@ pub fn write_html_report(
     insights: &[HealthInsight],
     phs: Option<&ProtocolHierarchy>,
     expert: Option<&ExpertReport>,
-    bookmarks: &[PacketBookmark],
+    bookmarks: &[BookmarkedPacket],
 ) -> Result<(), ExportError> {
     let html = build_html_report(title, stats, insights, phs, expert, bookmarks);
     std::fs::write(path, html).map_err(|source| ExportError::Io {

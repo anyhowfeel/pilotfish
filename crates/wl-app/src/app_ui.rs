@@ -122,6 +122,10 @@ impl App {
                             cmds.push(Command::ApplyFilter(f));
                         }
                         BookmarkBarAction::ClearAll => self.hub.bookmarks.clear(),
+                        BookmarkBarAction::SaveComments => match self.ctrl.backing() {
+                            Some(file) => self.hub.save_comments(file, ui.ctx().clone()),
+                            None => self.hub.error = Some("Open a capture first.".into()),
+                        },
                     }
                 }
                 let detail = self.ctrl.detail().filter(|d| Some(d.frame_no) == sel);
