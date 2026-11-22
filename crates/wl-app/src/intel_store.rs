@@ -134,12 +134,19 @@ fn summary(intel: &ThreatIntel) -> String {
     if intel.is_empty() {
         return "No lists found".to_owned();
     }
-    format!(
-        "{} addresses, {} domains, {} fingerprints",
-        format::count(ips as u64),
-        format::count(domains as u64),
-        format::count(prints as u64)
-    )
+    let item = |n: usize, one: &str, many: &str| {
+        format!(
+            "{} {}",
+            format::count(n as u64),
+            if n == 1 { one } else { many }
+        )
+    };
+    [
+        item(ips, "address", "addresses"),
+        item(domains, "domain", "domains"),
+        item(prints, "fingerprint", "fingerprints"),
+    ]
+    .join(", ")
 }
 
 /// Reads every regular file of `dir`: `.json` as a JA4DB export, anything else as a blocklist

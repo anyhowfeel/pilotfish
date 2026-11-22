@@ -36,7 +36,7 @@ fn json_is_ja4db_and_other_files_are_blocklists_named_after_the_file() {
             .fingerprint("t13d1516h2_8daaf6152771_02713d6af862")
             .is_some()
     );
-    assert_eq!(summary(&l.intel), "1 addresses, 1 domains, 1 fingerprints");
+    assert_eq!(summary(&l.intel), "1 address, 1 domain, 1 fingerprint");
 }
 
 #[test]
@@ -79,9 +79,6 @@ fn a_load_replaces_the_shared_lists() {
     store.tx.send(Msg::Loaded(load_dir(tmp.path()))).unwrap();
     assert!(store.poll(&egui::Context::default()));
     assert_eq!(store.current().ip("198.51.100.7"), Some("a"));
-    assert_eq!(
-        store.info().summary,
-        "1 addresses, 0 domains, 0 fingerprints"
-    );
+    assert_eq!(store.info().summary, "1 address, 0 domains, 0 fingerprints");
     assert!(!store.poll(&egui::Context::default()));
 }
