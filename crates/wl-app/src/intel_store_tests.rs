@@ -146,7 +146,7 @@ fn ja4db_csv_files_are_read_as_fingerprints_and_ranges_are_counted() {
     assert_eq!(l.intel.ip("10.1.2.3"), Some("drop"));
     assert_eq!(
         summary(&l.intel),
-        "0 addresses, 1 ranges, 0 domains, 1 fingerprints"
+        "0 addresses, 1 range, 0 domains, 1 fingerprint"
     );
 }
 
