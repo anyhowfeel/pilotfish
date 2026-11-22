@@ -68,6 +68,8 @@ pub struct TlsSession {
     pub stream: Option<u32>,
     pub first_frame: u64,
     pub start_rel: f64,
+    /// Unix time (seconds) of the first handshake packet: when the certificates were presented.
+    pub start_epoch: Option<i64>,
     /// SNI from the ClientHello — the "host" of an HTTPS request.
     pub server_name: Arc<str>,
     /// Negotiated version label, e.g. "TLS 1.3".

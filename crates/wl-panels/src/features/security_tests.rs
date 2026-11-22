@@ -42,6 +42,7 @@ fn tls(sni: &str, ja3: &str, ja4: &str) -> TlsSession {
         stream: None,
         first_frame: 1,
         start_rel: 0.0,
+        start_epoch: None,
         server_name: sni.into(),
         version: "TLS 1.3".into(),
         cipher: None,

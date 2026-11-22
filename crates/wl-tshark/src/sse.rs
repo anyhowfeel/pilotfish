@@ -156,13 +156,11 @@ impl SseDecoder {
         match name {
             "event" => self.block.event = Some(value),
             "id" => self.block.id = Some(value),
-            "data" => {
-                if self.block.data.len() < MAX_DATA {
-                    if !self.block.data.is_empty() {
-                        self.block.data.push('\n');
-                    }
-                    self.block.data.push_str(&value);
+            "data" if self.block.data.len() < MAX_DATA => {
+                if !self.block.data.is_empty() {
+                    self.block.data.push('\n');
                 }
+                self.block.data.push_str(&value);
             }
             _ => {}
         }

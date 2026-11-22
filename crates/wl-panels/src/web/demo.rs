@@ -41,6 +41,7 @@ pub fn session(frame: u64, sni: &str) -> TlsSession {
         stream: Some(frame as u32),
         first_frame: frame,
         start_rel: frame as f64 * 0.5,
+        start_epoch: None,
         server_name: sni.into(),
         version: "TLS 1.3".into(),
         cipher: Some("TLS_AES_128_GCM_SHA256".into()),

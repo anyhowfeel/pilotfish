@@ -10,7 +10,7 @@ use crate::interner::Interner;
 use crate::tls_names::{cipher_label, version_label};
 use crate::tsv_pass::{columns, opt};
 
-pub const FIELDS: [&str; 17] = [
+pub const FIELDS: [&str; 18] = [
     "frame.number",
     "frame.time_relative",
     "tcp.stream",
@@ -28,11 +28,13 @@ pub const FIELDS: [&str; 17] = [
     "tls.handshake.ja3",
     "tls.handshake.ja4",
     "tls.handshake.ja3s",
+    "frame.time_epoch",
 ];
 const JA3: usize = 14;
 const JA4: usize = 15;
 const JA3S: usize = 16;
-const CERT: usize = 17;
+const EPOCH: usize = 17;
+const CERT: usize = 18;
 /// Leaf certificate subject alternative name (first DNS name) — the best cheap "subject".
 pub const CERT_FIELD: &str = "x509ce.dNSName";
 
@@ -73,6 +75,11 @@ impl Merger {
             return;
         };
         let rel = f[1].trim().parse().unwrap_or(0.0);
+        let epoch = f[EPOCH]
+            .trim()
+            .parse::<f64>()
+            .ok()
+            .map(|e| e.floor() as i64);
         let idx = *self.index.entry(key).or_insert_with(|| {
             let e = self.interner.intern("");
             self.entries.push(Entry {
@@ -84,6 +91,7 @@ impl Merger {
                     },
                     first_frame: frame,
                     start_rel: rel,
+                    start_epoch: epoch,
                     server_name: e.clone(),
                     version: e.clone(),
                     cipher: None,
@@ -112,6 +120,7 @@ impl Merger {
         if frame < en.s.first_frame {
             en.s.first_frame = frame;
             en.s.start_rel = rel;
+            en.s.start_epoch = epoch;
         }
         if first == "1" {
             if let Some(n) = opt(f[12]) {

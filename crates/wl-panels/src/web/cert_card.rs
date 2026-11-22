@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use wl_kit::egui::{RichText, Ui};
 use wl_kit::theme::Palette;
 use wl_kit::widgets::badge;
-use wl_model::{CertInfo, CertWarning, TlsSession, date_label, evaluate_chain};
+use wl_model::{CertFinding, CertInfo, CertWarning, TlsSession, assess_chain, date_label};
 
 use super::card::{card, muted};
 use super::headers::headers_table;
@@ -55,18 +55,26 @@ pub fn cert_rows(cert: &CertInfo, now: i64) -> Vec<(String, String)> {
     rows
 }
 
+fn finding_text(f: &CertFinding, suffix: &str) -> String {
+    match f.depth {
+        0 => format!("{}{suffix}", f.warning.label()),
+        d => format!("{}{suffix} (chain #{d})", f.warning.label()),
+    }
+}
+
 fn warnings_row(ui: &mut Ui, t: &TlsSession, now: i64) {
-    let found = evaluate_chain(&t.certs, &t.server_name, now);
+    let a = assess_chain(&t.certs, &t.server_name, t.start_epoch, now);
     ui.horizontal_wrapped(|ui| {
-        if found.is_empty() {
-            badge(ui, "No problems found", Palette::ok());
+        if a.at_capture.is_empty() && a.only_now.is_empty() {
+            badge(ui, "No expiry, name or key issues", Palette::ok());
+        } else if a.at_capture.is_empty() {
+            badge(ui, "Valid at capture time", Palette::ok());
         }
-        for f in found {
-            let text = match f.depth {
-                0 => f.warning.label().to_owned(),
-                d => format!("{} (chain #{d})", f.warning.label()),
-            };
-            badge(ui, &text, Palette::warn());
+        for f in &a.at_capture {
+            badge(ui, &finding_text(f, ""), Palette::warn());
+        }
+        for f in &a.only_now {
+            badge(ui, &finding_text(f, " now"), Palette::warn());
         }
     });
 }

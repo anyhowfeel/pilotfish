@@ -27,7 +27,10 @@ pub use backend::{
 };
 pub use behavior::{BehaviorData, Channel, ChannelKind, Proto};
 pub use capture_options::{AutoStop, CaptureOptions, RingBuffer, SNAPLEN_MAX};
-pub use cert::{CertFinding, CertInfo, CertWarning, date_label, evaluate as evaluate_chain};
+pub use cert::{
+    Assessment, CertFinding, CertInfo, CertWarning, assess as assess_chain, date_label,
+    evaluate as evaluate_chain,
+};
 pub use credential::{CredKind, Credential, SecurityData, mask};
 pub use detail::{DetailNode, FrameDetail};
 pub use extras::{DecodeAs, DnsQuery, ExportObject, ObjectSet, Rcode, sanitize_filename};

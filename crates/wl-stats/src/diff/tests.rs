@@ -61,6 +61,7 @@ fn tls(name: &str) -> TlsSession {
         stream: None,
         first_frame: 1,
         start_rel: 0.0,
+        start_epoch: None,
         server_name: name.into(),
         version: "TLS 1.3".into(),
         cipher: None,

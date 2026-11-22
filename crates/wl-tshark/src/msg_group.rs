@@ -140,7 +140,7 @@ impl Grouper {
         }
         let known = self.sse.iter().position(|t| t.stream == row.stream);
         let req = self.requests.get(&row.stream);
-        let i = known.unwrap_or_else(|| self.sse.len());
+        let i = known.unwrap_or(self.sse.len());
         if known.is_none() {
             self.sse.push(SseTarget {
                 stream: row.stream,

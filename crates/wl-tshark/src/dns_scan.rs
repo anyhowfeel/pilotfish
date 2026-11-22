@@ -142,7 +142,7 @@ impl Builder {
         f: &[&str],
     ) {
         let rcode = f[7].parse::<u8>().ok().map(Rcode::from_code);
-        let answers = answer_values(&f);
+        let answers = answer_values(f);
         let target = f[10]
             .parse::<u64>()
             .ok()
