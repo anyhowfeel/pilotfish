@@ -1,5 +1,6 @@
 //! Incremental packet statistics: `PacketRow` stream -> `StatsSnapshot`.
 
+mod diff;
 mod edges;
 mod engine;
 mod flows;
@@ -10,6 +11,7 @@ mod series;
 mod services;
 mod top;
 
+pub use diff::{CaptureData, CaptureDiff, Metric, Micros, Presence, Row, Traffic};
 pub use engine::StatsEngine;
 pub use private::is_private;
 pub use series::TimeSeries;

@@ -15,6 +15,8 @@ mod bg;
 mod cli;
 mod clock;
 mod dialogs;
+mod diff_hub;
+mod diff_scan;
 mod dispatch;
 mod dns;
 #[allow(dead_code)]

@@ -20,20 +20,25 @@ impl Default for FileDialogs {
     }
 }
 
+/// Opens the native "choose a capture" dialog on a thread; the chosen path arrives on the receiver.
+pub fn pick_capture(ctx: egui::Context) -> Receiver<PathBuf> {
+    let (tx, rx) = unbounded();
+    std::thread::spawn(move || {
+        if let Some(p) = rfd::FileDialog::new()
+            .add_filter("Captures", &["pcap", "pcapng", "cap"])
+            .add_filter("All files", &["*"])
+            .pick_file()
+        {
+            let _ = tx.send(p);
+            ctx.request_repaint();
+        }
+    });
+    rx
+}
+
 impl FileDialogs {
     pub fn ask_open(&mut self, ctx: egui::Context) {
-        let (tx, rx) = unbounded();
-        self.open_rx = rx;
-        std::thread::spawn(move || {
-            if let Some(p) = rfd::FileDialog::new()
-                .add_filter("Captures", &["pcap", "pcapng", "cap"])
-                .add_filter("All files", &["*"])
-                .pick_file()
-            {
-                let _ = tx.send(p);
-                ctx.request_repaint();
-            }
-        });
+        self.open_rx = pick_capture(ctx);
     }
 
     pub fn ask_export(&mut self, frames: Vec<u64>, ctx: egui::Context) {

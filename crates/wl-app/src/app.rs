@@ -45,6 +45,7 @@ pub struct App {
     pub(crate) demo_map: Option<wl_model::StatsSnapshot>,
     /// Size of the stats the filter value suggestions were last built from.
     pub(crate) values_key: Option<(usize, usize)>,
+    pub(crate) diff: crate::diff_hub::DiffHub,
     pub(crate) web: WebPanel,
     pub(crate) web_link: WebLink,
     pub(crate) flows: FlowsPanel,
@@ -127,6 +128,7 @@ impl App {
             map,
             demo_map: cli.demo_map.then(|| demo_snapshot(40, 120)),
             values_key: None,
+            diff: crate::diff_hub::DiffHub::new(backend.clone()),
             web: WebPanel::default(),
             web_link: WebLink::new(cli.demo_web),
             flows: FlowsPanel::default(),
@@ -173,6 +175,9 @@ impl App {
         }
         if let Some(a) = &cli.map_select {
             app.map.select_host(a);
+        }
+        if let Some(f) = &cli.diff {
+            app.diff.set_other(f.clone());
         }
         if let Some(f) = cli.file() {
             app.execute(Command::OpenFile(f.clone()), &cc.egui_ctx);
