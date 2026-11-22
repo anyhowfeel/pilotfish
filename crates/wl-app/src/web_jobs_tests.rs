@@ -108,7 +108,7 @@ fn scans_only_when_active_and_once_for_files() {
         "finished file: one scan"
     );
     s.jobs.drain();
-    let (ex, tls) = s.jobs.take_web().expect("result");
+    let (ex, tls, _) = s.jobs.take_web().expect("result");
     assert_eq!((ex.len(), tls.len()), (1, 0));
     assert!(s.jobs.take_web().is_none(), "result is handed out once");
     s.on_new_capture();
@@ -175,7 +175,7 @@ fn controller_serves_real_exchanges_and_detail() {
     let mut c = Controller::new(Arc::new(b));
     c.set_web_active(true);
     c.start(CaptureSource::File(fixture), None);
-    let (ex, tls) = wait_for(|| {
+    let (ex, tls, _) = wait_for(|| {
         c.poll();
         c.poll_web()
     })

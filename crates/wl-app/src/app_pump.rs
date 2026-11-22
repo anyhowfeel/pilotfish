@@ -131,8 +131,9 @@ impl App {
         }
         if let Some(p) = ctx.input(|i| i.raw.dropped_files.first().map(|f| f.path().to_path_buf()))
         {
-            self.execute(Command::OpenFile(p), ctx);
+            self.dropped_file(p, ctx);
         }
+        self.pump_keys(ctx);
         let gh_changed = self.gh.pump(&mut self.dashboard);
         if polled.changed || hub_changed || gh_changed || self.props.pump() {
             ctx.request_repaint();

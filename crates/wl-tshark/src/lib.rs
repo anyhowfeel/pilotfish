@@ -6,6 +6,9 @@ mod backend_core;
 mod behavior_scan;
 mod capinfos;
 mod capture_args;
+mod cert_parse;
+mod cert_scan;
+mod comments;
 mod control;
 mod cred_parse;
 mod cred_scan;
@@ -35,8 +38,13 @@ mod interner;
 mod io_stat;
 mod io_stat_parse;
 mod json_ordered;
-mod keylog;
+pub mod keylog;
+mod keys_embed;
 mod live;
+mod msg_group;
+mod msg_preview;
+mod msg_rows;
+mod msg_scan;
 pub mod netinfo;
 mod object_names;
 pub mod objects;
@@ -50,6 +58,7 @@ mod pump;
 mod remote_args;
 mod ring;
 mod row_parser;
+mod sse;
 mod tcp_scan;
 mod tls_merge;
 mod tls_names;
@@ -65,7 +74,8 @@ use tempfile::TempDir;
 use wl_model::{
     CaptureBackend, CaptureError, CaptureOptions, CaptureProperties, CaptureSource, Channel,
     Credential, DecodeAs, DnsQuery, FlowEvents, FrameDetail, FrameFields, HttpDetail, HttpExchange,
-    Interface, IoGraph, IoSpec, ObjectSet, Session, TcpSamples, TlsSession,
+    Interface, IoGraph, IoSpec, MessageStream, ObjectSet, PacketBookmark, Session, TcpSamples,
+    TlsSession,
 };
 
 use process::Tools;
@@ -158,6 +168,23 @@ impl CaptureBackend for TsharkBackend {
             ex,
             &self.dissect_opts(),
         )
+    }
+
+    fn packet_comments(&self, file: &Path) -> Result<Vec<PacketBookmark>, CaptureError> {
+        comments::read(&self.tools, file, &self.dissect_opts())
+    }
+
+    fn save_with_comments(
+        &self,
+        file: &Path,
+        comments: &[PacketBookmark],
+        dest: &Path,
+    ) -> Result<(), CaptureError> {
+        comments::write(&self.tools, file, comments, dest)
+    }
+
+    fn message_streams(&self, file: &Path) -> Result<Vec<MessageStream>, CaptureError> {
+        msg_scan::message_streams(&self.tools, file, &self.dissect_opts())
     }
 
     fn flow_events(&self, file: &Path, filter: &str) -> Result<FlowEvents, CaptureError> {

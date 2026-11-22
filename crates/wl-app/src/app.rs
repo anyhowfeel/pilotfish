@@ -24,6 +24,7 @@ use crate::extras::Extras;
 use crate::features_hub::FeaturesHub;
 use crate::flows_link::FlowsLink;
 use crate::graphs_hub::GraphsHub;
+use crate::keys_link::KeysLink;
 use crate::missing::Missing;
 use crate::page::Page;
 use crate::prefs::Prefs;
@@ -48,6 +49,7 @@ pub struct App {
     pub(crate) diff: crate::diff_hub::DiffHub,
     pub(crate) web: WebPanel,
     pub(crate) web_link: WebLink,
+    pub(crate) keys: KeysLink,
     pub(crate) flows: FlowsPanel,
     pub(crate) flows_link: FlowsLink,
     pub(crate) setup: CaptureSetup,
@@ -138,6 +140,7 @@ impl App {
             diff: crate::diff_hub::DiffHub::new(backend.clone()),
             web: WebPanel::default(),
             web_link: WebLink::new(cli.demo_web),
+            keys: KeysLink::new(tshark.clone()),
             flows,
             flows_link: FlowsLink::new(backend.clone(), cc.egui_ctx.clone()),
             setup: CaptureSetup::default(),

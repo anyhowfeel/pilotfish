@@ -3,7 +3,7 @@
 
 use std::time::Instant;
 
-use wl_model::{HttpDetail, HttpExchange, TlsSession};
+use wl_model::{HttpDetail, HttpExchange, MessageStream, TlsSession};
 
 use super::Controller;
 
@@ -16,7 +16,7 @@ impl Controller {
     }
 
     /// Finished scan, once per result: `(exchanges, tls sessions)`.
-    pub fn poll_web(&mut self) -> Option<(Vec<HttpExchange>, Vec<TlsSession>)> {
+    pub fn poll_web(&mut self) -> Option<(Vec<HttpExchange>, Vec<TlsSession>, Vec<MessageStream>)> {
         self.poll_web_jobs();
         self.web.jobs.take_web()
     }

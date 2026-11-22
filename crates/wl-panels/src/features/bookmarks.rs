@@ -16,6 +16,8 @@ pub enum BookmarkBarAction {
     JumpTo(u64),
     FilterBookmarked(String),
     ClearAll,
+    /// Write the comments into a new .pcapng.
+    SaveComments,
 }
 
 /// Ordered store of bookmarked 1-based frame numbers and optional comments.
@@ -179,6 +181,13 @@ pub fn bookmark_toolbar_ui(
                 && let Some(n) = prev
             {
                 action = Some(BookmarkBarAction::JumpTo(n));
+            }
+            if ui
+                .small_button("Save to .pcapng")
+                .on_hover_text("Write the comments into a copy of the capture")
+                .clicked()
+            {
+                action = Some(BookmarkBarAction::SaveComments);
             }
             if let Some(flt) = filter
                 && ui.small_button("Filter marked").clicked()

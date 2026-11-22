@@ -39,6 +39,18 @@ impl TsharkBackend {
             .clone()
     }
 
+    pub fn can_embed_tls_keys(&self) -> bool {
+        self.tools.editcap.is_some()
+    }
+
+    /// Writes `dest` (a new file) with the current key log embedded in `file`.
+    pub fn embed_tls_keys(&self, file: &Path, dest: &Path) -> Result<(), CaptureError> {
+        let keylog = self
+            .tls_keylog()
+            .ok_or_else(|| CaptureError::Other("No TLS key log is loaded.".into()))?;
+        keys_embed::embed(&self.tools, file, &keylog, dest)
+    }
+
     pub(crate) fn start_live(
         &self,
         options: &CaptureOptions,

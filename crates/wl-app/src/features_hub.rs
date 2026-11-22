@@ -5,12 +5,13 @@ use std::sync::Arc;
 use crossbeam_channel::{Receiver, Sender, bounded};
 use eframe::egui;
 use wl_model::{
-    BehaviorData, CaptureBackend, CaptureError, ExpertReport, PacketRow, ProtocolHierarchy,
-    SecurityData, StatsSnapshot, StreamConversation, StreamFormat, StreamProtocol, ThreatIntel,
+    BehaviorData, CaptureBackend, CaptureError, ExpertReport, PacketBookmark, PacketRow,
+    ProtocolHierarchy, SecurityData, StatsSnapshot, StreamConversation, StreamFormat,
+    StreamProtocol, ThreatIntel,
 };
 use wl_panels::features::{
-    BookmarkStore, CommandPalette, FieldCatalog, InsightsAction, InsightsPanel, NameBook,
-    PaletteAction, PalettePage, StreamView, StreamViewAction, synthesize_insights,
+    BookmarkStore, CommandPalette, FieldCatalog, InsightsPanel, NameBook, PaletteAction,
+    PalettePage, StreamView, StreamViewAction,
 };
 use wl_panels::insights::InsightRules;
 
@@ -23,6 +24,7 @@ enum Msg {
     Insights(Option<ExpertReport>, Option<ProtocolHierarchy>),
     Behavior(BehaviorData, NameBook),
     Security(SecurityData),
+    Comments(Vec<PacketBookmark>),
     ExportDone(Result<String, String>),
 }
 
@@ -138,6 +140,9 @@ impl FeaturesHub {
             )
         });
         self.spawn_job(&file, &ctx, |b, f| {
+            Msg::Comments(b.packet_comments(f).unwrap_or_default())
+        });
+        self.spawn_job(&file, &ctx, |b, f| {
             let (channels, dns, tls, http) = std::thread::scope(|s| {
                 let c = s.spawn(|| b.behavior_channels(f).unwrap_or_default());
                 let t = s.spawn(|| b.tls_sessions(f).unwrap_or_default());
@@ -195,6 +200,11 @@ impl FeaturesHub {
                 Msg::Behavior(b, names) => {
                     self.behavior = Some(b);
                     self.names = (Arc::new(names), self.names.1 + 1);
+                }
+                Msg::Comments(list) => {
+                    for c in list {
+                        self.bookmarks.set(c.frame_no, c.comment);
+                    }
                 }
                 Msg::ExportDone(Ok(n)) => self.notice = Some(n),
                 Msg::ExportDone(Err(e)) => self.error = Some(e),

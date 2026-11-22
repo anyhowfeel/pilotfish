@@ -61,10 +61,12 @@ impl App {
                 }
             }
             Page::Web => {
-                let data = self.web_link.data();
+                let keys = self.keys.info();
+                let data = self.web_link.data(&keys);
                 let acts = self.web.ui(ui, &data);
+                let ctx = ui.ctx().clone();
                 for a in acts {
-                    self.web_action(a, &mut cmds);
+                    self.web_action(a, &mut cmds, &ctx);
                 }
             }
             Page::Diff => {
@@ -128,6 +130,10 @@ impl App {
                             cmds.push(Command::ApplyFilter(f));
                         }
                         BookmarkBarAction::ClearAll => self.hub.bookmarks.clear(),
+                        BookmarkBarAction::SaveComments => match self.ctrl.backing() {
+                            Some(file) => self.hub.save_comments(file, ui.ctx().clone()),
+                            None => self.hub.error = Some("Open a capture first.".into()),
+                        },
                     }
                 }
                 let detail = self.ctrl.detail().filter(|d| Some(d.frame_no) == sel);

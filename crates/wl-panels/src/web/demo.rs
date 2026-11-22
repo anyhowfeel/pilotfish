@@ -2,7 +2,10 @@
 
 use std::sync::Arc;
 
-use wl_model::{HttpDetail, HttpExchange, HttpMessage, TlsSession};
+use wl_model::{
+    CertInfo, HttpDetail, HttpExchange, HttpMessage, MessageStream, MsgDir, StreamKind,
+    StreamMessage, TlsSession,
+};
 
 /// One synthetic exchange (just the fields tests care about).
 pub fn exchange(
@@ -43,6 +46,7 @@ pub fn session(frame: u64, sni: &str) -> TlsSession {
         cipher: Some("TLS_AES_128_GCM_SHA256".into()),
         alpn: Some("h2".into()),
         cert_subject: Some(format!("CN={sni}, O=Example Inc, C=US").into()),
+        certs: demo_chain(sni),
         ja3: Some("e7d705a3286e19ea42f587b344ee6865".into()),
         ja4: Some("t13d1516h2_8daaf6152771_02713d6af862".into()),
         ja3s: Some("eb1d94daa7e0344597e756a1fb6e7054".into()),
@@ -52,6 +56,34 @@ pub fn session(frame: u64, sni: &str) -> TlsSession {
         client: None,
         threat: None,
     }
+}
+
+fn demo_chain(sni: &str) -> Vec<CertInfo> {
+    let cert = |subject: String, issuer: &str, sans: Vec<String>, is_ca| CertInfo {
+        subject,
+        issuer: issuer.into(),
+        not_before: 1_735_689_600,
+        not_after: 2_051_222_400,
+        sans,
+        key: if is_ca { "RSA 4096 bit" } else { "EC P-256" }.into(),
+        sig_alg: "sha256WithRSA".into(),
+        serial: "0a1b2c3d4e5f".into(),
+        is_ca,
+    };
+    vec![
+        cert(
+            format!("CN={sni}"),
+            "CN=Example CA R3, O=Example Inc",
+            vec![sni.into()],
+            false,
+        ),
+        cert(
+            "CN=Example CA R3, O=Example Inc".into(),
+            "CN=Example Root",
+            Vec::new(),
+            true,
+        ),
+    ]
 }
 
 fn reason(code: u16) -> &'static str {
@@ -139,6 +171,91 @@ pub fn demo_data() -> (Vec<HttpExchange>, Vec<TlsSession>) {
         })
         .collect();
     (ex, tls)
+}
+
+/// A WebSocket chat, an SSE feed and a gRPC call for `--demo-web`.
+pub fn demo_streams() -> Vec<MessageStream> {
+    let msg = |frame: u64, dir, label: &str, payload: &str| StreamMessage {
+        frame,
+        rel: frame as f64 * 0.21,
+        dir,
+        label: label.into(),
+        payload: payload.into(),
+        bytes: payload.len() as u64,
+    };
+    let stream = |id, kind, host: &str, target: &str, status: &str, messages| MessageStream {
+        id,
+        stream: id as u32,
+        kind,
+        host: host.into(),
+        target: target.into(),
+        start_rel: id as f64 * 0.21,
+        status: status.into(),
+        messages,
+    };
+    vec![
+        stream(
+            12,
+            StreamKind::WebSocket,
+            "chat.example.com",
+            "/ws",
+            "closed 1000",
+            vec![
+                msg(
+                    14,
+                    MsgDir::ToServer,
+                    "text",
+                    r#"{"type":"join","room":"general"}"#,
+                ),
+                msg(
+                    15,
+                    MsgDir::ToClient,
+                    "text",
+                    r#"{"type":"joined","users":3}"#,
+                ),
+                msg(18, MsgDir::ToServer, "ping", "70 69 6e 67"),
+                msg(19, MsgDir::ToClient, "pong", "70 69 6e 67"),
+                msg(
+                    24,
+                    MsgDir::ToClient,
+                    "text",
+                    r#"{"type":"message","from":"ada","text":"hello"}"#,
+                ),
+                msg(30, MsgDir::ToServer, "close", "code 1000"),
+            ],
+        ),
+        stream(
+            40,
+            StreamKind::Sse,
+            "api.example.com",
+            "/events",
+            "200",
+            vec![
+                msg(42, MsgDir::ToClient, "message", "welcome"),
+                msg(45, MsgDir::ToClient, "tick #1", r#"{"n":1}"#),
+                msg(49, MsgDir::ToClient, "tick #2", r#"{"n":2}"#),
+            ],
+        ),
+        stream(
+            60,
+            StreamKind::Grpc,
+            "grpc.example.com:443",
+            "/helloworld.Greeter/SayHello",
+            "0 OK",
+            vec![
+                msg(
+                    60,
+                    MsgDir::ToServer,
+                    "request",
+                    "/helloworld.Greeter/SayHello",
+                ),
+                msg(60, MsgDir::ToServer, "message", "world"),
+                msg(61, MsgDir::ToClient, "response", "HTTP 200"),
+                msg(61, MsgDir::ToClient, "message", "Hello world"),
+                msg(61, MsgDir::ToClient, "trailers", "grpc-status 0 OK OK"),
+            ],
+        ),
+    ]
 }
 
 /// Synthetic request/response detail for an exchange.

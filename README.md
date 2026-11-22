@@ -120,7 +120,7 @@ Environment variables:
 
 | Variable | Description |
 | --- | --- |
-| `SSLKEYLOGFILE` | TLS key log passed to `tshark`, so HTTPS traffic can be decrypted. |
+| `SSLKEYLOGFILE` | TLS key log passed to `tshark`, so HTTPS traffic can be decrypted. It can also be loaded or dropped in the app. |
 | `WIRELENS_CONFIG_DIR` | Directory for the preferences file (defaults to the user config directory). |
 | `WIRELENS_GEO_DIR` | Extra folder searched for location databases (`.mmdb`). |
 
@@ -212,6 +212,10 @@ Tests that need `tshark` or loopback capture rights skip themselves when those a
   domains), not address ranges. Credential detection only sees cleartext protocols.
 - HTTP/2 and QUIC handling is best effort. Chunked bodies without a `Content-Length` are
   only partly accounted for.
+- The Streams tab shows the first line of each payload; protobuf messages are not decoded, and
+  WebSocket messages compressed with `permessage-deflate` depend on what `tshark` can inflate.
+- Only one comment per packet is read from a capture, and saved comments are written on one line.
+- A key log is not remembered between runs; start the app with `SSLKEYLOGFILE` set to keep using one.
 - Windows and macOS have not been tried.
 
 ## Contributing
