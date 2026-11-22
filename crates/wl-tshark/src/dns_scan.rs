@@ -10,7 +10,7 @@ use crate::process::Tools;
 use crate::tsv_pass::{Pass, columns, opt, run_pass_all};
 
 /// Column order is part of the contract with `Builder::push`.
-const FIELDS: [&str; 19] = [
+const FIELDS: [&str; 21] = [
     "frame.number",
     "frame.time_relative",
     "ip.src",
@@ -30,7 +30,12 @@ const FIELDS: [&str; 19] = [
     "dns.mx.mail_exchange",
     "dns.retransmission",
     "dns.retransmit_request_in",
+    "dns.count.answers",
+    "dns.resp.type",
 ];
+/// Value columns of `FIELDS` and the record type each one lists, in wire order.
+const VALUE_COLUMNS: [(usize, &str); 5] =
+    [(12, "5"), (13, "1"), (14, "28"), (15, "12"), (16, "15")];
 /// Memory guard for huge captures.
 const MAX_RECORDS: usize = 250_000;
 
@@ -137,12 +142,7 @@ impl Builder {
         f: &[&str],
     ) {
         let rcode = f[7].parse::<u8>().ok().map(Rcode::from_code);
-        let answers: Vec<String> = f[12..17]
-            .iter()
-            .flat_map(|s| s.split(','))
-            .filter(|s| !s.is_empty())
-            .map(str::to_owned)
-            .collect();
+        let answers = answer_values(&f);
         let target = f[10]
             .parse::<u64>()
             .ok()
@@ -164,6 +164,29 @@ impl Builder {
         r.answers = answers;
         r.rtt_ms = rtt;
     }
+}
+
+/// Record values of the answer section only: tshark lists authority and additional records
+/// (glue) in the same fields, after the answers, in the order of `dns.resp.type`.
+fn answer_values(f: &[&str]) -> Vec<String> {
+    let answer_count = f[19].parse::<usize>().ok();
+    let answer_types: Vec<&str> = f[20]
+        .split(',')
+        .take(answer_count.unwrap_or(usize::MAX))
+        .collect();
+    VALUE_COLUMNS
+        .iter()
+        .flat_map(|&(col, rtype)| {
+            let wanted = answer_types.iter().filter(|t| **t == rtype).count();
+            let all = f[col].split(',').filter(|s| !s.is_empty());
+            let take = if answer_count.is_some() {
+                wanted
+            } else {
+                usize::MAX
+            };
+            all.take(take).map(str::to_owned)
+        })
+        .collect()
 }
 
 #[cfg(test)]

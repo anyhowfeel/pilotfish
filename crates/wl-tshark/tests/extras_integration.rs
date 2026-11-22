@@ -116,3 +116,12 @@ fn big_capture_objects_have_metadata() {
         }
     }
 }
+
+#[test]
+fn dns_answers_exclude_additional_glue_records() {
+    let Some(b) = backend() else { return };
+    let q = b.dns_queries(&fixture("dns-glue.pcap")).expect("dns");
+    let a = q.iter().find(|r| r.name == "a.test").expect("a.test");
+    assert_eq!(a.answers, ["1.1.1.1"]);
+    assert!(q.iter().any(|r| r.name == "we\"ird.test"));
+}
