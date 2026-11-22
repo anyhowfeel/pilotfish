@@ -1,8 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/logo/wirelens-dark.svg">
-    <img src="assets/logo/wirelens.svg" alt="wirelens logo" width="120">
-  </picture>
+  <img src="assets/logo/wirelens.svg" alt="logo" width="120">
 </p>
 
 <h1 align="center">wirelens</h1>
@@ -187,8 +184,8 @@ installed separately on Windows and macOS.
 | `wl-app` | The `wirelens` binary: window, state, background jobs. |
 
 `tests/fixtures/` holds the small capture files the tests read, `assets/screenshots/` the README
-images, and `assets/logo/` the logo (SVG sources in a blue and a dark version, PNG, `.ico` and
-`.icns` exports, and the GitHub social preview image).
+images, and `assets/logo/` the logo (the SVG source, PNG, `.ico` and `.icns`
+exports, and the GitHub social preview image).
 
 ## Tests
 
