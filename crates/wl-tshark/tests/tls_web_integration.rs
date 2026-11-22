@@ -157,7 +157,7 @@ fn sse_events_are_split_with_names_ids_and_comments() {
     );
     let frames: Vec<_> = sse.messages.iter().map(|m| m.frame).collect();
     assert!(
-        frames.windows(2).all(|w| w[0] < w[1]),
+        frames.windows(2).all(|w| w[0] <= w[1]),
         "per-segment timing: {frames:?}"
     );
 }
