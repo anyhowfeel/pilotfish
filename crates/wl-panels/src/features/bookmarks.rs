@@ -184,7 +184,11 @@ pub fn bookmark_toolbar_ui(
             }
             if ui
                 .small_button("Save to .pcapng")
-                .on_hover_text("Write the comments into a copy of the capture")
+                .on_hover_text(
+                    "Write the comments into a copy of the capture. editcap rewrites the file: \
+interface statistics blocks and the capture filter option are not kept, and a packet \
+keeps a single comment.",
+                )
                 .clicked()
             {
                 action = Some(BookmarkBarAction::SaveComments);

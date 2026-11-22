@@ -8,52 +8,90 @@ use wl_model::{CaptureError, PacketBookmark};
 
 use crate::error::from_stderr;
 use crate::process::{Tools, run};
-use crate::tsv_pass::{Pass, columns, run_pass};
+use crate::tsv_pass::{Pass, columns, run_pass_all};
 
-const FIELDS: [&str; 2] = ["frame.number", "frame.comment"];
+const FIELDS: [&str; 4] = [
+    "frame.number",
+    "_ws.expert.group",
+    "_ws.expert.severity",
+    "_ws.expert.message",
+];
+const SEP: char = '\u{1f}';
+/// Expert group and severity tshark gives to packet comments (PI_COMMENTS_GROUP, PI_COMMENT).
+const COMMENT_GROUP: &str = "184549376";
+const COMMENT_SEVERITY: &str = "1048576";
+/// editcap keeps one comment per packet, so several are saved as one text with this between them.
+pub const COMMENT_JOIN: &str = "\n\n";
 
 pub fn read(
     tools: &Tools,
     file: &Path,
     opts: &[String],
 ) -> Result<Vec<PacketBookmark>, CaptureError> {
+    let mut all = opts.to_vec();
+    all.extend(["-E".into(), format!("aggregator={SEP}")]);
     let pass = Pass {
         file,
         filter: "frame.comment",
         fields: &FIELDS,
-        opts,
+        opts: &all,
     };
     let mut out = Vec::new();
-    run_pass(tools, &pass, |line| {
-        let f: [&str; 2] = columns(line);
-        if let Ok(frame_no) = f[0].trim().parse() {
-            out.push(PacketBookmark {
-                frame_no,
-                comment: f[1].to_owned(),
-            });
+    run_pass_all(tools, &pass, |line| {
+        if let Some(b) = parse_line(line) {
+            out.push(b);
         }
         ControlFlow::Continue(())
     })?;
     Ok(out)
 }
 
-/// editcap takes one comment per `-a`; line breaks would not survive a round trip.
-fn one_line(comment: &str) -> String {
-    comment.split_whitespace().collect::<Vec<_>>().join(" ")
+/// tshark escapes backslash, line feed, carriage return and tab in field values.
+fn unescape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('n') => out.push('\n'),
+            Some('r') => out.push('\r'),
+            Some('t') => out.push('\t'),
+            Some(other) => out.push(other),
+            None => out.push('\\'),
+        }
+    }
+    out
 }
 
-/// Replaces every comment of the file by `comments` (empty ones are skipped).
+/// The expert items of a packet include its comments, told apart by group and severity.
+fn parse_line(line: &str) -> Option<PacketBookmark> {
+    let f: [&str; 4] = columns(line);
+    let frame_no = f[0].trim().parse().ok()?;
+    let comments: Vec<String> = f[1]
+        .split(SEP)
+        .zip(f[2].split(SEP))
+        .zip(f[3].split(SEP))
+        .filter(|((g, s), _)| *g == COMMENT_GROUP && *s == COMMENT_SEVERITY)
+        .map(|(_, m)| unescape(m))
+        .collect();
+    (!comments.is_empty()).then(|| PacketBookmark {
+        frame_no,
+        comment: comments.join(COMMENT_JOIN),
+    })
+}
+
+/// Replaces every comment of the file by `comments` (blank ones are skipped).
 pub fn write_args(comments: &[PacketBookmark], input: &Path, output: &Path) -> Vec<String> {
     let mut args = vec![
         "--discard-packet-comments".to_owned(),
         "-F".into(),
         "pcapng".into(),
     ];
-    for c in comments.iter().filter(|c| !one_line(&c.comment).is_empty()) {
-        args.extend([
-            "-a".into(),
-            format!("{}:{}", c.frame_no, one_line(&c.comment)),
-        ]);
+    for c in comments.iter().filter(|c| !c.comment.trim().is_empty()) {
+        args.extend(["-a".into(), format!("{}:{}", c.frame_no, c.comment)]);
     }
     args.push(input.to_string_lossy().into_owned());
     args.push(output.to_string_lossy().into_owned());
@@ -110,10 +148,25 @@ mod tests {
                 "-a",
                 "3:first: note",
                 "-a",
-                "9:two lines here",
+                "9:two\nlines  here",
                 "in.pcapng",
                 "out.pcapng"
             ]
         );
+    }
+
+    #[test]
+    fn all_comments_of_a_packet_are_read_and_unescaped() {
+        let s = SEP.to_string();
+        let line = [
+            "7".to_owned(),
+            format!("{COMMENT_GROUP}{s}117440512{s}{COMMENT_GROUP}"),
+            format!("{COMMENT_SEVERITY}{s}8388608{s}{COMMENT_SEVERITY}"),
+            format!("a\\nb\\\\c{s}Malformed{s}second"),
+        ]
+        .join("\t");
+        let b = parse_line(&line).expect("comments");
+        assert_eq!(b.comment, "a\nb\\c\n\nsecond");
+        assert_eq!(parse_line("7\t117440512\t8388608\tMalformed"), None);
     }
 }
