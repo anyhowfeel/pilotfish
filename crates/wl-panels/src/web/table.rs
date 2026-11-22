@@ -26,13 +26,16 @@ pub struct TableOut {
 
 /// (title, sort column, right aligned) of every header, optional ones flagged by `Cols`.
 fn heads(c: Cols) -> Vec<(&'static str, SortCol, bool)> {
-    let mut h = vec![
-        ("Time", SortCol::Time, true),
+    let mut h = Vec::new();
+    if c.time {
+        h.push(("Time", SortCol::Time, true));
+    }
+    h.extend([
         ("Method", SortCol::Method, false),
         ("Host", SortCol::Host, false),
         ("URL", SortCol::Path, false),
         ("Status", SortCol::Status, false),
-    ];
+    ]);
     if c.kind {
         h.push(("Type", SortCol::Type, false));
     }
@@ -90,7 +93,9 @@ pub fn master_table(ui: &mut Ui, t: &TableIn) -> TableOut {
                                 RowRef::Http(i) => t.data.ex[i as usize].start_rel,
                                 RowRef::Tls(i) => t.data.tls[i as usize].start_rel,
                             };
-                            row.col(|ui| num_cell(ui, &time_text(start)));
+                            if cols.time {
+                                row.col(|ui| num_cell(ui, &time_text(start)));
+                            }
                             match r {
                                 RowRef::Http(i) => {
                                     http_cells(&mut row, &t.data.ex[i as usize], t.max_ms, cols)
