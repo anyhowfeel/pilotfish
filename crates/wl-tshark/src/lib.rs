@@ -7,6 +7,8 @@ mod behavior_scan;
 mod capinfos;
 mod capture_args;
 mod control;
+mod cred_parse;
+mod cred_scan;
 mod decode_as;
 mod dns_scan;
 mod error;
@@ -61,8 +63,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use tempfile::TempDir;
 use wl_model::{
     CaptureBackend, CaptureError, CaptureOptions, CaptureProperties, CaptureSource, Channel,
-    DecodeAs, DnsQuery, FlowEvents, FrameDetail, FrameFields, HttpDetail, HttpExchange, Interface,
-    IoGraph, IoSpec, ObjectSet, Session, TcpSamples, TlsSession,
+    Credential, DecodeAs, DnsQuery, FlowEvents, FrameDetail, FrameFields, HttpDetail, HttpExchange,
+    Interface, IoGraph, IoSpec, ObjectSet, Session, TcpSamples, TlsSession,
 };
 
 use process::Tools;
@@ -207,6 +209,10 @@ impl CaptureBackend for TsharkBackend {
 
     fn behavior_channels(&self, file: &Path) -> Result<Vec<Channel>, CaptureError> {
         behavior_scan::behavior_channels(&self.tools, file, &self.dissect_opts())
+    }
+
+    fn credentials(&self, file: &Path) -> Result<Vec<Credential>, CaptureError> {
+        cred_scan::credentials(&self.tools, file, &self.dissect_opts())
     }
 
     fn dns_queries(&self, file: &Path) -> Result<Vec<DnsQuery>, CaptureError> {

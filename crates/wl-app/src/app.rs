@@ -61,6 +61,7 @@ pub struct App {
     pub(crate) dialogs: FileDialogs,
     pub(crate) resolver: AsyncResolver,
     pub(crate) geo_store: crate::geo_store::GeoStore,
+    pub(crate) intel_store: crate::intel_store::IntelStore,
     pub(crate) startup_error: Option<String>,
     pub(crate) shot: Option<Shot>,
     pub(crate) last_scale: f32,
@@ -102,7 +103,9 @@ impl App {
             let _ = itx.send(b.interfaces().unwrap_or_default());
             ctx.request_repaint();
         });
-        let resolver = AsyncResolver::spawn(cc.egui_ctx.clone());
+        let intel_store = crate::intel_store::IntelStore::default();
+        let mut resolver = AsyncResolver::spawn(cc.egui_ctx.clone());
+        resolver.set_intel(intel_store.handle());
         let mut hosts = HostsPanel::default();
         hosts.set_resolver(Box::new(resolver.clone()));
         let mut map = TopologyView::default();
@@ -141,6 +144,7 @@ impl App {
             dialogs: FileDialogs::default(),
             resolver,
             geo_store: Default::default(),
+            intel_store,
             startup_error,
             shot: cli.screenshot.clone().map(|p| Shot::new(p, cli.wait_ms)),
             last_scale: scale,
@@ -159,6 +163,7 @@ impl App {
         app.last_layout = Some(app.packets.layout());
         app.apply_capture_defaults();
         app.apply_runtime_settings();
+        app.intel_store.reload(&cc.egui_ctx);
         if let Some(spec) = &cli.setup_expand {
             app.setup.expand(spec);
         }

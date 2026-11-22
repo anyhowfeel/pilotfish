@@ -85,3 +85,19 @@ fn garbage_settings_fields_fall_back_to_defaults() {
         Prefs::default()
     );
 }
+
+#[test]
+fn insight_rules_survive_a_prefs_round_trip_and_are_clamped_on_load() {
+    let mut p = Prefs::default();
+    p.settings.insights.mute("10.0.0.9");
+    p.settings.insights.thresholds.scan_min_ports = 7;
+    let json = serde_json::to_string(&p).expect("ser");
+    let back: Prefs = serde_json::from_str(&json).expect("de");
+    assert_eq!(back.settings.insights, p.settings.insights);
+
+    p.settings.insights.thresholds.scan_min_ports = 0;
+    p.settings.insights.muted.push("  ".into());
+    let fixed = p.migrate().settings.insights;
+    assert_eq!(fixed.thresholds.scan_min_ports, 2);
+    assert_eq!(fixed.muted, ["10.0.0.9"]);
+}

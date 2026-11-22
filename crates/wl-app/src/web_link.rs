@@ -1,8 +1,9 @@
 //! Glue between the controller and the Web page: polling, detail requests, demo feed.
 
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use wl_model::{HttpDetail, HttpExchange, TlsSession};
+use wl_model::{HttpDetail, HttpExchange, ThreatIntel, TlsSession};
 use wl_panels::web::{WebAction, WebData, WebStatus, demo_data, demo_detail};
 
 use crate::app::App;
@@ -36,6 +37,7 @@ pub struct WebLink {
     last_packets: u64,
     last_request: Option<Instant>,
     unavailable: bool,
+    intel: Arc<ThreatIntel>,
 }
 
 impl WebLink {
@@ -56,7 +58,15 @@ impl WebLink {
             last_packets: 0,
             last_request: None,
             unavailable: false,
+            intel: Arc::default(),
         }
+    }
+
+    /// Marks the TLS sessions with the offline lists, now and for every later scan.
+    pub fn set_intel(&mut self, intel: Arc<ThreatIntel>) {
+        self.intel = intel;
+        self.intel.annotate_tls(&mut self.tls);
+        self.rev += 1;
     }
 
     pub fn data(&self) -> WebData<'_> {
@@ -129,6 +139,7 @@ impl WebLink {
         if let Some((ex, tls)) = b.poll_web() {
             self.exchanges = ex;
             self.tls = tls;
+            self.intel.annotate_tls(&mut self.tls);
             self.rev += 1;
             self.loading = false;
             changed = true;

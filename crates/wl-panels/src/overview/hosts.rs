@@ -17,6 +17,8 @@ use super::table_cells::{filter_box, share_bar, sort_header};
 
 const MIN_TABLE_W: f32 = 700.0;
 const SCOPE_PILL_W: f32 = 68.0;
+const THREAT_COL_W: f32 = 110.0;
+const THREAT_PILL_W: f32 = 96.0;
 
 pub struct HostsPanel {
     filter: String,
@@ -108,6 +110,7 @@ impl HostsPanel {
         let hosts = &stats.hosts;
         let (sort, max, resolver) = (self.sort, self.max_total, &self.resolver);
         let geo = resolver.geo_hint().is_none();
+        let threats = resolver.has_threats();
         let mut picked = None;
         let selected = self.selected.clone();
         let avail_w = ui.available_width();
@@ -122,6 +125,9 @@ impl HostsPanel {
                     let mut cols = TableCols::new().flex(150.0).fixed(90.0);
                     if geo {
                         cols = cols.flex(130.0);
+                    }
+                    if threats {
+                        cols = cols.fixed(THREAT_COL_W);
                     }
                     cols.num(74.0)
                         .num(74.0)
@@ -142,15 +148,19 @@ impl HostsPanel {
                                 ("Share", HostCol::Total, false),
                             ];
                             for (i, (t, c, right)) in heads.into_iter().enumerate() {
-                                if i == 2 && geo {
-                                    h.col(|ui| {
-                                        ui.label(
-                                            egui::RichText::new("Location")
-                                                .small()
-                                                .strong()
-                                                .color(Palette::muted()),
-                                        );
-                                    });
+                                if i == 2 {
+                                    for (shown, title) in [(geo, "Location"), (threats, "Threat")] {
+                                        if shown {
+                                            h.col(|ui| {
+                                                ui.label(
+                                                    egui::RichText::new(title)
+                                                        .small()
+                                                        .strong()
+                                                        .color(Palette::muted()),
+                                                );
+                                            });
+                                        }
+                                    }
                                 }
                                 h.col(|ui| {
                                     if sort_header(ui, t, c, &sort, right) {
@@ -186,6 +196,15 @@ impl HostsPanel {
                                         }
                                         None => {
                                             text_cell(ui, "");
+                                        }
+                                    });
+                                }
+                                if threats {
+                                    row.col(|ui| {
+                                        cell_pad(ui);
+                                        if let Some(list) = resolver.threat(&host.addr) {
+                                            let style = PillStyle::column(THREAT_PILL_W);
+                                            pill(ui, &list, Palette::danger(), style);
                                         }
                                     });
                                 }

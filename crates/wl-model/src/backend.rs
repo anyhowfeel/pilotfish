@@ -4,9 +4,9 @@ use crossbeam_channel::Receiver;
 use thiserror::Error;
 
 use crate::{
-    CaptureOptions, CaptureProperties, Channel, DecodeAs, DnsQuery, FlowEvents, FrameDetail,
-    HttpDetail, HttpExchange, IoGraph, IoSpec, ObjectSet, PacketRow, SysInfo, TcpSamples,
-    TlsSession,
+    CaptureOptions, CaptureProperties, Channel, Credential, DecodeAs, DnsQuery, FlowEvents,
+    FrameDetail, HttpDetail, HttpExchange, IoGraph, IoSpec, ObjectSet, PacketRow, SysInfo,
+    TcpSamples, TlsSession,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -147,6 +147,10 @@ pub trait CaptureBackend: Send + Sync {
     }
     /// Timing summary of connection attempts and TCP streams found in a backing file.
     fn behavior_channels(&self, _file: &Path) -> Result<Vec<Channel>, CaptureError> {
+        Ok(Vec::new())
+    }
+    /// Cleartext logins and tokens (HTTP, FTP, SMTP, POP3, NTLM) found in a backing file.
+    fn credentials(&self, _file: &Path) -> Result<Vec<Credential>, CaptureError> {
         Ok(Vec::new())
     }
     /// One entry per DNS transaction (query + response) found in a backing file.

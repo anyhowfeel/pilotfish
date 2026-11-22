@@ -54,7 +54,7 @@ impl Category {
                 "One host dominating traffic is normal for a download or backup, but unexpected for idle machines. Inspect it to see what it is talking to."
             }
             Category::Security => {
-                "Handshake failures, old protocol versions and certificate problems show up here. Check client and server TLS settings."
+                "Cleartext logins, blocklist matches, handshake failures, old protocol versions and certificate problems show up here. Switch cleartext protocols to TLS, change exposed secrets, and check client and server TLS settings."
             }
             Category::Anomalies => {
                 "Dissectors flagged frames as malformed or unusual. They can be caused by capture truncation, offloading, or genuinely broken senders."
@@ -74,7 +74,13 @@ pub fn category_of(i: &HealthInsight) -> Category {
             .to_ascii_lowercase()
     );
     let has = |ks: &[&str]| ks.iter().any(|k| t.contains(k));
-    if has(&["dns"]) {
+    let title = i.title.to_ascii_lowercase();
+    if ["blocklisted", "malicious", "cleartext"]
+        .iter()
+        .any(|k| title.contains(k))
+    {
+        Category::Security
+    } else if has(&["dns"]) {
         Category::Dns
     } else if has(&["icmp"]) {
         Category::Icmp

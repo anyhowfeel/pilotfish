@@ -3,7 +3,8 @@ use eframe::egui;
 use wl_kit::widgets::{PillLookKind, set_pill_look, toast};
 use wl_kit::{scale, theme};
 use wl_panels::settings::{
-    AboutInfo, Category, Density, GeoAction, PillLook, Settings, SettingsAction, ThemeChoice,
+    AboutInfo, Category, Density, GeoAction, IntelAction, PillLook, Settings, SettingsAction,
+    ThemeChoice,
 };
 
 use crate::app::App;
@@ -61,6 +62,7 @@ impl App {
         let s = &self.prefs.settings;
         self.resolver.set_enabled(s.resolve_dns);
         self.ctrl.set_stats_hz(s.stats_hz);
+        self.hub.rules = s.insights.clone();
     }
 
     /// Pushes the saved Capture > Options into the Setup page.
@@ -91,11 +93,15 @@ impl App {
             let about = self.about_info();
             self.settings.set_about(about);
             self.settings.set_geo(self.geo_store.info());
+            self.settings.set_intel(self.intel_store.info());
         }
         if self.geo_store.poll() {
             self.resolver.reload_geo();
             self.hosts.invalidate();
             self.map.invalidate();
+        }
+        if self.intel_store.poll(ctx) {
+            self.on_intel_changed(ctx);
         }
         match self.settings.ui(ctx) {
             Some(SettingsAction::Preview(s)) => apply_visuals(ctx, &s),
@@ -109,6 +115,7 @@ impl App {
             Some(SettingsAction::Cancel(orig)) => apply_visuals(ctx, &orig),
             Some(SettingsAction::OpenConfigDir) => self.open_config_dir(),
             Some(SettingsAction::Geo(action)) => self.run_geo_action(action, ctx),
+            Some(SettingsAction::Intel(action)) => self.run_intel_action(action, ctx),
             None => {}
         }
     }
@@ -131,6 +138,25 @@ impl App {
         }
     }
 
+    fn run_intel_action(&mut self, action: IntelAction, ctx: &egui::Context) {
+        match action {
+            IntelAction::AddFile => self.intel_store.pick_file(ctx),
+            IntelAction::Reload => self.intel_store.reload(ctx),
+            IntelAction::OpenFolder => {
+                if let Err(e) = self.intel_store.open_folder() {
+                    self.startup_error = Some(e);
+                }
+            }
+        }
+    }
+
+    fn on_intel_changed(&mut self, ctx: &egui::Context) {
+        let intel = self.intel_store.current();
+        self.web_link.set_intel(intel.clone());
+        self.hub.set_intel(intel, self.ctrl.backing(), ctx);
+        self.hosts.invalidate();
+    }
+
     fn open_config_dir(&mut self) {
         let Some(dir) = Prefs::path().and_then(|p| p.parent().map(|d| d.to_path_buf())) else {
             return;
@@ -142,6 +168,15 @@ impl App {
                 .map(drop)
         }) {
             self.startup_error = Some(format!("Could not open {}: {e}", dir.display()));
+        }
+    }
+
+    /// Hides the findings matching `pattern` from now on (undone in Settings > Insights).
+    pub(crate) fn mute_finding(&mut self, pattern: &str, ctx: &egui::Context) {
+        if self.prefs.settings.insights.mute(pattern) {
+            self.hub.rules = self.prefs.settings.insights.clone();
+            self.prefs.save();
+            toast::push(ctx, format!("Muted {pattern}"));
         }
     }
 

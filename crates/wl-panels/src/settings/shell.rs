@@ -8,6 +8,8 @@ use wl_kit::widgets::{close_button, modal_scrim};
 
 use super::category::Category;
 use super::geo_page::{self, GeoAction, GeoDbInfo};
+use super::insights_page;
+use super::intel_page::{self, IntelAction, IntelInfo};
 use super::layout::Geometry;
 use super::model::Settings;
 use super::pages;
@@ -21,6 +23,7 @@ pub struct Out {
     pub reset: bool,
     pub about: AboutAction,
     pub geo: Option<GeoAction>,
+    pub intel: Option<IntelAction>,
 }
 
 pub fn show(
@@ -30,6 +33,7 @@ pub fn show(
     cat: &mut Category,
     about: &AboutInfo,
     geo: &GeoDbInfo,
+    intel: &IntelInfo,
 ) -> Out {
     let mut out = Out {
         cancel: false,
@@ -37,6 +41,7 @@ pub fn show(
         reset: false,
         about: AboutAction::None,
         geo: None,
+        intel: None,
     };
     out.cancel |= modal_scrim(ctx, "settings", Order::Foreground);
     Area::new(Id::NULL.with("wl_settings_dialog"))
@@ -51,7 +56,7 @@ pub fn show(
                 &mut out,
             );
             nav(ui, g, cat);
-            body(ui, g, draft, *cat, about, geo, &mut out);
+            body(ui, g, draft, *cat, about, (geo, intel), &mut out);
             footer(
                 &mut child(ui, g.footer, Layout::right_to_left(Align::Center)),
                 &mut out,
@@ -196,7 +201,7 @@ fn body(
     draft: &mut Settings,
     cat: Category,
     about: &AboutInfo,
-    geo: &GeoDbInfo,
+    (geo, intel): (&GeoDbInfo, &IntelInfo),
     out: &mut Out,
 ) {
     let rect = g.body.shrink2(vec2(spacing::LG, 0.0));
@@ -213,7 +218,11 @@ fn body(
                 Category::Capture => pages::capture(ui, draft),
                 Category::Display => pages::display(ui, draft),
                 Category::Names => pages_more::names(ui, draft),
-                Category::Locations => out.geo = geo_page::page(ui, geo),
+                Category::Insights => insights_page::page(ui, &mut draft.insights),
+                Category::Locations => {
+                    out.geo = geo_page::page(ui, geo);
+                    out.intel = intel_page::card(ui, intel);
+                }
                 Category::Performance => pages_more::performance(ui, draft),
                 Category::Shortcuts => pages_more::shortcuts(ui),
                 Category::About => out.about = pages_more::about(ui, about),

@@ -79,6 +79,7 @@ impl App {
                             self.run_hub_command(HubCommand::ExportHtml, &ctx);
                         }
                         InsightsAction::LoadDns | InsightsAction::ShowInPackets(_) => {}
+                        InsightsAction::Mute(pattern) => self.mute_finding(&pattern, ui.ctx()),
                         InsightsAction::Refresh => {
                             if let Some(file) = self.ctrl.backing() {
                                 self.hub.refresh_insights(file, ui.ctx().clone());

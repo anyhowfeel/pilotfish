@@ -95,6 +95,8 @@ impl Merger {
                     src: e.clone(),
                     dst: e,
                     bytes: 0,
+                    client: None,
+                    threat: None,
                 },
                 has_version: false,
                 has_client: false,
