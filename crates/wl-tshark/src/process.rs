@@ -4,6 +4,7 @@ use std::ffi::OsStr;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Output, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -39,12 +40,20 @@ impl Tools {
     }
 }
 
+static SPAWNED: AtomicUsize = AtomicUsize::new(0);
+
+/// Child processes started so far; tests and benchmarks diff it to count scans.
+pub fn spawned() -> usize {
+    SPAWNED.load(Ordering::Relaxed)
+}
+
 /// Runs a tool to completion (stdin closed) and returns its output.
 pub fn run<I, S>(tool: &Path, args: I) -> Result<Output, CaptureError>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
+    SPAWNED.fetch_add(1, Ordering::Relaxed);
     Command::new(tool)
         .args(args)
         .stdin(Stdio::null())
@@ -54,6 +63,7 @@ where
 
 /// Spawns with piped stdout/stderr (and stdin when `pipe_stdin`).
 pub fn spawn(tool: &Path, args: &[String], pipe_stdin: bool) -> Result<Child, CaptureError> {
+    SPAWNED.fetch_add(1, Ordering::Relaxed);
     Command::new(tool)
         .args(args)
         .stdin(if pipe_stdin {

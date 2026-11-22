@@ -8,27 +8,44 @@ use crate::features_hub::HubCommand;
 use crate::page::Page;
 
 impl App {
+    /// Re-dissects the open capture (new key log): the filter and the bookmarks stay.
+    pub(crate) fn reload_file(&mut self, p: std::path::PathBuf, ctx: &egui::Context) {
+        let filter = self.ctrl.display_filter().map(str::to_owned);
+        let bookmarks = std::mem::take(&mut self.hub.bookmarks);
+        self.open_file(p, filter, ctx);
+        self.hub.bookmarks = bookmarks;
+    }
+
+    fn open_file(&mut self, p: std::path::PathBuf, filter: Option<String>, ctx: &egui::Context) {
+        self.streams.borrow_mut().clear();
+        self.packets.clear();
+        self.packets.set_follow(false);
+        self.hosts.invalidate();
+        self.web_link.clear();
+        self.flows_link.clear();
+        self.flows.reload();
+        self.reset_extras();
+        self.hub.clear_capture();
+        self.dashboard.clear_window_stats();
+        self.resolver.procs().clear();
+        self.ctrl
+            .start(CaptureSource::File(p.clone()), filter.clone());
+        self.hub.refresh_insights(p, ctx.clone());
+        self.packets
+            .filter_bar
+            .set_text(filter.as_deref().unwrap_or(""));
+    }
+
     pub fn execute(&mut self, cmd: Command, ctx: &egui::Context) {
         match cmd {
             Command::RequestOpenFile => self.dialogs.ask_open(ctx.clone()),
             Command::OpenFile(p) => {
-                self.streams.borrow_mut().clear();
-                self.packets.clear();
-                self.packets.set_follow(false);
-                self.hosts.invalidate();
-                self.web_link.clear();
-                self.flows_link.clear();
-                self.flows.reload();
-                self.reset_extras();
-                self.hub.clear_capture();
-                self.dashboard.clear_window_stats();
-                self.ctrl.start(CaptureSource::File(p.clone()), None);
-                self.hub.refresh_insights(p.clone(), ctx.clone());
-                self.packets.filter_bar.set_text("");
+                self.open_file(p.clone(), None, ctx);
                 self.prefs.push_recent(p);
                 self.prefs.save();
             }
             Command::StartLive(options) => {
+                self.resolver.procs().clear();
                 self.streams.borrow_mut().clear();
                 self.packets.clear();
                 self.packets.set_follow(self.prefs.settings.auto_scroll);
@@ -162,8 +179,9 @@ impl App {
                 .export_json(self.ctrl.snapshot().clone(), ctx.clone()),
             HubCommand::ExportHtml => {
                 let title = self.ctrl.status().source.clone();
+                let file = self.ctrl.backing();
                 self.hub
-                    .export_html(title, self.ctrl.snapshot().clone(), ctx.clone());
+                    .export_html(title, self.ctrl.snapshot().clone(), file, ctx.clone());
             }
         }
     }

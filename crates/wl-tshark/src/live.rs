@@ -9,7 +9,7 @@
 
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -20,9 +20,10 @@ use wl_model::{CaptureError, CaptureOptions, Session};
 
 use crate::capture_args::stream_args;
 use crate::control::Control;
-use crate::error::{from_dumpcap, io_error};
+use crate::error::{from_dumpcap, from_ssh, io_error};
 use crate::finish::{ProducerError, tshark_finish};
-use crate::process::{Proc, StderrTap, Tools, spawn};
+use crate::process::{Proc, StderrTap, Tools, find_in_path, spawn};
+use crate::remote_args::ssh_args;
 use crate::row_parser::field_args;
 use crate::{pump, ring, validate};
 
@@ -33,6 +34,31 @@ pub struct LiveArgs<'a> {
     pub empty_pcap: &'a Path,
     /// Extra tshark options (TLS keylog).
     pub opts: &'a [String],
+}
+
+/// The process whose stdout carries the capture: local dumpcap, or ssh running remote tcpdump.
+struct Producer {
+    program: PathBuf,
+    args: Vec<String>,
+    classify: fn(&str) -> CaptureError,
+}
+
+fn producer(tools: &Tools, o: &CaptureOptions) -> Result<Producer, CaptureError> {
+    if !o.remote.enabled {
+        return Ok(Producer {
+            program: tools.dumpcap.clone(),
+            args: stream_args(o),
+            classify: from_dumpcap,
+        });
+    }
+    if let Some(problem) = o.remote.problem() {
+        return Err(CaptureError::Other(problem.into()));
+    }
+    Ok(Producer {
+        program: find_in_path("ssh").ok_or_else(|| CaptureError::ToolMissing("ssh".into()))?,
+        args: ssh_args(o),
+        classify: from_ssh,
+    })
 }
 
 /// Copies dumpcap's stream to the backing file and tshark. Returns tshark's stdin (so the caller
@@ -66,7 +92,8 @@ pub fn start(tools: &Tools, a: &LiveArgs) -> Result<Session, CaptureError> {
     }
     let file = File::create(a.backing_file).map_err(|e| io_error("create capture file", &e))?;
 
-    let mut dumpcap = spawn(&tools.dumpcap, &stream_args(a.options), false)?;
+    let source = producer(tools, a.options)?;
+    let mut dumpcap = spawn(&source.program, &source.args, false)?;
     let (d_out, d_err) = (dumpcap.stdout.take(), dumpcap.stderr.take());
     let dumpcap = Proc::new(dumpcap);
     let (Some(d_out), Some(d_err)) = (d_out, d_err) else {
@@ -109,7 +136,7 @@ pub fn start(tools: &Tools, a: &LiveArgs) -> Result<Session, CaptureError> {
         return Err(if status.success() {
             CaptureError::Other("dumpcap exited unexpectedly".into())
         } else {
-            from_dumpcap(&msg)
+            (source.classify)(&msg)
         });
     }
 
@@ -139,7 +166,7 @@ pub fn start(tools: &Tools, a: &LiveArgs) -> Result<Session, CaptureError> {
                 && !stderr.trim().is_empty()
                 && let Ok(mut g) = producer_err.lock()
             {
-                *g = Some(from_dumpcap(&stderr));
+                *g = Some((source.classify)(&stderr));
             }
             drop(sink); // only now: tshark sees EOF, after the error (if any) is recorded
         })
@@ -185,6 +212,21 @@ mod tests {
             sink.is_empty(),
             "nothing is forwarded after the file failed"
         );
+    }
+
+    #[test]
+    fn hostile_remote_target_is_refused_before_spawning() {
+        let tools = Tools {
+            tshark: PathBuf::new(),
+            dumpcap: PathBuf::new(),
+            editcap: None,
+            mergecap: None,
+        };
+        let mut o = CaptureOptions::single("ignored", None);
+        o.remote.enabled = true;
+        o.remote.host = "-oProxyCommand=touch x".into();
+        o.remote.interface = "eth0".into();
+        assert!(matches!(producer(&tools, &o), Err(CaptureError::Other(_))));
     }
 
     #[test]

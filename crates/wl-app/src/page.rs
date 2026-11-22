@@ -12,10 +12,11 @@ pub enum Page {
     Flows,
     Web,
     Insights,
+    Diff,
 }
 
 impl Page {
-    pub const ALL: [Page; 10] = [
+    pub const ALL: [Page; 11] = [
         Page::Setup,
         Page::Overview,
         Page::Graphs,
@@ -26,6 +27,7 @@ impl Page {
         Page::Flows,
         Page::Web,
         Page::Insights,
+        Page::Diff,
     ];
 
     pub fn label(self) -> &'static str {
@@ -40,6 +42,7 @@ impl Page {
             Page::Flows => "Flows",
             Page::Web => "Web",
             Page::Insights => "Insights",
+            Page::Diff => "Diff",
         }
     }
 
@@ -55,6 +58,7 @@ impl Page {
             "flows" | "flow" | "flowgraph" => Some(Page::Flows),
             "web" | "http" | "https" => Some(Page::Web),
             "insights" | "health" | "expert" => Some(Page::Insights),
+            "diff" | "compare" => Some(Page::Diff),
             _ => None,
         }
     }

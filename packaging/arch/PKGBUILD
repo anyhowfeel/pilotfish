@@ -1,10 +1,10 @@
 # Maintainer: anyhowfeel <346877873+anyhowfeel@users.noreply.github.com>
-pkgname=wirelens
-pkgver=0.4.0
+pkgname=pilotfish
+pkgver=0.5.0
 pkgrel=1
 pkgdesc="Prototype desktop packet viewer on top of tshark, written in Rust with egui"
 arch=('x86_64' 'aarch64')
-url="https://github.com/anyhowfeel/wirelens"
+url="https://github.com/anyhowfeel/pilotfish"
 license=('GPL-3.0-or-later')
 depends=('wireshark-cli' 'libxkbcommon' 'wayland' 'libx11' 'libxcursor' 'libxrandr' 'libxi' 'mesa')
 makedepends=('cargo')
@@ -26,21 +26,21 @@ build() {
 
 package() {
   cd "$pkgname-$pkgver"
-  install -Dm755 target/release/wirelens "$pkgdir/usr/bin/wirelens"
-  install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/wirelens.desktop" <<'DESKTOP'
+  install -Dm755 target/release/pilotfish "$pkgdir/usr/bin/pilotfish"
+  install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/pilotfish.desktop" <<'DESKTOP'
 [Desktop Entry]
 Type=Application
-Name=wirelens
+Name=pilotfish
 GenericName=Packet viewer
 Comment=Prototype packet viewer on top of tshark
-Exec=wirelens %f
-Icon=wirelens
+Exec=pilotfish %f
+Icon=pilotfish
 Terminal=false
 Categories=Network;Monitor;
 MimeType=application/vnd.tcpdump.pcap;application/x-pcapng;
 DESKTOP
-  install -Dm644 assets/logo/wirelens.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/wirelens.svg"
-  install -Dm644 assets/logo/wirelens-256.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/wirelens.png"
+  install -Dm644 assets/logo/pilotfish.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/pilotfish.svg"
+  install -Dm644 assets/logo/pilotfish-256.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/pilotfish.png"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
 }

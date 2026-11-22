@@ -8,6 +8,7 @@ use std::thread;
 
 use wl_model::{CaptureError, TlsSession};
 
+use crate::cert_scan::{self, CertCache};
 use crate::process::Tools;
 use crate::tls_merge::{CERT_FIELD, FIELDS, Merger, StreamKey, stream_key};
 use crate::tsv_pass::{Pass, columns, run_pass};
@@ -60,18 +61,41 @@ fn flow_bytes(
 
 pub fn tls_sessions(
     tools: &Tools,
+    cache: &CertCache,
     file: &Path,
     opts: &[String],
 ) -> Result<Vec<TlsSession>, CaptureError> {
-    let (hs, bytes) = thread::scope(|s| {
+    // A first scan runs the chain pass beside the others; a rescan of a growing file only
+    // runs it when more streams carried a certificate.
+    let cold = !cache.knows(file);
+    let (hs, bytes, certs) = thread::scope(|s| {
         let b = s.spawn(|| flow_bytes(tools, file, opts));
+        let c = cold.then(|| s.spawn(|| cert_scan::chains(tools, file, opts)));
         let h = handshakes(tools, file, opts);
-        let b = b
-            .join()
-            .unwrap_or_else(|_| Err(CaptureError::Other("byte count thread panicked".into())));
-        (h, b)
+        let panicked = || CaptureError::Other("scan thread panicked".into());
+        (
+            h,
+            b.join().unwrap_or_else(|_| Err(panicked())),
+            c.map(|c| c.join().unwrap_or_else(|_| Err(panicked()))),
+        )
     });
     let merger = hs?;
-    // Byte totals are decoration: a failed second pass must not hide the sessions.
-    Ok(merger.finish(&bytes.unwrap_or_default()))
+    let streams = merger.cert_streams();
+    let certs = match certs {
+        Some(done) => done,
+        None => match cache.get(file, streams) {
+            Some(known) => Ok(known),
+            None => cert_scan::chains(tools, file, opts),
+        },
+    };
+    if let Ok(c) = &certs {
+        cache.put(file, streams, c);
+    }
+    // Byte totals and chains are decoration: a failed extra pass must not hide the sessions.
+    let mut sessions = merger.finish(&bytes.unwrap_or_default());
+    let mut certs = certs.unwrap_or_default();
+    for s in &mut sessions {
+        s.certs = s.stream.and_then(|n| certs.remove(&n)).unwrap_or_default();
+    }
+    Ok(sessions)
 }

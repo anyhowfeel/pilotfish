@@ -44,6 +44,7 @@ fn snapshot() -> StatsSnapshot {
             } else {
                 "DHCPv6".into()
             },
+            server_port: None,
         })
         .collect();
     let protocols = [
@@ -205,6 +206,68 @@ fn kpi_cells_fit_stat_cards() {
                     }
                 });
             }
+        }
+    }
+}
+
+struct WithProcesses;
+
+impl NameResolver for WithProcesses {
+    fn name(&self, _addr: &str) -> Option<Arc<str>> {
+        None
+    }
+
+    fn processes(&self, _addr: &str) -> Vec<wl_model::ProcessInfo> {
+        ["firefox", "curl"]
+            .into_iter()
+            .zip([1234, 77])
+            .map(|(n, pid)| wl_model::ProcessInfo {
+                pid,
+                name: n.into(),
+            })
+            .collect()
+    }
+
+    fn flow_process(&self, _key: &FlowKey) -> Option<wl_model::ProcessInfo> {
+        self.processes("").into_iter().next()
+    }
+
+    fn has_processes(&self) -> bool {
+        true
+    }
+}
+
+#[test]
+fn process_columns_fit_when_data_exists() {
+    let stats = snapshot();
+    let (mut hosts, mut convs) = (HostsPanel::default(), ConversationsPanel::default());
+    hosts.set_resolver(Box::new(WithProcesses));
+    convs.set_resolver(Box::new(WithProcesses));
+    for mode in [Mode::Dark, Mode::Light] {
+        for (w, h) in [(1000.0, 640.0), (1920.0, 1080.0)] {
+            run(w, h, 1.0, mode, |ui| {
+                hosts.ui(ui, &stats);
+                convs.ui(ui, &stats);
+            });
+        }
+    }
+}
+
+#[test]
+fn hosts_table_scrolls_sideways_instead_of_clipping_when_narrow() {
+    let stats = snapshot();
+    let mut hosts = HostsPanel::default();
+    for mode in [Mode::Dark, Mode::Light] {
+        for width in [390.0, 600.0] {
+            run(width, 640.0, 1.0, mode, |ui| {
+                let area = ui.max_rect();
+                hosts.ui(ui, &stats);
+                assert!(
+                    area.expand(1.0).contains_rect(ui.min_rect()),
+                    "{mode:?} {width}: {:?} outside {area:?}",
+                    ui.min_rect()
+                );
+            });
         }
     }
 }

@@ -1,6 +1,8 @@
 //! Capture > Options: everything `dumpcap` needs to start a live capture. Pure data.
 use serde::{Deserialize, Serialize};
 
+use crate::RemoteTarget;
+
 /// Default (and maximum) snap length: whole packets.
 pub const SNAPLEN_MAX: u32 = 262_144;
 
@@ -36,6 +38,7 @@ pub struct CaptureOptions {
     pub buffer_mb: u32,
     pub ring: RingBuffer,
     pub stop: AutoStop,
+    pub remote: RemoteTarget,
     /// Where to keep the capture (ring buffer base name when the ring is enabled). Empty = temp.
     pub save_to: String,
 }
@@ -56,6 +59,7 @@ impl Default for CaptureOptions {
                 files: 10,
             },
             stop: AutoStop::default(),
+            remote: RemoteTarget::default(),
             save_to: String::new(),
         }
     }
@@ -81,6 +85,9 @@ impl CaptureOptions {
 
     /// Why this configuration cannot be started, in plain words.
     pub fn problem(&self) -> Option<&'static str> {
+        if self.remote.enabled {
+            return self.remote.problem();
+        }
         if self.interfaces.is_empty() {
             return Some("Select at least one interface.");
         }
@@ -95,6 +102,9 @@ impl CaptureOptions {
 
     /// Short label for the status bar ("eth0" / "eth0 + 2 more").
     pub fn label(&self) -> String {
+        if self.remote.enabled {
+            return self.remote.label();
+        }
         match self.interfaces.as_slice() {
             [] => String::new(),
             [one] => one.clone(),

@@ -9,14 +9,14 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
-use wl_model::{CaptureBackend, CaptureError, HttpDetail, HttpExchange, TlsSession};
+use wl_model::{CaptureBackend, CaptureError, HttpDetail, HttpExchange, MessageStream, TlsSession};
 
 use crate::bg::LatestSlot;
 
 /// Live captures are re-scanned this often while the Web page is visible.
 pub const LIVE_REFRESH: Duration = Duration::from_secs(3);
 
-pub type WebData = (Vec<HttpExchange>, Vec<TlsSession>);
+pub type WebData = (Vec<HttpExchange>, Vec<TlsSession>, Vec<MessageStream>);
 
 enum Event {
     Web(u64, Result<WebData, CaptureError>),
@@ -99,13 +99,20 @@ impl WebJobs {
         let (tx, rx) = unbounded();
         let b = backend.clone();
         let scan = Lane::spawn(tx.clone(), move |seq, file: PathBuf| {
-            // The two scans are independent tshark passes: run them side by side.
-            let (h, t) = thread::scope(|s| {
+            // The scans are independent tshark passes: run them side by side.
+            let (h, t, m) = thread::scope(|s| {
                 let h = s.spawn(|| b.http_exchanges(&file));
+                let m = s.spawn(|| b.message_streams(&file));
                 let t = b.tls_sessions(&file);
-                (h.join().unwrap_or_else(|_| Err(panic_err())), t)
+                (
+                    h.join().unwrap_or_else(|_| Err(panic_err())),
+                    t,
+                    m.join().unwrap_or_else(|_| Err(panic_err())),
+                )
             });
-            Event::Web(seq, h.and_then(|h| t.map(|t| (h, t))))
+            // Message streams are an extra tab: their failure must not hide the exchanges.
+            let m = m.unwrap_or_default();
+            Event::Web(seq, h.and_then(|h| t.map(|t| (h, t, m))))
         });
         let detail = Lane::spawn(tx, move |seq, (file, ex): (PathBuf, HttpExchange)| {
             Event::Detail(seq, backend.http_detail(&file, &ex))

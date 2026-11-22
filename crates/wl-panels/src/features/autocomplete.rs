@@ -9,7 +9,7 @@ use eframe::egui::{
 use wl_kit::theme::{Palette, RADIUS, mono, spacing};
 
 pub use crate::features::autocomplete_catalog::{FieldCatalog, active_token, apply_completion};
-use crate::features::autocomplete_context::{Active, Kind, active};
+use crate::features::autocomplete_context::{Active, Kind, active, quoted_insert};
 pub use crate::features::autocomplete_values::ValueIndex;
 
 const MAX_SUGGESTIONS: usize = 8;
@@ -65,7 +65,7 @@ impl FilterAutocomplete {
         &self.catalog
     }
 
-    fn items(&self, a: &Active) -> Vec<Item> {
+    fn items(&self, a: &Active, expr: &str) -> Vec<Item> {
         match a.kind {
             Kind::Field if a.token.len() >= 2 => self
                 .catalog
@@ -83,8 +83,12 @@ impl FilterAutocomplete {
                 .suggest(field, a.token, MAX_SUGGESTIONS)
                 .into_iter()
                 .map(|s| Item {
-                    insert: s.text,
-                    hint: String::new(),
+                    insert: if s.quoted {
+                        quoted_insert(expr, a, &s.text)
+                    } else {
+                        s.text
+                    },
+                    hint: s.detail,
                     tag: s.hint.to_owned(),
                 })
                 .collect(),
@@ -105,7 +109,7 @@ impl FilterAutocomplete {
         if tok == self.dismissed_for {
             return false;
         }
-        let items = self.items(&act);
+        let items = self.items(&act, expr);
         if items.is_empty() {
             return false;
         }

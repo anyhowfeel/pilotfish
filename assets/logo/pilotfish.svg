@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
+  <title>Pilotfish</title>
+  <defs>
+    <clipPath id="icon"><rect x="90" y="90" width="900" height="900" rx="232"/></clipPath>
+    <filter id="soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="22"/></filter>
+    <filter id="fishShadow" x="-20%" y="-40%" width="140%" height="190%">
+      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#06306f" flood-opacity="0.38"/>
+    </filter>
+    <filter id="haze" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="30"/></filter>
+    <linearGradient id="bg" x1="250" y1="90" x2="850" y2="990" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f2f7fe"/>
+      <stop offset="0.45" stop-color="#dde9fd"/>
+      <stop offset="1" stop-color="#bbd8fb"/>
+    </linearGradient>
+    <linearGradient id="finOuter" x1="800" y1="213" x2="181" y2="786" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#62b3fd"/>
+      <stop offset="0.28" stop-color="#5da7f6"/>
+      <stop offset="0.47" stop-color="#519ae9"/>
+      <stop offset="0.65" stop-color="#3981d4"/>
+      <stop offset="0.82" stop-color="#1b5eb3"/>
+      <stop offset="1" stop-color="#1254a8"/>
+    </linearGradient>
+    <linearGradient id="finInner" x1="190" y1="700" x2="880" y2="430" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#043a88"/>
+      <stop offset="0.25" stop-color="#1050a4"/>
+      <stop offset="0.5" stop-color="#1e65bb"/>
+      <stop offset="0.72" stop-color="#3383d9"/>
+      <stop offset="1" stop-color="#53aaf6"/>
+    </linearGradient>
+    <linearGradient id="finLow" x1="180" y1="720" x2="900" y2="650" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#043a88"/>
+      <stop offset="0.27" stop-color="#06408f"/>
+      <stop offset="0.38" stop-color="#114fa3"/>
+      <stop offset="0.49" stop-color="#145bb0"/>
+      <stop offset="0.65" stop-color="#2f80d5"/>
+      <stop offset="0.78" stop-color="#52a3f0"/>
+      <stop offset="0.92" stop-color="#86c8fd"/>
+      <stop offset="1" stop-color="#8ccdfd"/>
+    </linearGradient>
+    <linearGradient id="wave" x1="180" y1="0" x2="900" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#b5d6fa"/>
+      <stop offset="0.14" stop-color="#70b0f0"/>
+      <stop offset="0.3" stop-color="#438bdb"/>
+      <stop offset="0.45" stop-color="#2b76cb"/>
+      <stop offset="0.61" stop-color="#3481d4"/>
+      <stop offset="0.77" stop-color="#4798e7"/>
+      <stop offset="0.94" stop-color="#8fc3f8"/>
+      <stop offset="1" stop-color="#bbd8fb"/>
+    </linearGradient>
+    <linearGradient id="bandX" x1="180" y1="0" x2="900" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#cfe3fc" stop-opacity="0"/>
+      <stop offset="0.2" stop-color="#c8defb" stop-opacity="0.85"/>
+      <stop offset="0.85" stop-color="#bfd9fb" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#bfd9fb" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fish" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f8fbff"/>
+      <stop offset="1" stop-color="#e9f3fe"/>
+    </linearGradient>
+    <radialGradient id="haze1" cx="880" cy="640" r="300" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8dc0fa" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#8dc0fa" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="haze2" cx="730" cy="880" r="260" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8ec2f8" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#8ec2f8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g clip-path="url(#icon)">
+    <rect width="1080" height="1080" fill="url(#bg)"/>
+    <g filter="url(#soft)">
+      <path d="M0 330 C200 270 380 360 640 300 S960 230 1080 250 V0 H0 Z" fill="#f7fbff" opacity="0.6"/>
+      <path d="M1080 470 C940 430 820 470 700 500 S380 600 0 640 V1080 H1080 Z" fill="#a9ccf8" opacity="0.22"/>
+      <path d="M1080 700 C900 690 760 760 560 820 S160 900 0 860 V1080 H1080 Z" fill="#9cc4f6" opacity="0.26"/>
+    </g>
+    <circle cx="880" cy="640" r="300" fill="url(#haze1)" filter="url(#haze)"/>
+    <circle cx="730" cy="880" r="260" fill="url(#haze2)" filter="url(#haze)"/>
+    <g>
+      <path d="M377.537 397.163 C502.071 277.143 657.162 214.627 801.482 213.013 C742.975 268.087 706.564 339.183 703.529 417.904 C703.15 427.738 703.3 437.494 703.957 447.153 C670.897 408.612 632.389 383.378 575.501 382.303 C387.379 378.748 256.45 599.528 180.579 785.616 L180.956 785.58 C180.599 786.018 180.242 786.457 179.887 786.897 C192.365 662.741 249.487 534.231 348.172 427.183 C357.583 416.974 367.372 406.96 377.537 397.163 Z" fill="url(#finOuter)" stroke="url(#finOuter)" stroke-width="1.4" stroke-linejoin="round"/>
+      <path d="M180.579 785.616 C256.45 599.528 387.379 378.748 575.501 382.303 C632.389 383.378 670.897 408.612 703.957 447.153 C711.576 559.126 787.441 658.122 899.351 716.078 C712.862 707.158 630.423 514.217 478.051 529.215 C349.017 541.916 238.029 679.543 180.579 785.616 Z" fill="url(#finInner)" stroke="url(#finInner)" stroke-width="1.4" stroke-linejoin="round"/>
+      <path d="M478.051 529.215 C630.423 514.217 712.862 707.158 899.351 716.078 C826.819 748.447 710.517 725.948 617.099 685.883 C567.219 664.49 514.996 655.879 464.569 655.879 L464.569 655.879 C353.076 655.879 248.266 703.008 180.956 785.58 L180.956 785.58 L180.579 785.616 C238.029 679.543 349.017 541.916 478.051 529.215 Z" fill="url(#finLow)" stroke="url(#finLow)" stroke-width="1.4" stroke-linejoin="round"/>
+      <path d="M180.649 833.341 C180.649 833.341 305.075 698.639 436.68 692.398 C568.215 686.161 623.201 742.733 705.307 762.178 C795.891 783.631 900.113 757.49 900.113 757.49 C900.113 757.49 780.281 866.987 676.057 866.987 C575.891 866.987 507.865 807.495 415.634 779.696 C300.379 744.956 180.649 833.341 180.649 833.341 Z" fill="url(#wave)"/>
+      <g fill="url(#fish)" filter="url(#fishShadow)">
+        <path d="M539.177 557.902 L519.082 534.13 L566.466 549.41 C566.466 549.41 600.181 534.13 628.489 534.13 C665.152 534.13 694.872 557.902 694.872 557.902 C694.872 557.902 665.152 581.673 628.489 581.673 C600.47 581.673 566.763 566.666 566.763 566.666 L519.082 581.673 Z"/>
+        <path d="M756.571 579.701 L738.143 557.902 L781.597 571.914 C781.597 571.914 812.515 557.902 838.474 557.902 C872.096 557.902 899.351 579.701 899.351 579.701 C899.351 579.701 872.096 601.501 838.474 601.501 C812.78 601.501 781.869 587.738 781.869 587.738 L738.143 601.501 Z"/>
+        <path d="M631.185 485.993 L606.977 457.356 L664.06 475.764 C664.06 475.764 704.675 457.356 738.777 457.356 C782.943 457.356 818.747 485.993 818.747 485.993 C818.747 485.993 782.943 514.63 738.777 514.63 C705.023 514.63 664.417 496.551 664.417 496.551 L606.977 514.63 Z"/>
+      </g>
+    </g>
+  </g>
+</svg>

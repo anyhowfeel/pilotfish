@@ -3,7 +3,9 @@ use wl_kit::egui::{self, Context, Rect, pos2, vec2};
 use wl_kit::theme::Mode;
 
 use super::model::Sel;
-use super::{WebAction, WebData, WebPanel, WebStatus, demo_data, demo_detail};
+use super::{
+    KeysInfo, WebAction, WebData, WebPanel, WebStatus, demo_data, demo_detail, demo_streams,
+};
 
 fn run(width: f32, height: f32, scale: f32, mode: Mode, mut f: impl FnMut(&mut egui::Ui)) {
     let ctx = Context::default();
@@ -24,6 +26,7 @@ fn run(width: f32, height: f32, scale: f32, mode: Mode, mut f: impl FnMut(&mut e
 #[test]
 fn page_stays_inside_its_area_at_all_widths_and_scales() {
     let (ex, tls) = demo_data();
+    let streams = demo_streams();
     let detail = demo_detail(&ex[4]);
     let sels = [
         Some(Sel::Http(ex[4].id)),
@@ -44,8 +47,10 @@ fn page_stays_inside_its_area_at_all_widths_and_scales() {
                             rev: 1,
                             exchanges: &ex,
                             tls: &tls,
+                            streams: &streams,
                             detail: Some(&detail),
                             status: WebStatus::Ready,
+                            keys: &KeysInfo::default(),
                         };
                         panel.ui(ui, &d);
                         assert!(
@@ -73,8 +78,10 @@ fn empty_loading_and_error_states_render() {
                 rev: 0,
                 exchanges: &[],
                 tls: &[],
+                streams: &[],
                 detail: None,
                 status,
+                keys: &KeysInfo::default(),
             };
             assert!(panel.ui(ui, &d).is_empty());
         }
@@ -84,6 +91,7 @@ fn empty_loading_and_error_states_render() {
 #[test]
 fn selecting_a_row_requests_its_detail_once() {
     let (ex, tls) = demo_data();
+    let streams = demo_streams();
     let mut panel = WebPanel {
         selected: Some(Sel::Http(ex[2].id)),
         ..Default::default()
@@ -94,8 +102,10 @@ fn selecting_a_row_requests_its_detail_once() {
             rev: 1,
             exchanges: &ex,
             tls: &tls,
+            streams: &streams,
             detail: None,
             status: WebStatus::Ready,
+            keys: &KeysInfo::default(),
         };
         loads += panel
             .ui(ui, &d)
@@ -104,4 +114,69 @@ fn selecting_a_row_requests_its_detail_once() {
             .count();
     });
     assert_eq!(loads, 1);
+}
+
+#[test]
+fn streams_tab_fits_with_and_without_a_selection() {
+    let streams = demo_streams();
+    let (ex, tls) = demo_data();
+    for mode in [Mode::Dark, Mode::Light] {
+        for sel in [None, Some(streams[2].id)] {
+            for width in [1000.0_f32, 1600.0] {
+                let mut panel = WebPanel::default();
+                panel.preselect("stream:0");
+                if let Some(id) = sel {
+                    panel.preselect(&format!("stream:{id}"));
+                }
+                run(width, 640.0, 1.0, mode, |ui| {
+                    let area = ui.max_rect();
+                    let d = WebData {
+                        rev: 1,
+                        exchanges: &ex,
+                        tls: &tls,
+                        streams: &streams,
+                        detail: None,
+                        status: WebStatus::Ready,
+                        keys: &KeysInfo::default(),
+                    };
+                    panel.ui(ui, &d);
+                    assert!(
+                        area.expand(1.0).contains_rect(ui.min_rect()),
+                        "{mode:?} {sel:?} {width}: {:?} outside {area:?}",
+                        ui.min_rect()
+                    );
+                });
+            }
+        }
+    }
+}
+
+#[test]
+fn keys_bar_fits_with_a_key_log_loaded() {
+    let (ex, tls) = demo_data();
+    let keys = KeysInfo {
+        file: Some("sslkeys-2026-11-20.log".into()),
+        can_embed: false,
+    };
+    for width in [1000.0_f32, 1600.0] {
+        let mut panel = WebPanel::default();
+        run(width, 640.0, 1.5, Mode::Light, |ui| {
+            let area = ui.max_rect();
+            let d = WebData {
+                rev: 1,
+                exchanges: &ex,
+                tls: &tls,
+                streams: &[],
+                detail: None,
+                status: WebStatus::Ready,
+                keys: &keys,
+            };
+            panel.ui(ui, &d);
+            assert!(
+                area.expand(1.0).contains_rect(ui.min_rect()),
+                "{width}: {:?} outside {area:?}",
+                ui.min_rect()
+            );
+        });
+    }
 }

@@ -19,21 +19,11 @@ fn transport_name(t: Transport) -> &'static str {
     }
 }
 
-/// The "server" port of a flow: the one with a known service name, else the lower one.
-fn server_port(c: &ConversationStat) -> Option<u16> {
-    let t = c.key.transport;
-    let (a, b) = (c.key.a_port, c.key.b_port);
-    let named = |p: Option<u16>| p.filter(|&p| wl_stats::service_name(p, t).is_some());
-    named(b).or(named(a)).or(match (a, b) {
-        (Some(a), Some(b)) => Some(a.min(b)),
-        (a, b) => a.or(b),
-    })
-}
-
 pub fn top_services(convs: &[ConversationStat], n: usize) -> Vec<ServiceStat> {
     let mut agg: HashMap<(String, Option<u16>, Transport), u64> = HashMap::new();
+    let servers = wl_stats::ServerPorts::of(convs);
     for c in convs {
-        let port = server_port(c);
+        let port = servers.pick(c);
         let name = port.and_then(|p| wl_stats::service_name(p, c.key.transport));
         let key = match (port, name) {
             (Some(p), Some(s)) => (
@@ -78,6 +68,7 @@ mod tests {
             first_rel: 0.0,
             last_rel: 1.0,
             protocol: "TCP".into(),
+            server_port: None,
         }
     }
 

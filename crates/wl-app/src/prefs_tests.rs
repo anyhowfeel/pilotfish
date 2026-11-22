@@ -85,3 +85,41 @@ fn garbage_settings_fields_fall_back_to_defaults() {
         Prefs::default()
     );
 }
+
+#[test]
+fn insight_rules_survive_a_prefs_round_trip_and_are_clamped_on_load() {
+    let mut p = Prefs::default();
+    p.settings.insights.mute("10.0.0.9");
+    p.settings.insights.thresholds.scan_min_ports = 7;
+    let json = serde_json::to_string(&p).expect("ser");
+    let back: Prefs = serde_json::from_str(&json).expect("de");
+    assert_eq!(back.settings.insights, p.settings.insights);
+
+    p.settings.insights.thresholds.scan_min_ports = 0;
+    p.settings.insights.muted.push("  ".into());
+    let fixed = p.migrate().settings.insights;
+    assert_eq!(fixed.thresholds.scan_min_ports, 2);
+    assert_eq!(fixed.muted, ["10.0.0.9"]);
+}
+
+#[test]
+fn saved_filters_survive_a_save_and_reload() {
+    let p = Prefs {
+        filter_presets: vec![wl_panels::packets::SavedFilter {
+            name: "web".into(),
+            expr: "tcp.port == 443".into(),
+        }],
+        ..Prefs::default()
+    };
+    let json = serde_json::to_vec_pretty(&p).expect("ser");
+    let back = serde_json::from_slice::<Prefs>(&json)
+        .expect("de")
+        .migrate();
+    assert_eq!(back.filter_presets, p.filter_presets);
+}
+
+#[test]
+fn old_prefs_have_no_saved_filters() {
+    let p = serde_json::from_str::<Prefs>(r#"{"filter_history":["tcp"]}"#).expect("parse");
+    assert!(p.filter_presets.is_empty());
+}

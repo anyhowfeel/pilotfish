@@ -61,11 +61,20 @@ impl App {
                 }
             }
             Page::Web => {
-                let data = self.web_link.data();
+                let keys = self.keys.info();
+                let data = self.web_link.data(&keys);
                 let acts = self.web.ui(ui, &data);
+                let ctx = ui.ctx().clone();
                 for a in acts {
-                    self.web_action(a, &mut cmds);
+                    self.web_action(a, &mut cmds, &ctx);
                 }
+            }
+            Page::Diff => {
+                let base = self
+                    .ctrl
+                    .backing()
+                    .map(|f| (f, self.ctrl.status().source.clone()));
+                self.diff.ui(ui, base);
             }
             Page::Insights => {
                 for act in self.hub.insights_ui(ui, &stats) {
@@ -79,6 +88,7 @@ impl App {
                             self.run_hub_command(HubCommand::ExportHtml, &ctx);
                         }
                         InsightsAction::LoadDns | InsightsAction::ShowInPackets(_) => {}
+                        InsightsAction::Mute(pattern) => self.mute_finding(&pattern, ui.ctx()),
                         InsightsAction::Refresh => {
                             if let Some(file) = self.ctrl.backing() {
                                 self.hub.refresh_insights(file, ui.ctx().clone());
@@ -120,6 +130,10 @@ impl App {
                             cmds.push(Command::ApplyFilter(f));
                         }
                         BookmarkBarAction::ClearAll => self.hub.bookmarks.clear(),
+                        BookmarkBarAction::SaveComments => match self.ctrl.backing() {
+                            Some(file) => self.hub.save_comments(file, ui.ctx().clone()),
+                            None => self.hub.error = Some("Open a capture first.".into()),
+                        },
                     }
                 }
                 let detail = self.ctrl.detail().filter(|d| Some(d.frame_no) == sel);
@@ -200,17 +214,12 @@ impl eframe::App for App {
         {
             self.props.open(f);
         }
-        let margin = if self.page == Page::Packets {
-            spacing::SM
-        } else {
-            spacing::LG
-        };
         let mut cmds = Vec::new();
         egui::CentralPanel::default()
             .frame(
                 egui::Frame::new()
                     .fill(Palette::bg())
-                    .inner_margin(Margin::same(margin as i8)),
+                    .inner_margin(Margin::same(spacing::LG as i8)),
             )
             .show(ui, |ui| {
                 self.banner(ui);
@@ -238,6 +247,7 @@ impl eframe::App for App {
         wl_kit::widgets::toast::draw(&ctx);
         self.apply_select();
         self.save_layout();
+        self.save_presets();
         if let Some(shot) = &mut self.shot {
             shot.tick(&ctx);
         }

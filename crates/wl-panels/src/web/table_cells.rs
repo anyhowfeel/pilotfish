@@ -15,6 +15,7 @@ use super::columns::Cols;
 use super::timing::fraction;
 
 const BAR_W: f32 = 40.0;
+const THREAT_PILL_W: f32 = 110.0;
 
 pub fn time_text(secs: f64) -> String {
     format!("{secs:.3}")
@@ -53,6 +54,7 @@ pub fn http_cells(row: &mut TableRow<'_, '_>, e: &HttpExchange, max_ms: f64, c: 
 
 fn tls_summary(t: &TlsSession) -> String {
     let mut parts: Vec<String> = Vec::new();
+    parts.extend(t.client.as_ref().map(|c| format!("client {c}")));
     parts.extend(t.alpn.as_ref().map(|a| a.to_string()));
     parts.extend(t.cipher.as_deref().map(cipher_short));
     parts.extend(t.cert_subject.as_deref().map(|c| cert_cn(c).to_owned()));
@@ -69,11 +71,20 @@ pub fn tls_cells(row: &mut TableRow<'_, '_>, t: &TlsSession, c: Cols) {
     row.col(|ui| {
         ui.add_space(CELL_PAD);
         ui.spacing_mut().item_spacing.x = spacing::SM;
-        lock_icon(ui, 14.0, Palette::ok());
+        let lock = if t.threat.is_some() {
+            Palette::danger()
+        } else {
+            Palette::ok()
+        };
+        lock_icon(ui, 14.0, lock);
         let l = egui::Label::new(&*t.server_name)
             .truncate()
             .selectable(false);
         ui.add(l).on_hover_text(&*t.server_name);
+        if let Some(list) = &t.threat {
+            let style = PillStyle::column(THREAT_PILL_W).with_dot(false);
+            pill(ui, &format!("listed: {list}"), Palette::danger(), style);
+        }
     });
     row.col(|ui| {
         let s = tls_summary(t);

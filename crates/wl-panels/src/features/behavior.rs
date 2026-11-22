@@ -5,29 +5,34 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use wl_kit::format;
-use wl_model::{BehaviorData, Channel, ChannelKind, HealthInsight, InsightSeverity, Proto};
+use wl_model::{BehaviorData, Channel, ChannelKind, InsightSeverity, Proto};
 
-use super::health::push_card;
+use super::health::{Cap, Findings, push_capped};
+use crate::insights::Thresholds;
 
-const SCAN_MIN_PORTS: usize = 20;
-const SWEEP_MIN_HOSTS: usize = 20;
-const SWEEP_MAX_TRIES_PER_HOST: u32 = 3;
 /// Ports where contacting many hosts is ordinary client behaviour, not a sweep.
 const BUSY_PORTS: [u16; 5] = [53, 80, 443, 8080, 8443];
-const BEACON_MIN_EVENTS: u32 = 8;
-const BEACON_MIN_PERIOD: f64 = 1.0;
-const BEACON_MAX_JITTER: f64 = 0.1;
-const DNS_LONG_NAME: usize = 60;
-const DNS_LONG_LABEL: usize = 40;
-const MAX_CARDS_PER_KIND: usize = 3;
+const PER_KIND: usize = 3;
+const SCANS: Cap = Cap {
+    name: "port scans",
+    max: PER_KIND,
+};
+const SWEEPS: Cap = Cap {
+    name: "host sweeps",
+    max: PER_KIND,
+};
+const RHYTHMS: Cap = Cap {
+    name: "regular traffic patterns",
+    max: PER_KIND,
+};
 
 type Addr = Arc<str>;
 
-pub fn detect(data: &BehaviorData, out: &mut Vec<HealthInsight>) {
-    port_scans(&data.channels, out);
-    sweeps(&data.channels, out);
-    beacons(&data.channels, out);
-    long_dns_names(data, out);
+pub fn detect(data: &BehaviorData, th: &Thresholds, out: &mut Findings) {
+    port_scans(&data.channels, th, out);
+    sweeps(&data.channels, th, out);
+    beacons(&data.channels, th, out);
+    long_dns_names(data, th, out);
 }
 
 fn new_flows(channels: &[Channel]) -> impl Iterator<Item = &Channel> {
@@ -48,6 +53,14 @@ fn dst_filter(addr: &str) -> String {
     format!("{field} == {addr}")
 }
 
+fn dport_filter(c: &Channel) -> String {
+    let proto = match c.proto {
+        Proto::Udp => "udp",
+        Proto::Tcp | Proto::Icmp => "tcp",
+    };
+    format!("{proto}.dstport == {}", c.dport)
+}
+
 fn attempts_filter(c: &Channel) -> String {
     let what = match c.proto {
         Proto::Tcp => "tcp.flags.syn == 1 && tcp.flags.ack == 0",
@@ -58,7 +71,7 @@ fn attempts_filter(c: &Channel) -> String {
     format!("{} && {what}", src_filter(c))
 }
 
-fn port_scans(channels: &[Channel], out: &mut Vec<HealthInsight>) {
+fn port_scans(channels: &[Channel], th: &Thresholds, out: &mut Findings) {
     let mut ports: BTreeMap<(&Addr, &Addr, Proto), (BTreeSet<u16>, &Channel)> = BTreeMap::new();
     for c in new_flows(channels).filter(|c| c.proto != Proto::Icmp) {
         ports
@@ -69,13 +82,14 @@ fn port_scans(channels: &[Channel], out: &mut Vec<HealthInsight>) {
     }
     let mut hits: Vec<_> = ports
         .into_iter()
-        .filter(|(_, (p, _))| p.len() >= SCAN_MIN_PORTS)
+        .filter(|(_, (p, _))| p.len() >= th.scan_min_ports as usize)
         .collect();
     hits.sort_by_key(|(_, (p, _))| std::cmp::Reverse(p.len()));
-    for ((src, dst, proto), (p, c)) in hits.into_iter().take(MAX_CARDS_PER_KIND) {
+    for ((src, dst, proto), (p, c)) in hits {
         let flt = format!("{} && {}", attempts_filter(c), dst_filter(dst));
-        push_card(
+        push_capped(
             out,
+            Some(SCANS),
             InsightSeverity::Warning,
             format!("{} port scan: {src} probes {dst}", proto.label()),
             format!(
@@ -90,11 +104,11 @@ fn port_scans(channels: &[Channel], out: &mut Vec<HealthInsight>) {
 }
 
 /// Same port tried on many hosts, a few times each: ping sweeps and service hunting.
-fn sweeps(channels: &[Channel], out: &mut Vec<HealthInsight>) {
+fn sweeps(channels: &[Channel], th: &Thresholds, out: &mut Findings) {
     let mut targets: BTreeMap<(&Addr, Proto, u16), (BTreeSet<&Addr>, &Channel)> = BTreeMap::new();
     for c in new_flows(channels)
         .filter(|c| c.proto != Proto::Udp && !BUSY_PORTS.contains(&c.dport))
-        .filter(|c| c.count <= SWEEP_MAX_TRIES_PER_HOST)
+        .filter(|c| c.count <= th.sweep_max_tries_per_host)
     {
         targets
             .entry((&c.src, c.proto, c.dport))
@@ -104,10 +118,10 @@ fn sweeps(channels: &[Channel], out: &mut Vec<HealthInsight>) {
     }
     let mut hits: Vec<_> = targets
         .into_iter()
-        .filter(|(_, (t, _))| t.len() >= SWEEP_MIN_HOSTS)
+        .filter(|(_, (t, _))| t.len() >= th.sweep_min_hosts as usize)
         .collect();
     hits.sort_by_key(|(_, (t, _))| std::cmp::Reverse(t.len()));
-    for ((src, proto, port), (t, c)) in hits.into_iter().take(MAX_CARDS_PER_KIND) {
+    for ((src, proto, port), (t, c)) in hits {
         let (what, flt) = match proto {
             Proto::Icmp => ("ping sweep".to_owned(), attempts_filter(c)),
             _ => (
@@ -115,8 +129,9 @@ fn sweeps(channels: &[Channel], out: &mut Vec<HealthInsight>) {
                 format!("{} && tcp.dstport == {port}", attempts_filter(c)),
             ),
         };
-        push_card(
+        push_capped(
             out,
+            Some(SWEEPS),
             InsightSeverity::Warning,
             format!("Host {what} from {src}"),
             format!(
@@ -129,34 +144,42 @@ fn sweeps(channels: &[Channel], out: &mut Vec<HealthInsight>) {
     }
 }
 
-fn beacons(channels: &[Channel], out: &mut Vec<HealthInsight>) {
+fn beacons(channels: &[Channel], th: &Thresholds, out: &mut Findings) {
+    let min_period = f64::from(th.beacon_min_period_secs);
+    let max_jitter = f64::from(th.beacon_max_jitter_pct) / 100.0;
     let mut hits: Vec<&Channel> = channels
         .iter()
-        .filter(|c| c.proto != Proto::Icmp && c.count >= BEACON_MIN_EVENTS)
-        .filter(|c| c.gap_mean >= BEACON_MIN_PERIOD && c.gap_jitter <= BEACON_MAX_JITTER)
+        .filter(|c| c.proto != Proto::Icmp && c.count >= th.beacon_min_events)
+        .filter(|c| c.gap_mean >= min_period && c.gap_jitter <= max_jitter)
         .collect();
     hits.sort_by(|a, b| a.gap_jitter.total_cmp(&b.gap_jitter));
-    for c in hits.into_iter().take(MAX_CARDS_PER_KIND) {
+    for c in hits {
         let (title, unit, flt) = match c.kind {
             ChannelKind::NewFlows => (
                 "Regular connections",
                 "connections",
-                format!("{} && {}", attempts_filter(c), dst_filter(&c.dst)),
+                format!(
+                    "{} && {} && {}",
+                    attempts_filter(c),
+                    dst_filter(&c.dst),
+                    dport_filter(c)
+                ),
             ),
             ChannelKind::Stream => (
                 "Regular traffic in one connection",
                 "data packets",
                 format!(
-                    "{} && {} && tcp.dstport == {} && tcp.len > 0",
+                    "{} && {} && {} && tcp.len > 0",
                     src_filter(c),
                     dst_filter(&c.dst),
-                    c.dport
+                    dport_filter(c)
                 ),
             ),
         };
         let every = format::duration(c.gap_mean);
-        push_card(
+        push_capped(
             out,
+            Some(RHYTHMS),
             InsightSeverity::Warning,
             format!(
                 "{title}: {} to {}:{} ({})",
@@ -176,12 +199,15 @@ fn beacons(channels: &[Channel], out: &mut Vec<HealthInsight>) {
     }
 }
 
-fn is_long(name: &str) -> bool {
-    name.len() >= DNS_LONG_NAME || name.split('.').any(|l| l.len() >= DNS_LONG_LABEL)
+fn is_long(name: &str, th: &Thresholds) -> bool {
+    name.len() >= th.dns_long_name as usize
+        || name
+            .split('.')
+            .any(|l| l.len() >= th.dns_long_label as usize)
 }
 
-fn long_dns_names(data: &BehaviorData, out: &mut Vec<HealthInsight>) {
-    let long: Vec<_> = data.dns.iter().filter(|q| is_long(&q.name)).collect();
+fn long_dns_names(data: &BehaviorData, th: &Thresholds, out: &mut Findings) {
+    let long: Vec<_> = data.dns.iter().filter(|q| is_long(&q.name, th)).collect();
     let Some(first) = long.first() else { return };
     let severity = if long.len() >= 5 {
         InsightSeverity::Warning
@@ -189,16 +215,22 @@ fn long_dns_names(data: &BehaviorData, out: &mut Vec<HealthInsight>) {
         InsightSeverity::Info
     };
     let distinct: BTreeSet<_> = long.iter().map(|q| q.name.as_str()).collect();
-    push_card(
+    push_capped(
         out,
+        None,
         severity,
         "Unusually long DNS names",
         format!(
-            "{} queries use names of {DNS_LONG_NAME}+ characters (e.g. {}). Long or random-looking names can indicate DNS tunnelling or generated domains.",
+            "{} queries use names of {}+ characters or labels of {}+ characters (e.g. {}). Long or random-looking names can indicate DNS tunnelling or generated domains.",
             long.len(),
+            th.dns_long_name,
+            th.dns_long_label,
             first.name
         ),
-        Some(&format!("dns.qry.name.len >= {DNS_LONG_NAME}")),
+        Some(&format!(
+            "dns.qry.name.len >= {} || dns.qry.name matches \"[^.]{{{},}}\"",
+            th.dns_long_name, th.dns_long_label
+        )),
         format!("{} names", distinct.len()),
     );
 }

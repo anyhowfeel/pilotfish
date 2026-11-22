@@ -9,6 +9,7 @@
 pub mod autocomplete;
 mod autocomplete_catalog;
 mod autocomplete_context;
+mod autocomplete_names;
 #[cfg(test)]
 mod autocomplete_tests;
 mod autocomplete_values;
@@ -21,16 +22,18 @@ pub mod health;
 #[cfg(test)]
 mod health_tests;
 mod palette_items;
+mod security;
 mod stream_text;
 pub mod stream_view;
 
 pub use crate::insights::{InsightsAction, InsightsPanel};
 pub use autocomplete::{FieldCatalog, FilterAutocomplete, ValueIndex};
+pub use autocomplete_names::NameBook;
 pub use bookmarks::{BookmarkBarAction, BookmarkStore, bookmark_toolbar_ui};
 pub use command_palette::{CommandPalette, PaletteAction, PalettePage};
 pub use detail_filter::{
     FieldFilterCandidate, FilterCombine, build_expression, detail_filter_menu,
     extract_filter_candidate,
 };
-pub use health::synthesize_insights;
+pub use health::{InsightContext, synthesize_insights};
 pub use stream_view::{StreamView, StreamViewAction};

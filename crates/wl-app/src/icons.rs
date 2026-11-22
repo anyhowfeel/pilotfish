@@ -134,6 +134,12 @@ pub fn paint(p: &Painter, page: Page, r: Rect, c: Color32) {
             p.add(wl_kit::egui::Shape::line(arc(1.0), s));
             p.add(wl_kit::egui::Shape::line(arc(-1.0), s));
         }
+        Page::Diff => {
+            for dx in [-0.35, 0.35] {
+                let sq = Rect::from_center_size(m + vec2(dx * u, dx * u), vec2(u * 1.25, u * 1.25));
+                p.rect_stroke(sq, 2.0, s, StrokeKind::Inside);
+            }
+        }
         Page::Insights => {
             let pts = [
                 pos2(m.x - u * 0.9, m.y + u * 0.1),

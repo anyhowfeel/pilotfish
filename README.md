@@ -1,13 +1,10 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/logo/wirelens-dark.svg">
-    <img src="assets/logo/wirelens.svg" alt="wirelens logo" width="120">
-  </picture>
+  <img src="assets/logo/pilotfish.svg" alt="logo" width="120">
 </p>
 
-<h1 align="center">wirelens</h1>
+<h1 align="center">pilotfish</h1>
 
-[![CI](https://github.com/anyhowfeel/wirelens/actions/workflows/ci.yml/badge.svg)](https://github.com/anyhowfeel/wirelens/actions/workflows/ci.yml)
+[![CI](https://github.com/anyhowfeel/pilotfish/actions/workflows/ci.yml/badge.svg)](https://github.com/anyhowfeel/pilotfish/actions/workflows/ci.yml)
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
 [![Rust 2024 edition](https://img.shields.io/badge/rust-2024%20edition-orange?logo=rust)](https://www.rust-lang.org)
 ![Status: prototype](https://img.shields.io/badge/status-prototype-lightgrey)
@@ -15,7 +12,7 @@
 
 A small desktop packet viewer written in Rust with [egui](https://github.com/emilk/egui).
 It does no dissection of its own: captures are read and filtered by `tshark` / `dumpcap`
-(Wireshark's command-line tools), and wirelens turns the output into tables, charts and a
+(Wireshark's command-line tools), and pilotfish turns the output into tables, charts and a
 host graph.
 
 This is a prototype built to explore what a Wireshark front end could look like. It is not
@@ -27,8 +24,8 @@ Taken on a small synthetic capture: a laptop, a TV, a phone and a NAS on an inve
 talking to well-known public services over DNS, TLS, plain HTTP and SMB-style transfers, with a
 retransmission burst and three made-up behaviours for Insights (a visitor scanning the NAS, a phone
 calling a documentation address at a steady rhythm, and very long DNS names). Nothing in it comes from a
-real network. `tests/fixtures/demo.pcap` is the same network without those three behaviours, so you can
-open it and compare most pages: `wirelens tests/fixtures/demo.pcap`.
+real network. `tests/fixtures/gen_demo_capture.py` writes it, so you can open the same file and compare:
+`pilotfish tests/fixtures/demo.pcap`.
 
 | Overview | Packets | Hosts |
 | :---: | :---: | :---: |
@@ -61,15 +58,15 @@ open it and compare most pages: `wirelens tests/fixtures/demo.pcap`.
 
 ## Install
 
-Each [release](https://github.com/anyhowfeel/wirelens/releases) contains, next to a `SHA256SUMS` file:
+Each [release](https://github.com/anyhowfeel/pilotfish/releases) contains, next to a `SHA256SUMS` file:
 
 | Platform | File | Notes |
 | --- | --- | --- |
-| Debian, Ubuntu | `wirelens_<version>_amd64.deb` / `_arm64.deb` | `sudo apt install ./wirelens_*.deb` pulls in `tshark`. |
-| Arch Linux | `wirelens-<version>-1-x86_64.pkg.tar.zst`, or `packaging/arch/PKGBUILD` | `sudo pacman -U wirelens-*.pkg.tar.zst` (the package is not signed), or `cd packaging/arch && makepkg -si` to build it from the tagged source. |
-| Other Linux | `wirelens-<tag>-linux-x86_64.tar.gz`, `-linux-aarch64.tar.gz` | Unpack and run `./wirelens`. |
-| Windows | `wirelens-<version>-windows-x86_64-setup.exe` | Installer; a `.zip` with the bare executable is also provided. |
-| macOS | `wirelens-<version>-macos-arm64.dmg`, `-macos-x86_64.dmg` | Drag `wirelens` to `Applications`. The app is not signed: on first launch use right-click, Open. |
+| Debian, Ubuntu | `pilotfish_<version>_amd64.deb` / `_arm64.deb` | `sudo apt install ./pilotfish_*.deb` pulls in `tshark`. |
+| Arch Linux | `pilotfish-<version>-1-x86_64.pkg.tar.zst`, or `packaging/arch/PKGBUILD` | `sudo pacman -U pilotfish-*.pkg.tar.zst` (the package is not signed), or `cd packaging/arch && makepkg -si` to build it from the tagged source. |
+| Other Linux | `pilotfish-<tag>-linux-x86_64.tar.gz`, `-linux-aarch64.tar.gz` | Unpack and run `./pilotfish`. |
+| Windows | `pilotfish-<version>-windows-x86_64-setup.exe` | Installer; a `.zip` with the bare executable is also provided. |
+| macOS | `pilotfish-<version>-macos-arm64.dmg`, `-macos-x86_64.dmg` | Drag `pilotfish` to `Applications`. The app is not signed: on first launch use right-click, Open. |
 
 Wireshark's command-line tools (`tshark`, `dumpcap`) must be installed separately on Windows and
 macOS. These packages are built by CI and have not been tested on every platform.
@@ -92,12 +89,12 @@ cargo run --release -- --live eth0         # capture live on an interface
 cargo run --release                        # start on the Capture page
 ```
 
-The binary is called `wirelens`.
+The binary is called `pilotfish`.
 
 ## Command line
 
 ```
-wirelens [OPTIONS] [FILE]
+pilotfish [OPTIONS] [FILE]
 ```
 
 | Option | Description |
@@ -120,14 +117,17 @@ Environment variables:
 
 | Variable | Description |
 | --- | --- |
-| `SSLKEYLOGFILE` | TLS key log passed to `tshark`, so HTTPS traffic can be decrypted. |
-| `WIRELENS_CONFIG_DIR` | Directory for the preferences file (defaults to the user config directory). |
-| `WIRELENS_GEO_DIR` | Extra folder searched for location databases (`.mmdb`). |
+| `SSLKEYLOGFILE` | TLS key log passed to `tshark`, so HTTPS traffic can be decrypted. It can also be loaded or dropped in the app. |
+| `PILOTFISH_CONFIG_DIR` | Directory for the preferences file (defaults to the user config directory). |
+| `PILOTFISH_GEO_DIR` | Extra folder searched for location databases (`.mmdb`). |
 
 ## What it does
 
 - **Capture**: interface list grouped by type with live rates, capture options (filter,
-  promiscuous, snap length, ring buffer, auto-stop), recent files.
+  promiscuous, snap length, ring buffer, auto-stop), recent files. A remote host can be captured
+  over `ssh` (key or agent login, `tcpdump` on the other side, optional `sudo -n`). During a local
+  live capture on Linux, Hosts, Conversations, Flows and the Map name the process behind each socket
+  (read from `/proc`; processes of other users stay unnamed).
 - **Packets**: virtualized packet list that stays responsive with about a million rows, display
   filter bar with field completion (and, after an operator, the hosts and ports of the capture)
   plus quick-filter chips, find (string, regex, hex),
@@ -146,6 +146,9 @@ Environment variables:
   extracted objects.
 - **Insights**: plain-language findings (including port scans, sweeps, beaconing and odd DNS
   names), expert info, protocol hierarchy, DNS log.
+- **Diff**: compares the open capture with a second one (`--diff FILE` or the Choose capture
+  button): new, missing and changed hosts, services, mean latencies, HTTP hosts, status codes and
+  TLS server names.
 - Command palette (`Ctrl+K`), settings (`Ctrl+,`), dark and light themes.
 
 Shift+click on a sidebar entry opens that page in a separate window.
@@ -154,8 +157,8 @@ Shift+click on a sidebar entry opens that page in a separate window.
 
 Open Settings > Locations to download the free DB-IP Country and ASN databases (about 4 and 5 MB),
 or to add your own MaxMind-format `.mmdb` files (GeoLite2, DB-IP Lite). They are kept in
-`~/.local/share/wirelens/geo`; wirelens also reads the qBittorrent `GeoDB` folder, `/usr/share/GeoIP`
-and the folder named by `WIRELENS_GEO_DIR`. Lookups are offline. The only thing wirelens downloads is
+`~/.local/share/pilotfish/geo`; pilotfish also reads the qBittorrent `GeoDB` folder, `/usr/share/GeoIP`
+and the folder named by `PILOTFISH_GEO_DIR`. Lookups are offline. The only thing pilotfish downloads is
 the file you ask for with the Download button.
 
 The country and network shown in the screenshots come from the DB-IP Lite databases, licensed
@@ -178,11 +181,11 @@ installed separately on Windows and macOS.
 | `wl-stats` | Incremental statistics over the packet stream. |
 | `wl-kit` | Theme, widgets and charts shared by the UI. |
 | `wl-panels` | The pages (packets, overview, map, flows, web, settings, ...). |
-| `wl-app` | The `wirelens` binary: window, state, background jobs. |
+| `wl-app` | The `pilotfish` binary: window, state, background jobs. |
 
 `tests/fixtures/` holds the small capture files the tests read, `assets/screenshots/` the README
-images, and `assets/logo/` the logo (SVG sources in a blue and a dark version, PNG, `.ico` and
-`.icns` exports, and the GitHub social preview image).
+images, and `assets/logo/` the logo (the SVG source, PNG, `.ico` and `.icns`
+exports, and the GitHub social preview image).
 
 ## Tests
 
@@ -197,11 +200,19 @@ Tests that need `tshark` or loopback capture rights skip themselves when those a
 - Everything depends on the installed Wireshark version; field names follow `tshark` 4.x.
 - Files over a few hundred thousand packets load quickly but `tshark` itself uses a lot of
   memory on them.
-- The filter suggestions after an operator cover addresses and ports, not names.
-- The findings in Insights are heuristics with fixed thresholds (for example 20 ports for a scan, 8
-  connections for a steady rhythm); expect false positives from polling and keep-alives.
+- Name suggestions in the filter (DNS log, SNI, HTTP Host) appear once the background scan of an
+  opened file has finished, and only for the names the capture itself contains; there is no
+  reverse lookup.
+- The findings in Insights are heuristics with thresholds you can tune in Settings > Insights (by default 20
+  ports for a scan, 8 connections for a steady rhythm); expect false positives from polling and keep-alives.
+- Threat lists are matched offline from files you provide; they match exact addresses and domains (and their parent
+  domains), not address ranges. Credential detection only sees cleartext protocols.
 - HTTP/2 and QUIC handling is best effort. Chunked bodies without a `Content-Length` are
   only partly accounted for.
+- The Streams tab shows the first line of each payload; protobuf messages are not decoded, and
+  WebSocket messages compressed with `permessage-deflate` depend on what `tshark` can inflate.
+- Only one comment per packet is read from a capture, and saved comments are written on one line.
+- A key log is not remembered between runs; start the app with `SSLKEYLOGFILE` set to keep using one.
 - Windows and macOS have not been tried.
 
 ## Contributing

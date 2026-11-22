@@ -24,6 +24,7 @@ use crate::extras::Extras;
 use crate::features_hub::FeaturesHub;
 use crate::flows_link::FlowsLink;
 use crate::graphs_hub::GraphsHub;
+use crate::keys_link::KeysLink;
 use crate::missing::Missing;
 use crate::page::Page;
 use crate::prefs::Prefs;
@@ -44,9 +45,11 @@ pub struct App {
     pub(crate) map: TopologyView,
     pub(crate) demo_map: Option<wl_model::StatsSnapshot>,
     /// Size of the stats the filter value suggestions were last built from.
-    pub(crate) values_key: Option<(usize, usize)>,
+    pub(crate) values_key: Option<(usize, usize, u64)>,
+    pub(crate) diff: crate::diff_hub::DiffHub,
     pub(crate) web: WebPanel,
     pub(crate) web_link: WebLink,
+    pub(crate) keys: KeysLink,
     pub(crate) flows: FlowsPanel,
     pub(crate) flows_link: FlowsLink,
     pub(crate) setup: CaptureSetup,
@@ -61,6 +64,7 @@ pub struct App {
     pub(crate) dialogs: FileDialogs,
     pub(crate) resolver: AsyncResolver,
     pub(crate) geo_store: crate::geo_store::GeoStore,
+    pub(crate) intel_store: crate::intel_store::IntelStore,
     pub(crate) startup_error: Option<String>,
     pub(crate) shot: Option<Shot>,
     pub(crate) last_scale: f32,
@@ -102,11 +106,17 @@ impl App {
             let _ = itx.send(b.interfaces().unwrap_or_default());
             ctx.request_repaint();
         });
-        let resolver = AsyncResolver::spawn(cc.egui_ctx.clone());
+        let intel_store = crate::intel_store::IntelStore::default();
+        let mut resolver = AsyncResolver::spawn(cc.egui_ctx.clone());
+        resolver.set_intel(intel_store.handle());
         let mut hosts = HostsPanel::default();
         hosts.set_resolver(Box::new(resolver.clone()));
         let mut map = TopologyView::default();
         map.set_resolver(Box::new(resolver.clone()));
+        let mut convs = ConversationsPanel::default();
+        convs.set_resolver(Box::new(resolver.clone()));
+        let mut flows = FlowsPanel::default();
+        flows.set_resolver(Box::new(resolver.clone()));
         let setup_io = SetupIo::new(backend.clone(), cc.egui_ctx.clone());
         let mut rules = prefs.decode_as.clone();
         for r in cli.decode_rules() {
@@ -123,13 +133,15 @@ impl App {
             packets: PacketsView::default(),
             dashboard: Dashboard::default(),
             hosts,
-            convs: ConversationsPanel::default(),
+            convs,
             map,
             demo_map: cli.demo_map.then(|| demo_snapshot(40, 120)),
             values_key: None,
+            diff: crate::diff_hub::DiffHub::new(backend.clone()),
             web: WebPanel::default(),
             web_link: WebLink::new(cli.demo_web),
-            flows: FlowsPanel::default(),
+            keys: KeysLink::new(tshark.clone()),
+            flows,
             flows_link: FlowsLink::new(backend.clone(), cc.egui_ctx.clone()),
             setup: CaptureSetup::default(),
             setup_io,
@@ -141,6 +153,7 @@ impl App {
             dialogs: FileDialogs::default(),
             resolver,
             geo_store: Default::default(),
+            intel_store,
             startup_error,
             shot: cli.screenshot.clone().map(|p| Shot::new(p, cli.wait_ms)),
             last_scale: scale,
@@ -159,12 +172,15 @@ impl App {
         app.last_layout = Some(app.packets.layout());
         app.apply_capture_defaults();
         app.apply_runtime_settings();
+        app.intel_store.reload(&cc.egui_ctx);
         if let Some(spec) = &cli.setup_expand {
             app.setup.expand(spec);
         }
         app.packets.set_table_prefs(app.prefs.table.clone());
         app.packets
             .set_filter_history(app.prefs.filter_history.clone());
+        app.packets
+            .set_filter_presets(app.prefs.filter_presets.clone());
         let lookup = app.streams.clone();
         app.convs
             .set_stream_lookup(Box::new(move |k| lookup.borrow().get(k).copied()));
@@ -173,6 +189,9 @@ impl App {
         }
         if let Some(a) = &cli.map_select {
             app.map.select_host(a);
+        }
+        if let Some(f) = &cli.diff {
+            app.diff.set_other(f.clone());
         }
         if let Some(f) = cli.file() {
             app.execute(Command::OpenFile(f.clone()), &cc.egui_ctx);

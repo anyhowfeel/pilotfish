@@ -5,22 +5,29 @@ use std::sync::Arc;
 use crossbeam_channel::{Receiver, Sender, bounded};
 use eframe::egui;
 use wl_model::{
-    BehaviorData, CaptureBackend, CaptureError, ExpertReport, HealthInsight, PacketRow,
-    ProtocolHierarchy, StatsSnapshot, StreamConversation, StreamFormat, StreamProtocol,
+    BehaviorData, CaptureBackend, CaptureError, ExpertReport, PacketBookmark, PacketRow,
+    ProtocolHierarchy, SecurityData, StatsSnapshot, StreamConversation, StreamFormat,
+    StreamProtocol, ThreatIntel,
 };
 use wl_panels::features::{
-    BookmarkStore, CommandPalette, FieldCatalog, InsightsAction, InsightsPanel, PaletteAction,
-    PalettePage, StreamView, StreamViewAction, synthesize_insights,
+    BookmarkStore, CommandPalette, FieldCatalog, InsightsPanel, NameBook, PaletteAction,
+    PalettePage, StreamView, StreamViewAction,
 };
+use wl_panels::insights::InsightRules;
 
 use crate::export_data::{write_html_report, write_packets_csv, write_stats_json};
 use crate::page::Page;
+
+/// Results of scans that belong to one capture carry its generation: `None` means valid for any.
+type Tagged = (Option<u64>, Msg);
 
 enum Msg {
     Fields(Arc<FieldCatalog>),
     Stream(Result<StreamConversation, CaptureError>),
     Insights(Option<ExpertReport>, Option<ProtocolHierarchy>),
-    Behavior(BehaviorData),
+    Behavior(BehaviorData, NameBook),
+    Security(SecurityData),
+    Comments(Vec<PacketBookmark>),
     ExportDone(Result<String, String>),
 }
 
@@ -44,6 +51,8 @@ pub enum HubCommand {
 
 #[path = "features_hub_export.rs"]
 mod export;
+#[path = "features_hub_insights.rs"]
+mod insights_job;
 
 pub struct FeaturesHub {
     tshark: Option<Arc<wl_tshark::TsharkBackend>>,
@@ -56,8 +65,14 @@ pub struct FeaturesHub {
     pub expert: Option<ExpertReport>,
     pub phs: Option<ProtocolHierarchy>,
     pub behavior: Option<BehaviorData>,
-    tx: Sender<Msg>,
-    rx: Receiver<Msg>,
+    pub security: Option<SecurityData>,
+    pub intel: Arc<ThreatIntel>,
+    pub rules: InsightRules,
+    /// Names for the filter suggestions and how many times they were rebuilt.
+    pub names: (Arc<NameBook>, u64),
+    generation: u64,
+    tx: Sender<Tagged>,
+    rx: Receiver<Tagged>,
     pub notice: Option<String>,
     pub error: Option<String>,
 }
@@ -70,7 +85,7 @@ impl FeaturesHub {
             std::thread::spawn(move || {
                 if let Ok(fields) = b.filter_fields(None) {
                     let catalog = Arc::new(FieldCatalog::from_fields(fields));
-                    let _ = tx2.try_send(Msg::Fields(catalog));
+                    let _ = tx2.try_send((None, Msg::Fields(catalog)));
                     ctx.request_repaint();
                 }
             });
@@ -86,6 +101,11 @@ impl FeaturesHub {
             expert: None,
             phs: None,
             behavior: None,
+            security: None,
+            intel: Arc::default(),
+            rules: InsightRules::default(),
+            names: (Arc::default(), 0),
+            generation: 0,
             tx,
             rx,
             notice: None,
@@ -93,20 +113,17 @@ impl FeaturesHub {
         }
     }
 
-    pub(crate) fn insights_for(&self, stats: &StatsSnapshot) -> Vec<HealthInsight> {
-        synthesize_insights(
-            self.expert.as_ref(),
-            self.phs.as_ref(),
-            self.behavior.as_ref(),
-            stats,
-        )
-    }
-
     pub fn clear_capture(&mut self) {
         self.expert = None;
         self.phs = None;
         self.behavior = None;
+        self.security = None;
+        self.names = (Arc::default(), self.names.1 + 1);
+        self.bookmarks.clear();
+        self.bookmark_comment.clear();
+        self.bookmark_frame = None;
         self.stream_view.close();
+        self.generation += 1;
     }
 
     fn spawn_job<F>(&self, file: &Arc<PathBuf>, ctx: &egui::Context, job: F)
@@ -115,8 +132,9 @@ impl FeaturesHub {
     {
         let Some(b) = self.tshark.clone() else { return };
         let (file, tx, ctx) = (file.clone(), self.tx.clone(), ctx.clone());
+        let generation = Some(self.generation);
         std::thread::spawn(move || {
-            let _ = tx.try_send(job(&b, &file));
+            let _ = tx.try_send((generation, job(&b, &file)));
             ctx.request_repaint();
         });
     }
@@ -132,13 +150,25 @@ impl FeaturesHub {
             )
         });
         self.spawn_job(&file, &ctx, |b, f| {
-            let (channels, dns) = std::thread::scope(|s| {
-                let c = s.spawn(|| b.behavior_channels(f).unwrap_or_default());
-                let d = b.dns_queries(f).unwrap_or_default();
-                (c.join().unwrap_or_default(), d)
-            });
-            Msg::Behavior(BehaviorData { channels, dns })
+            Msg::Comments(b.packet_comments(f).unwrap_or_default())
         });
+        self.spawn_job(&file, &ctx, |b, f| {
+            let (channels, dns, tls, http) = std::thread::scope(|s| {
+                let c = s.spawn(|| b.behavior_channels(f).unwrap_or_default());
+                let t = s.spawn(|| b.tls_sessions(f).unwrap_or_default());
+                let h = s.spawn(|| b.http_exchanges(f).unwrap_or_default());
+                let d = b.dns_queries(f).unwrap_or_default();
+                (
+                    c.join().unwrap_or_default(),
+                    d,
+                    t.join().unwrap_or_default(),
+                    h.join().unwrap_or_default(),
+                )
+            });
+            let names = NameBook::build(&dns, &tls, &http);
+            Msg::Behavior(BehaviorData { channels, dns }, names)
+        });
+        self.spawn_security(&file, &ctx);
     }
 
     pub fn open_stream(
@@ -155,10 +185,11 @@ impl FeaturesHub {
                 .set_error("tshark backend unavailable".into());
             return;
         };
-        let tx = self.tx.clone();
+        let (tx, generation) = (self.tx.clone(), Some(self.generation));
         std::thread::spawn(move || {
-            let _ = tx.try_send(Msg::Stream(
-                b.follow_stream(&file, protocol, stream_id, format),
+            let _ = tx.try_send((
+                generation,
+                Msg::Stream(b.follow_stream(&file, protocol, stream_id, format)),
             ));
             ctx.request_repaint();
         });
@@ -166,7 +197,10 @@ impl FeaturesHub {
 
     pub fn poll(&mut self) -> (Option<Arc<FieldCatalog>>, bool) {
         let (mut fields, mut changed) = (None, false);
-        while let Ok(msg) = self.rx.try_recv() {
+        while let Ok((generation, msg)) = self.rx.try_recv() {
+            if generation.is_some_and(|g| g != self.generation) {
+                continue;
+            }
             changed = true;
             match msg {
                 Msg::Fields(f) => fields = Some(f),
@@ -176,7 +210,18 @@ impl FeaturesHub {
                     self.expert = e;
                     self.phs = p;
                 }
-                Msg::Behavior(b) => self.behavior = Some(b),
+                Msg::Security(s) => self.security = Some(s),
+                Msg::Behavior(b, names) => {
+                    self.behavior = Some(b);
+                    self.names = (Arc::new(names), self.names.1 + 1);
+                }
+                Msg::Comments(list) => {
+                    for c in list {
+                        if self.bookmarks.comment(c.frame_no).is_none_or(str::is_empty) {
+                            self.bookmarks.set(c.frame_no, c.comment);
+                        }
+                    }
+                }
                 Msg::ExportDone(Ok(n)) => self.notice = Some(n),
                 Msg::ExportDone(Err(e)) => self.error = Some(e),
             }
@@ -222,16 +267,6 @@ impl FeaturesHub {
             PaletteAction::DnsLog => HubCommand::DnsLog,
         })
     }
-
-    pub fn insights_ui(&mut self, ui: &mut egui::Ui, stats: &StatsSnapshot) -> Vec<InsightsAction> {
-        self.insights.ui(
-            ui,
-            stats,
-            self.expert.as_ref(),
-            self.phs.as_ref(),
-            self.behavior.as_ref(),
-        )
-    }
 }
 
 fn map_page(p: PalettePage) -> Page {
@@ -246,3 +281,7 @@ fn map_page(p: PalettePage) -> Page {
         PalettePage::Insights => Page::Insights,
     }
 }
+
+#[cfg(test)]
+#[path = "features_hub_tests.rs"]
+mod tests;

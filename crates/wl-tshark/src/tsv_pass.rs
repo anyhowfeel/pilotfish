@@ -110,6 +110,11 @@ pub fn opt(s: &str) -> Option<&str> {
     (!s.is_empty()).then_some(s)
 }
 
+/// A boolean tshark field: `True` / `1`.
+pub fn flag(s: &str) -> bool {
+    s.trim().eq_ignore_ascii_case("true") || s.trim() == "1"
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -3,6 +3,8 @@
 use serde::{Deserialize, Serialize};
 use wl_model::CaptureOptions;
 
+use crate::insights::InsightRules;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum ThemeChoice {
     #[default]
@@ -65,6 +67,8 @@ pub struct Settings {
     pub batch_size: u32,
     pub fps_cap: u32,
     pub detail_cache: u32,
+    // Insights
+    pub insights: InsightRules,
 }
 
 impl Default for Settings {
@@ -91,6 +95,7 @@ impl Default for Settings {
             batch_size: 2_000,
             fps_cap: 60,
             detail_cache: 64,
+            insights: InsightRules::default(),
         }
     }
 }
@@ -111,6 +116,7 @@ impl Settings {
         self.batch_size = self.batch_size.clamp(100, 50_000);
         self.fps_cap = self.fps_cap.clamp(15, 240);
         self.detail_cache = self.detail_cache.clamp(8, 1_024);
+        self.insights = self.insights.clamped();
         self
     }
 }

@@ -1,0 +1,35 @@
+name: Hygiene
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  pr-title:
+    name: conventional pr title
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the title follows Conventional Commits
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          pattern='^(feat|fix|perf|refactor|docs|test|build|ci|chore|revert)(\([a-z0-9-]+\))?!?: [^ ].*$'
+          if [[ ! "$TITLE" =~ $pattern ]] || [[ ${#TITLE} -gt 72 ]]; then
+            echo "::error::The pull request title '$TITLE' must look like 'type(scope): summary' (72 characters at most)."
+            echo "Types: feat fix perf refactor docs test build ci chore revert. Add ! before the colon for a breaking change."
+            exit 1
+          fi
+
+  version:
+    name: version files agree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: tools/check-version.sh

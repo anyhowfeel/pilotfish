@@ -1,10 +1,14 @@
 //! Plain-language "Why is my network slow?" diagnostic synthesis from Expert Info, PHS & stats.
 
+use std::collections::BTreeMap;
+
 use wl_kit::format;
 use wl_model::{
     BehaviorData, ExpertReport, ExpertSeverity, HealthInsight, InsightSeverity, ProtocolHierarchy,
-    StatsSnapshot,
+    SecurityData, StatsSnapshot, ThreatIntel,
 };
+
+use crate::insights::InsightRules;
 
 fn has_any(s: &str, needles: &[&str]) -> bool {
     needles.iter().any(|k| s.contains(k))
@@ -24,24 +28,135 @@ fn sum_matching(report: &ExpertReport, pred: impl Fn(&str, &str) -> bool) -> u64
         .sum()
 }
 
+/// Title of the all-clear card, which the findings list leaves out.
+pub const HEALTHY_TITLE: &str = "Network capture looks healthy";
+
+/// A group of findings of which only the strongest `max` are listed; the rest are counted.
+#[derive(Clone, Copy)]
+pub(super) struct Cap {
+    pub name: &'static str,
+    pub max: usize,
+}
+
+/// Collects findings: muted ones are dropped first, then each capped group keeps its first
+/// `max` (callers push strongest first), so muting reveals what the cap had pushed out.
+pub(super) struct Findings<'a> {
+    rules: &'a InsightRules,
+    pub cards: Vec<HealthInsight>,
+    shown: BTreeMap<&'static str, (usize, usize)>,
+    muted: usize,
+}
+
+impl<'a> Findings<'a> {
+    pub fn new(rules: &'a InsightRules) -> Self {
+        Self {
+            rules,
+            cards: Vec::new(),
+            shown: BTreeMap::new(),
+            muted: 0,
+        }
+    }
+
+    fn admit(&mut self, cap: Option<Cap>, card: HealthInsight) {
+        if self.rules.hides(&card) {
+            self.muted += 1;
+            return;
+        }
+        if let Some(cap) = cap {
+            let (kept, dropped) = self.shown.entry(cap.name).or_default();
+            if *kept >= cap.max {
+                *dropped += 1;
+                return;
+            }
+            *kept += 1;
+        }
+        self.cards.push(card);
+    }
+
+    /// Appends the notices for what was capped or muted and returns every card.
+    pub fn finish(mut self) -> Vec<HealthInsight> {
+        for (name, (kept, dropped)) in std::mem::take(&mut self.shown) {
+            if dropped > 0 {
+                self.cards.push(notice(
+                    format!("{dropped} more {name} not shown"),
+                    format!(
+                        "Only the {kept} strongest {name} are listed. Mute the ones you have reviewed to see the others."
+                    ),
+                ));
+            }
+        }
+        if self.muted > 0 {
+            let n = self.muted;
+            self.cards.push(notice(
+                format!("{n} findings hidden by mutes"),
+                format!(
+                    "{n} findings match the muted patterns ({}). Remove a pattern in Settings > Insights to show them again.",
+                    self.rules.muted.join(", ")
+                ),
+            ));
+        }
+        self.cards
+    }
+}
+
+fn notice(title: String, explanation: String) -> HealthInsight {
+    HealthInsight {
+        severity: InsightSeverity::Info,
+        title,
+        explanation,
+        suggested_filter: None,
+        metric: String::new(),
+    }
+}
+
+#[cfg(test)]
+pub(super) fn collect(rules: &InsightRules, f: impl FnOnce(&mut Findings)) -> Vec<HealthInsight> {
+    let mut out = Findings::new(rules);
+    f(&mut out);
+    out.finish()
+}
+
 pub(super) fn push_card(
-    out: &mut Vec<HealthInsight>,
+    out: &mut Findings,
     severity: InsightSeverity,
     title: impl Into<String>,
     explanation: String,
     suggested_filter: Option<&str>,
     metric: String,
 ) {
-    out.push(HealthInsight {
+    push_capped(
+        out,
+        None,
         severity,
-        title: title.into(),
+        title,
         explanation,
-        suggested_filter: suggested_filter.map(ToOwned::to_owned),
+        suggested_filter,
         metric,
-    });
+    );
 }
 
-fn analyze_expert(rep: &ExpertReport, total_packets: u64, out: &mut Vec<HealthInsight>) {
+pub(super) fn push_capped(
+    out: &mut Findings,
+    cap: Option<Cap>,
+    severity: InsightSeverity,
+    title: impl Into<String>,
+    explanation: String,
+    suggested_filter: Option<&str>,
+    metric: String,
+) {
+    out.admit(
+        cap,
+        HealthInsight {
+            severity,
+            title: title.into(),
+            explanation,
+            suggested_filter: suggested_filter.map(ToOwned::to_owned),
+            metric,
+        },
+    );
+}
+
+fn analyze_expert(rep: &ExpertReport, total_packets: u64, out: &mut Findings) {
     let errors = rep.count_by_severity(ExpertSeverity::Error);
     if errors > 0 {
         let n = format::count(errors);
@@ -83,7 +198,7 @@ fn analyze_expert(rep: &ExpertReport, total_packets: u64, out: &mut Vec<HealthIn
                 "{n} TCP recovery events (retransmissions/lost segments/dup ACKs) stall throughput."
             ),
             Some(
-                "tcp.analysis.retransmission || tcp.analysis.lost_segment || tcp.analysis.dup_ack",
+                "tcp.analysis.retransmission || tcp.analysis.lost_segment || tcp.analysis.duplicate_ack",
             ),
             format!("{n} TCP events"),
         );
@@ -154,14 +269,23 @@ fn analyze_expert(rep: &ExpertReport, total_packets: u64, out: &mut Vec<HealthIn
     }
 }
 
+/// What the security and tuning parts of the findings are computed from.
+#[derive(Clone, Copy)]
+pub struct InsightContext<'a> {
+    pub security: Option<&'a SecurityData>,
+    pub intel: &'a ThreatIntel,
+    pub rules: &'a InsightRules,
+}
+
 /// Synthesizes prioritized plain-language diagnostic cards with one-click Wireshark filters.
 pub fn synthesize_insights(
     expert: Option<&ExpertReport>,
     phs: Option<&ProtocolHierarchy>,
     behavior: Option<&BehaviorData>,
     stats: &StatsSnapshot,
+    cx: &InsightContext,
 ) -> Vec<HealthInsight> {
-    let mut out = Vec::new();
+    let mut out = Findings::new(cx.rules);
     let total_packets = stats.total_packets.max(phs.map_or(0, |p| p.total_frames));
 
     if let Some(rep) = expert {
@@ -203,21 +327,29 @@ pub fn synthesize_insights(
     }
 
     if let Some(data) = behavior {
-        super::behavior::detect(data, &mut out);
+        super::behavior::detect(data, &cx.rules.thresholds, &mut out);
     }
+    let inputs = super::security::Inputs {
+        security: cx.security,
+        intel: cx.intel,
+        hosts: &stats.hosts,
+        dns: behavior.map_or(&[][..], |b| &b.dns),
+        reveal_secrets: cx.rules.reveal_secrets,
+    };
+    super::security::detect(&inputs, &mut out);
+    let mut out = out.finish();
 
     if out.is_empty() && total_packets > 0 {
         let n = format::count(total_packets);
-        push_card(
-            &mut out,
-            InsightSeverity::Info,
-            "Network capture looks healthy",
-            format!(
+        out.push(HealthInsight {
+            severity: InsightSeverity::Info,
+            title: HEALTHY_TITLE.to_owned(),
+            explanation: format!(
                 "No retransmissions, resets, DNS failures, or malformed frames across {n} packets."
             ),
-            None,
-            format!("{n} pkts"),
-        );
+            suggested_filter: None,
+            metric: format!("{n} pkts"),
+        });
     }
 
     out.sort_by_key(|i| i.severity);

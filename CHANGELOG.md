@@ -1,13 +1,88 @@
 # Changelog
 
-All notable changes to wirelens are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+All notable changes to pilotfish (formerly wirelens) are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-22
+
+### Added
+- **Offline threat lists.** Files dropped in the `intel` folder (opened from Settings > Locations, where files can also
+  be added) are matched against the capture without any network call. A JA4DB `.json` export names the application
+  behind a TLS fingerprint, and text or CSV blocklists (abuse.ch formats work) list addresses, domains and JA3 / JA4
+  fingerprints. Hosts shows a Threat column, the Web TLS rows and details show the known client and any listing, and
+  Insights reports blocklisted addresses and domains and malicious fingerprints.
+- **Cleartext credentials in Insights.** HTTP Basic logins, bearer tokens, API keys in headers and query strings, FTP,
+  POP3 and SMTP logins and NTLM authentications are reported with the secret masked. Settings > Insights can show the
+  secrets, but the exported reports always mask them.
+- **Tunable Insights.** Settings > Insights sets the thresholds of the port scan, sweep, steady rhythm and long DNS name
+  findings. Right-clicking a finding mutes a host or a kind of finding, and the muted list is managed on the same page.
+- **Capture Diff page.** It compares the open capture with a second one, picked from the page or given with `--diff`.
+  It lists the hosts, services (endpoints and server port, so changing client ports do not count), mean HTTP and DNS
+  latencies, HTTP hosts, status codes and TLS server names that are new, missing or changed, biggest change first.
+- **Saved filters.** The filter bar has a Saved menu to keep the current filter under a name, apply it again, rename it
+  or delete it. They are remembered between sessions.
+- **The filter box suggests names.** After `ip.addr ==` typing a domain offers the addresses it resolved to in the DNS
+  log or the TLS handshake, and each suggested address shows its name. `http.host`, `dns.qry.name` and the TLS server
+  name field suggest the names seen in the capture.
+- **Live captures name the process behind each connection (Linux).** While a local capture runs, the sockets listed in
+  `/proc/net` are matched with the file descriptors of running processes every two seconds. Hosts and Conversations get a
+  Process column, the Flows list shows the process name and the Map tooltip a Process line, all only once a process is
+  known. Processes of other users cannot be inspected and stay unnamed.
+- **Capture over SSH.** Capture options has a Remote capture (SSH) section: host, user, port, interface and an optional
+  `sudo -n`, with the capture filter field as the filter. Pilotfish runs `tcpdump` on the remote host through the system
+  `ssh` (never asking for a password, so a key or agent is needed) and feeds the stream to the same live view as a local
+  capture. Every value is quoted for the remote shell, and failures such as a refused login, a missing `tcpdump` or a
+  sudo that wants a password are reported in plain words. Stop ends the ssh process.
+- **TLS keys can be loaded from the app.** The Web page has a TLS keys line: pick a key log file, or drop one on the
+  window, and the capture is read again with it, so HTTPS shows up as ordinary HTTP. A dropped file is recognised as a
+  key log by its content, anything else still opens as a capture. Embed into .pcapng saves a copy of the capture that
+  carries the keys (it needs `editcap` and is greyed out without it); the original file is never overwritten.
+- **Certificates can be inspected.** An HTTPS session lists the certificate chain the server sent: subject, issuer,
+  validity dates, alternative names, key type and signature, with warnings for a self-signed, expired, not yet valid
+  or mismatching (against the SNI) certificate. TLS 1.3 chains appear once the keys are loaded.
+- **WebSocket, Server-Sent Events and gRPC have a Streams tab** in Web. Each conversation is one row with its
+  endpoint, message counts and status (WebSocket close code, gRPC status); selecting it shows the timeline of
+  messages with direction, opcode, event name or gRPC call, and a payload preview.
+- **Packet comments of pcapng files are read and written.** Comments stored in a capture become bookmarks when it is
+  opened, and the bookmark bar's Save to .pcapng writes the bookmark comments into a new capture. The HTML report now
+  lists each bookmarked packet with its time, addresses, protocol and info next to your comment.
+
 ### Changed
+- **The app is now called pilotfish.** The binary, the window title, the packages, the icons and the environment
+  variables (`PILOTFISH_CONFIG_DIR`, `PILOTFISH_GEO_DIR`, `PILOTFISH_INTEL_DIR`) carry the new name. The `wirelens`
+  folders of your configuration and data are moved to `pilotfish` the first time it starts, and the `WIRELENS_*`
+  variables are still read. The packages are called `pilotfish`, so remove an installed `wirelens` package yourself.
+- **A new logo**: a fin and a school of pilot fish on a rounded tile, as the window icon, in the packages and in the
+  README, with a new GitHub social preview image. The sidebar now shows only the name.
+- **The Flows list is easier to read.** Each conversation shows its endpoints with the ports dimmed, the protocol as a
+  pill, aligned packet, byte and duration figures (the least useful one is dropped first in a narrow pane) and a thin bar
+  for its share of the traffic. Top talkers and Top services on the Overview use the same bar style.
+- **Narrow windows behave.** The Capture Diff page has Before, After and Change columns and scrolls sideways instead of
+  clipping, the Web TLS keys line keeps its buttons on one line, the Hosts table keeps a visible sideways scroll bar and
+  the status bar hides the rate and the elapsed time first.
+- **Insights says what it leaves out.** When a kind of finding is capped, for example to three cards per behaviour, a
+  note tells how many more are not shown.
+- **Opening a capture runs fewer `tshark` passes.** The TLS, HTTP, DNS and credential scans are shared between Web,
+  Insights, Diff and the filter suggestions and run once per file version.
+- **Releases follow a written convention.** Pull requests are squash-merged with a Conventional Commits title,
+  versions follow Semantic Versioning, and `tools/check-version.sh` makes the CI fail when `Cargo.toml`,
+  `Cargo.lock`, the Arch PKGBUILD, the changelog and the tag disagree. CONTRIBUTING.md describes the steps.
+- **The Locations page writes your home folder as `~`**, so the folder of the databases reads
+  `~/.local/share/pilotfish/geo` instead of a full path.
+- **A richer demo capture.** `tests/fixtures/demo.pcap` now also holds a visitor scanning the NAS, a phone calling an
+  address at a steady rhythm and very long DNS names, so Insights has something to show, and
+  `tests/fixtures/gen_demo_capture.py` writes it.
+- **The releases take their notes from this changelog**: the title is "pilotfish X.Y.Z" and the notes are the section of
+  the tag, instead of a list of pull request titles.
 - **New screenshots in the README.** It shows nine pages instead of six (Hosts with its locations, Insights and the
   Locations settings were added), in both themes, all taken on an invented home network.
+
+### Fixed
+- **The quick filters No broadcast and Not multicast** also work on captures taken with `tcpdump -i any`.
+- **The long DNS name finding** gives a filter that matches the names that triggered it, including a single very long
+  label.
 
 ## [0.4.0] - 2026-11-21
 
@@ -113,8 +188,9 @@ First public prototype of wirelens, a desktop packet viewer written in Rust with
 - **Release binaries** built by the CI for Linux (`x86_64`, `aarch64`, Arch Linux), macOS (`arm64`, `x86_64`) and
   Windows (`x86_64`).
 
-[Unreleased]: https://github.com/anyhowfeel/wirelens/compare/v0.4.0...HEAD
-[0.4.0]: https://github.com/anyhowfeel/wirelens/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/anyhowfeel/wirelens/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/anyhowfeel/wirelens/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/anyhowfeel/wirelens/releases/tag/v0.1.0
+[Unreleased]: https://github.com/anyhowfeel/pilotfish/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/anyhowfeel/pilotfish/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/anyhowfeel/pilotfish/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/anyhowfeel/pilotfish/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/anyhowfeel/pilotfish/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/anyhowfeel/pilotfish/releases/tag/v0.1.0

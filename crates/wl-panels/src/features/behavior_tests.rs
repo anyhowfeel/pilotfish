@@ -1,6 +1,8 @@
-use wl_model::DnsQuery;
+use wl_model::{DnsQuery, HealthInsight};
 
+use super::super::health::collect;
 use super::*;
+use crate::insights::InsightRules;
 
 fn chan(
     proto: Proto,
@@ -44,9 +46,10 @@ fn dns(name: &str) -> DnsQuery {
 }
 
 fn run(channels: Vec<Channel>, dns: Vec<DnsQuery>) -> Vec<HealthInsight> {
-    let mut out = Vec::new();
-    detect(&BehaviorData { channels, dns }, &mut out);
-    out
+    let rules = InsightRules::default();
+    collect(&rules, |out| {
+        detect(&BehaviorData { channels, dns }, &Thresholds::default(), out);
+    })
 }
 
 fn many(n: u16, f: impl Fn(u16) -> Channel) -> Vec<Channel> {
@@ -215,3 +218,81 @@ fn long_dns_names_scale_with_count() {
     assert_eq!(more[0].severity, InsightSeverity::Warning);
     assert!(run(Vec::new(), vec![dns("www.example.com")]).is_empty());
 }
+
+fn scanner(src: &str, ports: u16) -> Vec<Channel> {
+    many(ports, |p| Channel {
+        src: src.into(),
+        ..flow(Proto::Tcp, "10.0.0.1", p)
+    })
+}
+
+#[test]
+fn muting_reveals_findings_the_cap_had_hidden_and_the_overflow_is_announced() {
+    let channels: Vec<Channel> = (1..=5)
+        .flat_map(|i| scanner(&format!("10.0.1.{i}"), 20 + i))
+        .collect();
+    let data = BehaviorData {
+        channels,
+        dns: Vec::new(),
+    };
+    let titles = |rules: &InsightRules| -> Vec<String> {
+        collect(rules, |out| detect(&data, &Thresholds::default(), out))
+            .into_iter()
+            .map(|f| f.title)
+            .collect()
+    };
+    let mut rules = InsightRules::default();
+    let before = titles(&rules);
+    assert_eq!(before.len(), 4, "{before:?}");
+    assert!(before[0].contains("10.0.1.5"));
+    assert_eq!(before[3], "2 more port scans not shown");
+
+    rules.mute("10.0.1.5");
+    let after = titles(&rules);
+    assert!(after[2].contains("10.0.1.2"), "{after:?}");
+    assert_eq!(after[3], "1 more port scans not shown");
+    assert_eq!(after[4], "1 findings hidden by mutes");
+}
+
+#[test]
+fn rhythm_evidence_is_pinned_to_the_destination_port() {
+    let mut udp = chan(
+        Proto::Udp,
+        ChannelKind::NewFlows,
+        "8.8.4.4",
+        5353,
+        20,
+        5.0,
+        0.0,
+    );
+    udp.src = "10.0.0.9".into();
+    let tcp = chan(
+        Proto::Tcp,
+        ChannelKind::NewFlows,
+        "10.0.0.2",
+        8443,
+        20,
+        5.0,
+        0.0,
+    );
+    let out = run(vec![udp, tcp], Vec::new());
+    let filters: Vec<_> = out
+        .iter()
+        .filter_map(|f| f.suggested_filter.as_deref())
+        .collect();
+    assert!(
+        filters
+            .iter()
+            .any(|f| f.ends_with("udp && ip.dst == 8.8.4.4 && udp.dstport == 5353")),
+        "{filters:?}"
+    );
+    assert!(
+        filters
+            .iter()
+            .any(|f| f.ends_with("ip.dst == 10.0.0.2 && tcp.dstport == 8443")),
+        "{filters:?}"
+    );
+}
+
+#[path = "behavior_threshold_tests.rs"]
+mod thresholds;

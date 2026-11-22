@@ -61,7 +61,7 @@ def exchange(port, path, ctype, body, t0):
 
 
 def main(path):
-    png = (Path(__file__).resolve().parents[2] / "assets/logo/wirelens-64.png").read_bytes()
+    png = (Path(__file__).resolve().parents[2] / "assets/logo/pilotfish-64.png").read_bytes()
     events = []
     for i, (p, ct, body) in enumerate([("/index.html", "text/html; charset=utf-8", HTML),
                                        ("/data.json", "application/json", JSON),

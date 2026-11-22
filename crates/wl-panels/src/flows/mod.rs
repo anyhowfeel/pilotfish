@@ -8,6 +8,7 @@ mod grip;
 mod header;
 mod lanes;
 mod list;
+mod list_row;
 mod marks;
 mod paint;
 mod parts;
@@ -27,6 +28,7 @@ use wl_kit::theme::{Palette, RADIUS, spacing};
 use wl_kit::widgets::{empty_state, segmented_w};
 use wl_model::{FlowEvents, FlowSel, TcpSamples};
 
+use crate::overview::NameResolver;
 use graph::FlowGraph;
 use header::Header;
 use list::List;
@@ -58,6 +60,10 @@ pub struct FlowsPanel {
 }
 
 impl FlowsPanel {
+    pub fn set_resolver(&mut self, r: Box<dyn NameResolver>) {
+        self.list.set_resolver(r);
+    }
+
     /// Shows this conversation (called by the list, context menus and the CLI).
     pub fn open(&mut self, sel: FlowSel) {
         if self.sel.as_ref() == Some(&sel) {

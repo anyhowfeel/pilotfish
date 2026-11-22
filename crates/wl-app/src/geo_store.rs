@@ -1,4 +1,4 @@
-//! Location databases managed from Settings: downloads proposed by wirelens and files added by
+//! Location databases managed from Settings: downloads proposed by pilotfish and files added by
 //! the user, all kept in one folder that `GeoDb` reads first.
 use std::collections::{HashMap, HashSet};
 use std::io;
@@ -13,7 +13,7 @@ use wl_panels::settings::{GeoDbInfo, GeoDbRow, GeoDbState};
 
 use crate::geo::GeoDb;
 
-/// A database wirelens can download. DB-IP publishes a new "Lite" file every month.
+/// A database pilotfish can download. DB-IP publishes a new "Lite" file every month.
 pub struct Source {
     pub id: &'static str,
     pub title: &'static str,
@@ -132,7 +132,7 @@ impl GeoStore {
             });
         }
         GeoDbInfo {
-            dir: self.dir.display().to_string(),
+            dir: tilde(&self.dir),
             rows,
             error: self.error.clone(),
         }
@@ -215,6 +215,15 @@ impl GeoStore {
     }
 }
 
+/// `path` for display, with the home folder written as `~`.
+fn tilde(path: &Path) -> String {
+    match dirs::home_dir().and_then(|h| path.strip_prefix(h).ok().map(Path::to_path_buf)) {
+        Some(rest) if rest.as_os_str().is_empty() => "~".to_owned(),
+        Some(rest) => format!("~/{}", rest.display()),
+        None => path.display().to_string(),
+    }
+}
+
 /// `(year, month)` of the current month and of the one before it.
 fn latest_months(year: i32, month: u32) -> [(i32, u32); 2] {
     let prev = if month == 1 {
@@ -249,7 +258,7 @@ fn download_gz(url: &str, dir: &Path, file: &str) -> Result<(), String> {
         .into();
     let response = agent
         .get(url)
-        .header("User-Agent", "wirelens")
+        .header("User-Agent", "pilotfish")
         .call()
         .map_err(|e| format!("{e}"))?;
     let body = response

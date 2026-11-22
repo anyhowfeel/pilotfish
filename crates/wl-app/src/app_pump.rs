@@ -1,7 +1,7 @@
 //! Per-frame event pump: capture rows, background jobs, selection and layout persistence.
 use eframe::egui;
 
-use wl_model::CaptureError;
+use wl_model::{CaptureError, CaptureSource};
 
 use crate::app::App;
 use crate::dispatch::Command;
@@ -31,6 +31,13 @@ impl App {
         }
     }
 
+    pub(crate) fn save_presets(&mut self) {
+        if self.packets.filter_presets() != self.prefs.filter_presets && self.shot.is_none() {
+            self.prefs.filter_presets = self.packets.filter_presets().to_vec();
+            self.prefs.save();
+        }
+    }
+
     pub(crate) fn save_layout(&mut self) {
         let t = self.packets.table_prefs();
         if t != self.prefs.table {
@@ -47,15 +54,20 @@ impl App {
         }
     }
 
-    /// Feeds the filter boxes with the hosts and ports of the capture, when they changed.
+    /// Feeds the filter boxes with the hosts, ports and names of the capture, when they changed.
     fn refresh_filter_values(&mut self) {
         let stats = self.ctrl.snapshot();
-        let key = (stats.hosts.len(), stats.conversations.len());
+        let key = (
+            stats.hosts.len(),
+            stats.conversations.len(),
+            self.hub.names.1,
+        );
         if self.values_key == Some(key) {
             return;
         }
         self.values_key = Some(key);
-        let values = std::sync::Arc::new(wl_panels::features::ValueIndex::from_stats(stats));
+        let index = wl_panels::features::ValueIndex::from_stats(stats);
+        let values = std::sync::Arc::new(index.with_names(self.hub.names.0.clone()));
         self.gh.panel.set_values(values.clone());
         self.packets.set_filter_values(values);
     }
@@ -74,6 +86,9 @@ impl App {
             self.packets.resort();
         }
         self.was_running = running;
+        let remote = self.ctrl.source().is_some_and(CaptureSource::is_remote);
+        let local_live = self.ctrl.is_live() && !remote;
+        self.resolver.procs().set_active(running && local_live);
         let web_shown = self.shows(Page::Web);
         if self.web_link.tick(&mut self.ctrl, web_shown) {
             ctx.request_repaint();
@@ -116,8 +131,9 @@ impl App {
         }
         if let Some(p) = ctx.input(|i| i.raw.dropped_files.first().map(|f| f.path().to_path_buf()))
         {
-            self.execute(Command::OpenFile(p), ctx);
+            self.keys.probe_dropped(p, ctx);
         }
+        self.pump_keys(ctx);
         let gh_changed = self.gh.pump(&mut self.dashboard);
         if polled.changed || hub_changed || gh_changed || self.props.pump() {
             ctx.request_repaint();

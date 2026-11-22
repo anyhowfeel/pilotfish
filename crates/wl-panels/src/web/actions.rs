@@ -1,6 +1,6 @@
 //! Panel input (`WebData`) and output (`WebAction`).
 
-use wl_model::{HttpDetail, HttpExchange, TlsSession};
+use wl_model::{HttpDetail, HttpExchange, MessageStream, TlsSession};
 
 /// What the panel asks the app to do.
 #[derive(Debug, Clone, PartialEq)]
@@ -12,6 +12,18 @@ pub enum WebAction {
     ApplyFilter(String),
     /// Request of the Files tab (extraction, preview, save).
     Objects(super::ObjectsAction),
+    PickKeylog,
+    ClearKeylog,
+    /// Save a copy of the capture with the key log embedded.
+    EmbedKeys,
+}
+
+/// State of the TLS key log, shown above the tabs.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct KeysInfo {
+    /// File name of the active key log, if any.
+    pub file: Option<String>,
+    pub can_embed: bool,
 }
 
 /// Loading state of the exchange list.
@@ -30,7 +42,9 @@ pub struct WebData<'a> {
     pub rev: u64,
     pub exchanges: &'a [HttpExchange],
     pub tls: &'a [TlsSession],
+    pub streams: &'a [MessageStream],
     /// Detail of the currently selected exchange, once loaded.
     pub detail: Option<&'a HttpDetail>,
     pub status: WebStatus<'a>,
+    pub keys: &'a KeysInfo,
 }

@@ -16,6 +16,8 @@ pub enum BookmarkBarAction {
     JumpTo(u64),
     FilterBookmarked(String),
     ClearAll,
+    /// Write the comments into a new .pcapng.
+    SaveComments,
 }
 
 /// Ordered store of bookmarked 1-based frame numbers and optional comments.
@@ -159,11 +161,7 @@ pub fn bookmark_toolbar_ui(
                     }
                 }
             } else {
-                ui.label(
-                    RichText::new("Select a frame to bookmark")
-                        .small()
-                        .color(Palette::muted()),
-                );
+                ui.label(RichText::new("Select a frame to bookmark").color(Palette::muted()));
             }
         },
         |ui| {
@@ -179,6 +177,17 @@ pub fn bookmark_toolbar_ui(
                 && let Some(n) = prev
             {
                 action = Some(BookmarkBarAction::JumpTo(n));
+            }
+            if ui
+                .small_button("Save to .pcapng")
+                .on_hover_text(
+                    "Write the comments into a copy of the capture. editcap rewrites the file: \
+interface statistics blocks and the capture filter option are not kept, and a packet \
+keeps a single comment.",
+                )
+                .clicked()
+            {
+                action = Some(BookmarkBarAction::SaveComments);
             }
             if let Some(flt) = filter
                 && ui.small_button("Filter marked").clicked()

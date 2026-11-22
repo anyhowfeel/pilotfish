@@ -4,6 +4,8 @@ mod category;
 #[cfg(test)]
 mod dialog_tests;
 mod geo_page;
+mod insights_page;
+mod intel_page;
 mod layout;
 mod model;
 mod pages;
@@ -12,6 +14,7 @@ mod shell;
 
 pub use category::Category;
 pub use geo_page::{GeoAction, GeoDbInfo, GeoDbRow, GeoDbState};
+pub use intel_page::{IntelAction, IntelInfo};
 pub use layout::{Geometry, geometry};
 pub use model::{Density, PillLook, Settings, ThemeChoice, TimeFormat};
 pub use pages_more::AboutInfo;
@@ -31,6 +34,8 @@ pub enum SettingsAction {
     OpenConfigDir,
     /// A button of the Locations page (download, remove, add a file, open the folder).
     Geo(GeoAction),
+    /// A button of the threat lists card.
+    Intel(IntelAction),
 }
 
 #[derive(Default)]
@@ -42,6 +47,7 @@ pub struct SettingsDialog {
     cat: Category,
     about: AboutInfo,
     geo: GeoDbInfo,
+    intel: IntelInfo,
 }
 
 impl SettingsDialog {
@@ -64,6 +70,11 @@ impl SettingsDialog {
     /// Refreshes the database list of the Locations page (downloads finish while it is open).
     pub fn set_geo(&mut self, geo: GeoDbInfo) {
         self.geo = geo;
+    }
+
+    /// Refreshes the threat lists card (the lists load in the background).
+    pub fn set_intel(&mut self, intel: IntelInfo) {
+        self.intel = intel;
     }
 
     pub fn is_open(&self) -> bool {
@@ -93,6 +104,7 @@ impl SettingsDialog {
             &mut self.cat,
             &self.about,
             &self.geo,
+            &self.intel,
         );
         if ctx.input(|i| i.key_pressed(Key::Escape)) {
             out.cancel = true;
@@ -110,6 +122,9 @@ impl SettingsDialog {
         }
         if let Some(a) = out.geo.take() {
             return Some(SettingsAction::Geo(a));
+        }
+        if let Some(a) = out.intel.take() {
+            return Some(SettingsAction::Intel(a));
         }
         match out.about {
             AboutAction::OpenConfigDir => return Some(SettingsAction::OpenConfigDir),

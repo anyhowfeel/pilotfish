@@ -7,14 +7,21 @@ use std::sync::Arc;
 
 use crate::packets::filter_expr::protocol_name;
 
-/// One-click filters that are not protocols (exclusive: they replace the filter text).
+/// One-click filters that are not protocols (exclusive: they replace the filter text). The cast
+/// filters also test `sll.pkttype` because Linux-cooked captures have no `eth.dst`.
 pub const PRESETS: [(&str, &str); 6] = [
-    ("No broadcast", "!(eth.dst == ff:ff:ff:ff:ff:ff)"),
+    (
+        "No broadcast",
+        "!(eth.dst == ff:ff:ff:ff:ff:ff || sll.pkttype == 1)",
+    ),
     ("No ARP", "!arp"),
     ("TCP problems", "tcp.analysis.flags"),
     ("TCP SYN", "tcp.flags.syn == 1 && tcp.flags.ack == 0"),
-    ("DNS errors", "dns.flags.rcode != 0"),
-    ("Not multicast", "!(eth.dst[0] & 1)"),
+    ("DNS errors", "dns.flags.rcode != 0"), // error responses; unanswered queries are not flagged
+    (
+        "Not multicast",
+        "!(eth.dst[0] & 1 || sll.pkttype == 1 || sll.pkttype == 2)",
+    ),
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -213,5 +220,38 @@ mod tests {
         assert_eq!(fit_count(&w, 300.0, 4.0, 90.0), 3);
         assert_eq!(fit_count(&w, 10.0, 4.0, 90.0), 0);
         assert_eq!(fit_count(&[], 10.0, 4.0, 90.0), 0);
+    }
+
+    fn tshark_count(file: &str, expr: &str) -> Option<usize> {
+        let path = format!("{}/../../tests/fixtures/{file}", env!("CARGO_MANIFEST_DIR"));
+        let out = std::process::Command::new("tshark")
+            .args([
+                "-r",
+                &path,
+                "-Y",
+                expr,
+                "-T",
+                "fields",
+                "-e",
+                "frame.number",
+            ])
+            .output()
+            .ok()?;
+        out.status
+            .success()
+            .then(|| String::from_utf8_lossy(&out.stdout).lines().count())
+    }
+
+    #[test]
+    fn cast_presets_filter_linux_cooked_captures() {
+        let expr = |label: &str| PRESETS.iter().find(|p| p.0 == label).map(|p| p.1).unwrap();
+        let Some(no_broadcast) = tshark_count("sll-cast.pcap", expr("No broadcast")) else {
+            return;
+        };
+        assert_eq!(no_broadcast, 3);
+        assert_eq!(
+            tshark_count("sll-cast.pcap", expr("Not multicast")),
+            Some(2)
+        );
     }
 }

@@ -5,7 +5,7 @@ edition.workspace = true
 description = "Prototype desktop packet viewer on top of tshark"
 
 [[bin]]
-name = "wirelens"
+name = "pilotfish"
 path = "src/main.rs"
 
 [dependencies]
@@ -41,19 +41,19 @@ tempfile = "3"
 workspace = true
 
 [package.metadata.deb]
-name = "wirelens"
+name = "pilotfish"
 maintainer = "anyhowfeel <346877873+anyhowfeel@users.noreply.github.com>"
-copyright = "wirelens contributors"
+copyright = "pilotfish contributors"
 license-file = ["../../LICENSE", "0"]
 section = "net"
 priority = "optional"
 depends = "$auto, tshark"
-extended-description = "Prototype desktop packet viewer written in Rust with egui. Captures are read and filtered by tshark and dumpcap; wirelens shows them as tables, charts and a host graph."
+extended-description = "Prototype desktop packet viewer written in Rust with egui. Captures are read and filtered by tshark and dumpcap; pilotfish shows them as tables, charts and a host graph."
 assets = [
-    ["target/release/wirelens", "usr/bin/", "755"],
-    ["../../packaging/linux/wirelens.desktop", "usr/share/applications/", "644"],
-    ["../../assets/logo/wirelens.svg", "usr/share/icons/hicolor/scalable/apps/wirelens.svg", "644"],
-    ["../../assets/logo/wirelens-256.png", "usr/share/icons/hicolor/256x256/apps/wirelens.png", "644"],
-    ["../../README.md", "usr/share/doc/wirelens/README.md", "644"],
-    ["../../CHANGELOG.md", "usr/share/doc/wirelens/CHANGELOG.md", "644"],
+    ["target/release/pilotfish", "usr/bin/", "755"],
+    ["../../packaging/linux/pilotfish.desktop", "usr/share/applications/", "644"],
+    ["../../assets/logo/pilotfish.svg", "usr/share/icons/hicolor/scalable/apps/pilotfish.svg", "644"],
+    ["../../assets/logo/pilotfish-256.png", "usr/share/icons/hicolor/256x256/apps/pilotfish.png", "644"],
+    ["../../README.md", "usr/share/doc/pilotfish/README.md", "644"],
+    ["../../CHANGELOG.md", "usr/share/doc/pilotfish/CHANGELOG.md", "644"],
 ]

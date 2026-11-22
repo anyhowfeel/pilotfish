@@ -4,9 +4,9 @@ use crossbeam_channel::Receiver;
 use thiserror::Error;
 
 use crate::{
-    CaptureOptions, CaptureProperties, Channel, DecodeAs, DnsQuery, FlowEvents, FrameDetail,
-    HttpDetail, HttpExchange, IoGraph, IoSpec, ObjectSet, PacketRow, SysInfo, TcpSamples,
-    TlsSession,
+    CaptureOptions, CaptureProperties, Channel, Credential, DecodeAs, DnsQuery, FlowEvents,
+    FrameDetail, HttpDetail, HttpExchange, IoGraph, IoSpec, MessageStream, ObjectSet,
+    PacketBookmark, PacketRow, SysInfo, TcpSamples, TlsSession,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,6 +30,12 @@ pub enum CaptureSource {
     /// Live capture with the full Capture > Options set.
     Capture(CaptureOptions),
     File(PathBuf),
+}
+
+impl CaptureSource {
+    pub fn is_remote(&self) -> bool {
+        matches!(self, CaptureSource::Capture(o) if o.remote.enabled)
+    }
 }
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
@@ -91,6 +97,25 @@ pub trait CaptureBackend: Send + Sync {
     fn tls_sessions(&self, _file: &Path) -> Result<Vec<TlsSession>, CaptureError> {
         Ok(Vec::new())
     }
+    /// Comments stored in the capture file itself (pcapng `opt_comment` of packets).
+    fn packet_comments(&self, _file: &Path) -> Result<Vec<PacketBookmark>, CaptureError> {
+        Ok(Vec::new())
+    }
+    /// Writes a new pcapng file whose packet comments are exactly `comments`.
+    fn save_with_comments(
+        &self,
+        _file: &Path,
+        _comments: &[PacketBookmark],
+        _dest: &Path,
+    ) -> Result<(), CaptureError> {
+        Err(CaptureError::Other(
+            "this backend cannot write comments".into(),
+        ))
+    }
+    /// WebSocket, Server-Sent Events and gRPC streams with their messages.
+    fn message_streams(&self, _file: &Path) -> Result<Vec<MessageStream>, CaptureError> {
+        Ok(Vec::new())
+    }
     /// Start line, headers and body preview of one exchange.
     fn http_detail(&self, _file: &Path, _ex: &HttpExchange) -> Result<HttpDetail, CaptureError> {
         Ok(HttpDetail::default())
@@ -147,6 +172,10 @@ pub trait CaptureBackend: Send + Sync {
     }
     /// Timing summary of connection attempts and TCP streams found in a backing file.
     fn behavior_channels(&self, _file: &Path) -> Result<Vec<Channel>, CaptureError> {
+        Ok(Vec::new())
+    }
+    /// Cleartext logins and tokens (HTTP, FTP, SMTP, POP3, NTLM) found in a backing file.
+    fn credentials(&self, _file: &Path) -> Result<Vec<Credential>, CaptureError> {
         Ok(Vec::new())
     }
     /// One entry per DNS transaction (query + response) found in a backing file.

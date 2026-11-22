@@ -112,7 +112,7 @@ fn verdict(
         ok: None,
         detail: String::new(),
     };
-    let (Some(iface), false) = (o.interfaces.first(), filter.is_empty()) else {
+    let (Some(iface), false) = (o.interfaces.first(), filter.is_empty() || o.remote.enabled) else {
         return v;
     };
     match status.filter(|s| &s.interface == iface && s.filter == filter) {

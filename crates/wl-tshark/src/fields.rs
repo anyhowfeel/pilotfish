@@ -110,7 +110,7 @@ pub fn builtin_fields() -> Vec<FilterField> {
             "Previous segment(s) not captured",
             "FT_NONE",
         ),
-        ("tcp.analysis.dup_ack", "Duplicate ACK", "FT_NONE"),
+        ("tcp.analysis.duplicate_ack", "Duplicate ACK", "FT_NONE"),
         ("tcp.analysis.zero_window", "Zero window", "FT_NONE"),
         (
             "tcp.analysis.ack_rtt",

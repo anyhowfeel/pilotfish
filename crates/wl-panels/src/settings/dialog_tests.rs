@@ -91,7 +91,7 @@ fn every_state() -> super::GeoDbInfo {
         custom,
     };
     super::GeoDbInfo {
-        dir: "/home/someone/.local/share/wirelens/geo".into(),
+        dir: "/home/someone/.local/share/pilotfish/geo".into(),
         rows: vec![
             row("missing", GeoDbState::Missing, false),
             row("busy", GeoDbState::Downloading, false),

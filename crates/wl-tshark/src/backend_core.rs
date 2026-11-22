@@ -6,7 +6,7 @@ impl TsharkBackend {
     pub fn new() -> Result<Self, CaptureError> {
         let tools = Tools::locate()?;
         let scratch = tempfile::Builder::new()
-            .prefix("wirelens-")
+            .prefix("pilotfish-")
             .tempdir()
             .map_err(|e| error::io_error("create scratch dir", &e))?;
         let empty_pcap = scratch.path().join("empty.pcap");
@@ -21,6 +21,7 @@ impl TsharkBackend {
             http_cache: http_detail::DetailCache::default(),
             keylog: Mutex::new(keylog::from_env()),
             decode_as: Mutex::new(Vec::new()),
+            scans: Scans::default(),
         })
     }
 
@@ -30,6 +31,7 @@ impl TsharkBackend {
         *self.keylog.lock().unwrap_or_else(|e| e.into_inner()) = path;
         self.frame_cache.clear();
         self.http_cache.clear();
+        self.scans.clear();
     }
 
     pub fn tls_keylog(&self) -> Option<PathBuf> {
@@ -37,6 +39,18 @@ impl TsharkBackend {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .clone()
+    }
+
+    pub fn can_embed_tls_keys(&self) -> bool {
+        self.tools.editcap.is_some()
+    }
+
+    /// Writes `dest` (a new file) with the current key log embedded in `file`.
+    pub fn embed_tls_keys(&self, file: &Path, dest: &Path) -> Result<(), CaptureError> {
+        let keylog = self
+            .tls_keylog()
+            .ok_or_else(|| CaptureError::Other("No TLS key log is loaded.".into()))?;
+        keys_embed::embed(&self.tools, file, &keylog, dest)
     }
 
     pub(crate) fn start_live(

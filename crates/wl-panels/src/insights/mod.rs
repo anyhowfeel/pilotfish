@@ -6,11 +6,13 @@ mod header;
 #[cfg(test)]
 mod layout_tests;
 mod logic;
+mod rules;
 mod secondary;
 
 pub use actions::InsightsAction;
 pub use category::Category;
 pub use logic::{HealthState, findings, group, health_state};
+pub use rules::{InsightRules, MuteChoice, Thresholds, mute_choices};
 
 use wl_kit::egui::{self, Align, Key, Layout, Rect, RichText, ScrollArea, Ui, vec2};
 use wl_kit::theme::{Palette, spacing};
@@ -20,7 +22,7 @@ use wl_model::{
 };
 
 use crate::dns::{DnsAction, DnsPanel};
-use crate::features::synthesize_insights;
+use crate::features::{InsightContext, synthesize_insights};
 use finding_card::finding_card;
 use header::{Summary, header, summary_strip};
 
@@ -63,9 +65,10 @@ impl InsightsPanel {
         expert: Option<&ExpertReport>,
         phs: Option<&ProtocolHierarchy>,
         behavior: Option<&BehaviorData>,
+        cx: &InsightContext,
     ) -> Vec<InsightsAction> {
         let mut actions = Vec::new();
-        let all = synthesize_insights(expert, phs, behavior, stats);
+        let all = synthesize_insights(expert, phs, behavior, stats, cx);
         let found = findings(&all);
         let total = stats.total_packets;
         centered(ui, |ui| {

@@ -97,7 +97,8 @@ pub fn write_stats_json(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wl_model::{InsightSeverity, PacketBookmark, ProtocolStat, Transport};
+    use crate::report_bookmarks::BookmarkedPacket;
+    use wl_model::{InsightSeverity, ProtocolStat, Transport};
 
     fn sample_row() -> PacketRow {
         PacketRow {
@@ -154,14 +155,20 @@ mod tests {
         assert!(json.contains("\"total_packets\": 42"));
         assert!(json.contains("tcp.analysis.retransmission"));
 
-        let bm = [PacketBookmark {
+        let bm = [BookmarkedPacket {
             frame_no: 7,
             comment: "Check <b>SYN</b>".into(),
+            time: "0.123".into(),
+            src: "10.0.0.1".into(),
+            dst: "10.0.0.2".into(),
+            protocol: "TCP".into(),
+            info: "SYN <x>".into(),
         }];
         let html = build_html_report("cap<1>", &stats, &insights, None, None, &bm);
         assert!(html.contains("cap&lt;1&gt;"));
         assert!(html.contains("Retrans &lt;script&gt;"));
         assert!(html.contains("Check &lt;b&gt;SYN&lt;/b&gt;"));
+        assert!(html.contains("SYN &lt;x&gt;") && html.contains("10.0.0.2"));
         assert!(!html.contains("<script>"));
 
         let hpath = std::env::temp_dir().join(format!("wl-rep-{}.html", std::process::id()));
