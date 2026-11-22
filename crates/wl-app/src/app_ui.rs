@@ -214,17 +214,12 @@ impl eframe::App for App {
         {
             self.props.open(f);
         }
-        let margin = if self.page == Page::Packets {
-            spacing::SM
-        } else {
-            spacing::LG
-        };
         let mut cmds = Vec::new();
         egui::CentralPanel::default()
             .frame(
                 egui::Frame::new()
                     .fill(Palette::bg())
-                    .inner_margin(Margin::same(margin as i8)),
+                    .inner_margin(Margin::same(spacing::LG as i8)),
             )
             .show(ui, |ui| {
                 self.banner(ui);

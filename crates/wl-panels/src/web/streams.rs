@@ -34,10 +34,10 @@ fn kind_color(kind: StreamKind) -> wl_kit::egui::Color32 {
     }
 }
 
-fn arrow(dir: MsgDir) -> &'static str {
+fn arrow(dir: MsgDir) -> (&'static str, wl_kit::egui::Color32) {
     match dir {
-        MsgDir::ToServer => "out",
-        MsgDir::ToClient => "in",
+        MsgDir::ToServer => ("out", Palette::accent()),
+        MsgDir::ToClient => ("in", Palette::ok()),
     }
 }
 
@@ -112,11 +112,8 @@ fn timeline(ui: &mut Ui, s: &MessageStream) -> Option<u64> {
                 let m: &StreamMessage = &s.messages[row.index()];
                 row.col(|ui| num_cell(ui, &time_text(m.rel)));
                 row.col(|ui| {
-                    ui.label(
-                        RichText::new(arrow(m.dir))
-                            .strong()
-                            .color(Palette::accent()),
-                    );
+                    let (text, color) = arrow(m.dir);
+                    ui.label(RichText::new(text).strong().color(color));
                 });
                 row.col(|ui| {
                     text_cell(ui, &m.label);
@@ -184,5 +181,15 @@ impl StreamsPanel {
         }
         out.extend(frame.map(WebAction::ShowInPackets));
         out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn directions_have_distinct_colors() {
+        assert_ne!(arrow(MsgDir::ToServer).1, arrow(MsgDir::ToClient).1);
     }
 }

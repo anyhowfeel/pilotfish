@@ -161,11 +161,7 @@ pub fn bookmark_toolbar_ui(
                     }
                 }
             } else {
-                ui.label(
-                    RichText::new("Select a frame to bookmark")
-                        .small()
-                        .color(Palette::muted()),
-                );
+                ui.label(RichText::new("Select a frame to bookmark").color(Palette::muted()));
             }
         },
         |ui| {

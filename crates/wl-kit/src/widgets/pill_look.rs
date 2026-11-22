@@ -62,3 +62,24 @@ pub fn pill_fg_for(color: Color32, m: Mode) -> Color32 {
         Mode::Light => lerp_color(color, target, 0.20),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::theme::Palette;
+    use crate::theme::contrast::{blend_over, contrast_ratio};
+
+    #[test]
+    fn semantic_pill_text_is_readable_in_both_themes() {
+        for mode in [Mode::Dark, Mode::Light] {
+            let c = Palette::colors_for(mode);
+            for (name, color) in [("accent", c.accent), ("ok", c.ok), ("warn", c.warn)] {
+                for (bg_name, bg) in [("surface", c.surface), ("bg", c.bg), ("alt", c.row_alt)] {
+                    let fill = blend_over(color, pill_fill_alpha(mode), bg);
+                    let ratio = contrast_ratio(pill_fg_for(color, mode), fill);
+                    assert!(ratio >= 4.5, "{mode:?} {name} on {bg_name}: {ratio:.2}");
+                }
+            }
+        }
+    }
+}

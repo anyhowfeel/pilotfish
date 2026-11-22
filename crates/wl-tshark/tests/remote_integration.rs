@@ -73,7 +73,7 @@ fn replayed_capture_reaches_the_model() {
     assert!(args.contains("BatchMode=yes"), "{args}");
     assert!(args.contains("2222\n--\nops@198.51.100.7\n"), "{args}");
     assert!(
-        args.contains("sudo -n tcpdump -U -n -i 'eth0' -w - 'port 53; id'"),
+        args.contains("sudo -n tcpdump -U -n -i 'eth0' -w - -- 'port 53; id'"),
         "{args}"
     );
 }
