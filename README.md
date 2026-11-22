@@ -27,6 +27,11 @@ calling a documentation address at a steady rhythm, and very long DNS names). No
 real network. `tests/fixtures/gen_demo_capture.py` writes it, so you can open the same file and compare:
 `pilotfish tests/fixtures/demo.pcap`.
 
+The last row comes from other invented captures: Diff compares two cuts of the same demo capture (one without
+the scan and `mail.proton.me`, the other without `github.com` and the TV), Streams opens
+`tests/fixtures/web-streams.pcap` and Credentials `tests/fixtures/credentials.pcap`, whose logins and passwords
+are made up and shown masked.
+
 | Overview | Packets | Hosts |
 | :---: | :---: | :---: |
 | <img src="assets/screenshots/overview-dark.png" alt="Overview, dark theme"> | <img src="assets/screenshots/packets-dark.png" alt="Packets, dark theme"> | <img src="assets/screenshots/hosts-dark.png" alt="Hosts, dark theme"> |
@@ -38,6 +43,10 @@ real network. `tests/fixtures/gen_demo_capture.py` writes it, so you can open th
 | Flows | Graphs | Settings |
 | :---: | :---: | :---: |
 | <img src="assets/screenshots/flows-dark.png" alt="Flows, dark theme"> | <img src="assets/screenshots/graphs-dark.png" alt="Graphs, dark theme"> | <img src="assets/screenshots/settings-dark.png" alt="Settings, dark theme"> |
+
+| Diff | Streams | Credentials |
+| :---: | :---: | :---: |
+| <img src="assets/screenshots/diff-dark.png" alt="Diff, dark theme"> | <img src="assets/screenshots/streams-dark.png" alt="Streams, dark theme"> | <img src="assets/screenshots/credentials-dark.png" alt="Credentials in Insights, dark theme"> |
 
 <details>
 <summary>Light theme</summary>
@@ -53,6 +62,10 @@ real network. `tests/fixtures/gen_demo_capture.py` writes it, so you can open th
 | Flows | Graphs | Settings |
 | :---: | :---: | :---: |
 | <img src="assets/screenshots/flows-light.png" alt="Flows, light theme"> | <img src="assets/screenshots/graphs-light.png" alt="Graphs, light theme"> | <img src="assets/screenshots/settings-light.png" alt="Settings, light theme"> |
+
+| Diff | Streams | Credentials |
+| :---: | :---: | :---: |
+| <img src="assets/screenshots/diff-light.png" alt="Diff, light theme"> | <img src="assets/screenshots/streams-light.png" alt="Streams, light theme"> | <img src="assets/screenshots/credentials-light.png" alt="Credentials in Insights, light theme"> |
 
 </details>
 
