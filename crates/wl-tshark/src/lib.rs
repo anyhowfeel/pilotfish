@@ -58,6 +58,7 @@ mod pump;
 mod remote_args;
 mod ring;
 mod row_parser;
+mod scan_memo;
 mod sse;
 mod tcp_scan;
 mod tls_merge;
@@ -79,7 +80,7 @@ use wl_model::{
 };
 
 use process::Tools;
-pub use process::kill_all_children;
+pub use process::{kill_all_children, spawned as processes_spawned};
 
 pub struct TsharkBackend {
     pub(crate) tools: Tools,
@@ -91,6 +92,26 @@ pub struct TsharkBackend {
     http_cache: http_detail::DetailCache,
     keylog: Mutex<Option<PathBuf>>,
     decode_as: Mutex<Vec<DecodeAs>>,
+    scans: Scans,
+}
+
+#[derive(Default)]
+struct Scans {
+    http: scan_memo::ScanMemo<HttpExchange>,
+    tls: scan_memo::ScanMemo<TlsSession>,
+    dns: scan_memo::ScanMemo<DnsQuery>,
+    credentials: scan_memo::ScanMemo<Credential>,
+    certs: cert_scan::CertCache,
+}
+
+impl Scans {
+    fn clear(&self) {
+        self.http.clear();
+        self.tls.clear();
+        self.dns.clear();
+        self.credentials.clear();
+        self.certs.clear();
+    }
 }
 
 impl CaptureBackend for TsharkBackend {
@@ -153,11 +174,15 @@ impl CaptureBackend for TsharkBackend {
     }
 
     fn http_exchanges(&self, file: &Path) -> Result<Vec<HttpExchange>, CaptureError> {
-        http_scan::http_exchanges(&self.tools, file, &self.dissect_opts())
+        self.scans.http.get_or_scan(file, || {
+            http_scan::http_exchanges(&self.tools, file, &self.dissect_opts())
+        })
     }
 
     fn tls_sessions(&self, file: &Path) -> Result<Vec<TlsSession>, CaptureError> {
-        tls_scan::tls_sessions(&self.tools, file, &self.dissect_opts())
+        self.scans.tls.get_or_scan(file, || {
+            tls_scan::tls_sessions(&self.tools, &self.scans.certs, file, &self.dissect_opts())
+        })
     }
 
     fn http_detail(&self, file: &Path, ex: &HttpExchange) -> Result<HttpDetail, CaptureError> {
@@ -214,6 +239,7 @@ impl CaptureBackend for TsharkBackend {
         *self.decode_as.lock().unwrap_or_else(|e| e.into_inner()) = rules;
         self.frame_cache.clear();
         self.http_cache.clear();
+        self.scans.clear();
     }
 
     fn decode_protocols(&self, field: &str) -> Result<Vec<String>, CaptureError> {
@@ -240,10 +266,14 @@ impl CaptureBackend for TsharkBackend {
     }
 
     fn credentials(&self, file: &Path) -> Result<Vec<Credential>, CaptureError> {
-        cred_scan::credentials(&self.tools, file, &self.dissect_opts())
+        self.scans.credentials.get_or_scan(file, || {
+            cred_scan::credentials(&self.tools, file, &self.dissect_opts())
+        })
     }
 
     fn dns_queries(&self, file: &Path) -> Result<Vec<DnsQuery>, CaptureError> {
-        dns_scan::dns_queries(&self.tools, file, &self.dissect_opts())
+        self.scans.dns.get_or_scan(file, || {
+            dns_scan::dns_queries(&self.tools, file, &self.dissect_opts())
+        })
     }
 }

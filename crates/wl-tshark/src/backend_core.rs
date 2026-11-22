@@ -21,6 +21,7 @@ impl TsharkBackend {
             http_cache: http_detail::DetailCache::default(),
             keylog: Mutex::new(keylog::from_env()),
             decode_as: Mutex::new(Vec::new()),
+            scans: Scans::default(),
         })
     }
 
@@ -30,6 +31,7 @@ impl TsharkBackend {
         *self.keylog.lock().unwrap_or_else(|e| e.into_inner()) = path;
         self.frame_cache.clear();
         self.http_cache.clear();
+        self.scans.clear();
     }
 
     pub fn tls_keylog(&self) -> Option<PathBuf> {

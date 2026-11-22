@@ -152,6 +152,14 @@ impl Merger {
         }
     }
 
+    /// Streams whose handshake carried a certificate so far.
+    pub fn cert_streams(&self) -> usize {
+        self.entries
+            .iter()
+            .filter(|e| e.s.cert_subject.is_some())
+            .count()
+    }
+
     /// Sessions ordered by first frame; `bytes` fills `TlsSession::bytes`.
     pub fn finish(self, bytes: &HashMap<StreamKey, u64>) -> Vec<TlsSession> {
         let mut v: Vec<TlsSession> = self
