@@ -18,7 +18,7 @@ pub fn inject_args(keylog: &Path, input: &Path, output: &Path) -> Vec<String> {
     ]
 }
 
-fn same_file(a: &Path, b: &Path) -> bool {
+pub(crate) fn same_file(a: &Path, b: &Path) -> bool {
     matches!((a.canonicalize(), b.canonicalize()), (Ok(a), Ok(b)) if a == b)
 }
 

@@ -5,8 +5,8 @@ use thiserror::Error;
 
 use crate::{
     CaptureOptions, CaptureProperties, Channel, DecodeAs, DnsQuery, FlowEvents, FrameDetail,
-    HttpDetail, HttpExchange, IoGraph, IoSpec, MessageStream, ObjectSet, PacketRow, SysInfo,
-    TcpSamples, TlsSession,
+    HttpDetail, HttpExchange, IoGraph, IoSpec, MessageStream, ObjectSet, PacketBookmark, PacketRow,
+    SysInfo, TcpSamples, TlsSession,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -90,6 +90,21 @@ pub trait CaptureBackend: Send + Sync {
     /// TLS sessions (SNI, version, cipher, ALPN, cert subject) found in a backing file.
     fn tls_sessions(&self, _file: &Path) -> Result<Vec<TlsSession>, CaptureError> {
         Ok(Vec::new())
+    }
+    /// Comments stored in the capture file itself (pcapng `opt_comment` of packets).
+    fn packet_comments(&self, _file: &Path) -> Result<Vec<PacketBookmark>, CaptureError> {
+        Ok(Vec::new())
+    }
+    /// Writes a new pcapng file whose packet comments are exactly `comments`.
+    fn save_with_comments(
+        &self,
+        _file: &Path,
+        _comments: &[PacketBookmark],
+        _dest: &Path,
+    ) -> Result<(), CaptureError> {
+        Err(CaptureError::Other(
+            "this backend cannot write comments".into(),
+        ))
     }
     /// WebSocket, Server-Sent Events and gRPC streams with their messages.
     fn message_streams(&self, _file: &Path) -> Result<Vec<MessageStream>, CaptureError> {

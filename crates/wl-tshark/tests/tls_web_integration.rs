@@ -182,3 +182,44 @@ fn grpc_call_shows_method_messages_and_status() {
         ]
     );
 }
+
+fn bm(frame_no: u64, comment: &str) -> wl_model::PacketBookmark {
+    wl_model::PacketBookmark {
+        frame_no,
+        comment: comment.into(),
+    }
+}
+
+#[test]
+fn comments_round_trip_through_a_new_pcapng() {
+    let Some(b) = backend() else { return };
+    let src = fixture("sample.pcapng");
+    assert!(b.packet_comments(&src).expect("read").is_empty());
+    let dir = tempfile::tempdir().expect("tempdir");
+    let out = dir.path().join("annotated.pcapng");
+    let notes = [bm(3, "first: handshake"), bm(5, "two\nlines"), bm(8, "")];
+    b.save_with_comments(&src, &notes, &out).expect("write");
+    assert_eq!(
+        b.packet_comments(&out).expect("read back"),
+        [bm(3, "first: handshake"), bm(5, "two lines")]
+    );
+    assert!(b.packet_comments(&src).expect("untouched").is_empty());
+}
+
+#[test]
+fn saving_replaces_existing_comments_and_refuses_the_original() {
+    let Some(b) = backend() else { return };
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (one, two) = (dir.path().join("one.pcapng"), dir.path().join("two.pcapng"));
+    b.save_with_comments(
+        &fixture("sample.pcapng"),
+        &[bm(2, "old"), bm(4, "stale")],
+        &one,
+    )
+    .expect("first");
+    b.save_with_comments(&one, &[bm(4, "new")], &two)
+        .expect("second");
+    assert_eq!(b.packet_comments(&two).expect("read"), [bm(4, "new")]);
+    assert!(b.save_with_comments(&one, &[bm(1, "x")], &one).is_err());
+    assert_eq!(b.packet_comments(&one).expect("intact").len(), 2);
+}
