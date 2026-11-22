@@ -71,10 +71,8 @@ fn parses_ipv4_rows_and_skips_inode_zero_and_garbage() {
 fn parses_ipv6_rows_including_mapped_addresses() {
     let rows = parse_proc_net(TCP6, SockProto::Tcp);
     assert_eq!(rows[0].local, "[::1]:631".parse().unwrap());
-    assert_eq!(
-        rows[1].local,
-        "[::ffff:192.168.2.15]:40000".parse().unwrap()
-    );
+    assert_eq!(rows[1].local, "192.168.2.15:40000".parse().unwrap());
+    assert_eq!(rows[1].remote, "93.184.216.34:443".parse().unwrap());
     assert_eq!(rows[2].local, "[2001:db8::1]:54321".parse().unwrap());
     assert_eq!(rows[2].remote, "[2001:db8::2]:443".parse().unwrap());
 }
@@ -160,4 +158,41 @@ fn summary_counts_the_extra_processes() {
 fn sockets_without_a_known_owner_are_ignored() {
     let sockets = parse_proc_net(TCP, SockProto::Tcp);
     assert!(ProcessMap::build(&sockets, &HashMap::new()).is_empty());
+}
+
+#[test]
+fn dual_stack_socket_matches_an_ipv4_flow() {
+    let m = sample_map();
+    let f = key("192.168.2.15", 40000, "93.184.216.34", 443, Transport::Tcp);
+    assert_eq!(m.for_flow(&f).map(|p| p.pid), Some(1234));
+}
+
+#[test]
+fn wildcard_listener_labels_only_flows_local_to_this_host() {
+    let sockets = parse_proc_net(
+        "h\n 0: 00000000:01BB 00000000:0000 0A 0:0 00:0 0 0 0 11001 1\n 1: 0F02A8C0:C350 22D8B85D:0050 01 0:0 00:0 0 0 0 33003 1\n",
+        SockProto::Tcp,
+    );
+    let owners = HashMap::from([owner(11001, 900, "nginx"), owner(33003, 1234, "curl")]);
+    let m = ProcessMap::build(&sockets, &owners);
+    let inbound = key("203.0.113.5", 51000, "192.168.2.15", 443, Transport::Tcp);
+    assert_eq!(m.for_flow(&inbound).map(|p| &*p.name), Some("nginx"));
+    let outbound = key("192.168.1.12", 51000, "198.51.100.9", 443, Transport::Tcp);
+    assert!(m.for_flow(&outbound).is_none());
+    let transit = key("203.0.113.5", 443, "198.51.100.9", 51000, Transport::Tcp);
+    assert!(m.for_flow(&transit).is_none());
+}
+
+#[test]
+fn closed_connections_stay_attributable_for_a_few_scans() {
+    let flow = key("192.168.2.15", 50000, "93.184.216.34", 443, Transport::Tcp);
+    let mut m = sample_map();
+    for _ in 0..KEEP_SCANS - 1 {
+        m = m.refreshed(ProcessMap::default());
+        assert_eq!(m.for_flow(&flow).map(|p| p.pid), Some(1234));
+        assert_eq!(m.for_host("93.184.216.34").len(), 1);
+    }
+    m = m.refreshed(ProcessMap::default());
+    assert!(m.for_flow(&flow).is_none());
+    assert!(m.for_host("93.184.216.34").is_empty());
 }

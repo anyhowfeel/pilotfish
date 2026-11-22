@@ -28,7 +28,7 @@ impl ProcWatch {
                 loop {
                     std::thread::sleep(PERIOD);
                     if bg.active.load(Ordering::Relaxed) {
-                        bg.replace(scan(Path::new(PROC)));
+                        bg.merge(scan(Path::new(PROC)));
                         ctx.request_repaint();
                     }
                 }
@@ -40,6 +40,13 @@ impl ProcWatch {
     fn replace(&self, map: ProcessMap) {
         if let Ok(mut g) = self.map.write() {
             *g = map;
+            self.updated.store(true, Ordering::Relaxed);
+        }
+    }
+
+    fn merge(&self, scanned: ProcessMap) {
+        if let Ok(mut g) = self.map.write() {
+            *g = std::mem::take(&mut *g).refreshed(scanned);
             self.updated.store(true, Ordering::Relaxed);
         }
     }

@@ -1,7 +1,7 @@
 //! Socket-to-process attribution: parsers for `/proc/net/{tcp,tcp6,udp,udp6}` text and the
 //! lookup tables built from them. No I/O: callers supply the text and the inode owners.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 
@@ -42,9 +42,10 @@ pub struct SocketEntry {
     pub inode: u64,
 }
 
-// The kernel prints each 32-bit address word in host byte order; little-endian hosts only.
+// The kernel prints each 32-bit address word as a host-order integer, so its in-memory bytes
+// (`to_ne_bytes`) are the network-order octets on any endianness.
 fn parse_ip(hex: &str) -> Option<IpAddr> {
-    let word = |s: &str| u32::from_str_radix(s, 16).ok().map(u32::to_le_bytes);
+    let word = |s: &str| u32::from_str_radix(s, 16).ok().map(u32::to_ne_bytes);
     match hex.len() {
         8 => Some(Ipv4Addr::from(word(hex)?).into()),
         32 => {
@@ -61,7 +62,7 @@ fn parse_ip(hex: &str) -> Option<IpAddr> {
 fn parse_endpoint(s: &str) -> Option<SocketAddr> {
     let (ip, port) = s.split_once(':')?;
     Some(SocketAddr::new(
-        parse_ip(ip)?,
+        parse_ip(ip)?.to_canonical(),
         u16::from_str_radix(port, 16).ok()?,
     ))
 }
@@ -96,16 +97,33 @@ pub fn socket_inode(link: &str) -> Option<u64> {
 
 type Pair = (SockProto, SocketAddr, SocketAddr);
 
+/// Scans a closed connection stays attributable for, so short-lived flows still get a label.
+const KEEP_SCANS: u8 = 3;
+
+#[derive(Debug)]
+struct Seen {
+    process: ProcessInfo,
+    age: u8,
+}
+
 #[derive(Default, Debug)]
 pub struct ProcessMap {
-    connected: HashMap<Pair, ProcessInfo>,
+    connected: HashMap<Pair, Seen>,
     bound: HashMap<(SockProto, u16), Vec<(IpAddr, ProcessInfo)>>,
     by_remote: HashMap<IpAddr, Vec<ProcessInfo>>,
+    local: HashSet<IpAddr>,
 }
 
 impl ProcessMap {
     pub fn build(sockets: &[SocketEntry], owners: &HashMap<u64, ProcessInfo>) -> Self {
-        let mut m = Self::default();
+        let mut m = Self {
+            local: sockets
+                .iter()
+                .map(|s| s.local.ip())
+                .filter(|ip| !ip.is_unspecified())
+                .collect(),
+            ..Self::default()
+        };
         for s in sockets {
             let Some(p) = owners.get(&s.inode) else {
                 continue;
@@ -117,14 +135,39 @@ impl ProcessMap {
                     .push((s.local.ip(), p.clone()));
                 continue;
             }
-            m.connected.insert((s.proto, s.local, s.remote), p.clone());
-            let list = m.by_remote.entry(s.remote.ip()).or_default();
-            if !list.contains(p) {
-                list.push(p.clone());
+            let seen = Seen {
+                process: p.clone(),
+                age: 0,
+            };
+            m.connected.insert((s.proto, s.local, s.remote), seen);
+        }
+        m.reindex();
+        m
+    }
+
+    /// `scanned` plus the connections of `self` that vanished less than `KEEP_SCANS` scans ago.
+    pub fn refreshed(self, mut scanned: ProcessMap) -> ProcessMap {
+        for (pair, seen) in self.connected {
+            if seen.age + 1 < KEEP_SCANS {
+                scanned.connected.entry(pair).or_insert(Seen {
+                    process: seen.process,
+                    age: seen.age + 1,
+                });
             }
         }
-        m.by_remote.values_mut().for_each(|l| l.sort());
-        m
+        scanned.reindex();
+        scanned
+    }
+
+    fn reindex(&mut self) {
+        self.by_remote.clear();
+        for ((_, _, remote), seen) in &self.connected {
+            let list = self.by_remote.entry(remote.ip()).or_default();
+            if !list.contains(&seen.process) {
+                list.push(seen.process.clone());
+            }
+        }
+        self.by_remote.values_mut().for_each(|l| l.sort());
     }
 
     pub fn is_empty(&self) -> bool {
@@ -145,11 +188,18 @@ impl ProcessMap {
             Transport::Udp => SockProto::Udp,
             _ => return None,
         };
-        let a = SocketAddr::new(key.a.parse().ok()?, key.a_port?);
-        let b = SocketAddr::new(key.b.parse().ok()?, key.b_port?);
+        let endpoint = |ip: &str, port: Option<u16>| {
+            Some(SocketAddr::new(
+                ip.parse::<IpAddr>().ok()?.to_canonical(),
+                port?,
+            ))
+        };
+        let a = endpoint(&key.a, key.a_port)?;
+        let b = endpoint(&key.b, key.b_port)?;
         self.connected
             .get(&(proto, a, b))
             .or_else(|| self.connected.get(&(proto, b, a)))
+            .map(|s| &s.process)
             .or_else(|| self.bound_to(proto, a))
             .or_else(|| self.bound_to(proto, b))
     }
@@ -158,8 +208,12 @@ impl ProcessMap {
         self.bound
             .get(&(proto, at.port()))?
             .iter()
-            .find(|(ip, _)| *ip == at.ip() || ip.is_unspecified())
+            .find(|(ip, _)| *ip == at.ip() || (ip.is_unspecified() && self.is_local(at.ip())))
             .map(|(_, p)| p)
+    }
+
+    fn is_local(&self, ip: IpAddr) -> bool {
+        ip.is_loopback() || self.local.contains(&ip)
     }
 }
 
