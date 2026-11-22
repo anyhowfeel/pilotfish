@@ -45,6 +45,8 @@ mod msg_group;
 mod msg_preview;
 mod msg_rows;
 mod msg_scan;
+mod msg_target;
+mod msg_ws;
 pub mod netinfo;
 mod object_names;
 pub mod objects;

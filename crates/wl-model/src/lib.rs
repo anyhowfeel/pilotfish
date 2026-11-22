@@ -34,7 +34,9 @@ pub use extras::{DecodeAs, DnsQuery, ExportObject, ObjectSet, Rcode, sanitize_fi
 pub use flow::{FlowEvent, FlowEvents, FlowFlags, FlowSel, MAX_FLOW_EVENTS};
 pub use intel::{Fingerprint, Indicator, ThreatIntel};
 pub use io_graph::{CaptureProperties, DeltaStat, InterfaceInfo, IoGraph, IoSeries, IoSpec};
-pub use msg_stream::{MessageStream, MsgDir, StreamKind, StreamMessage, grpc_status_name};
+pub use msg_stream::{
+    MessageStream, MsgDir, StreamKind, StreamMessage, grpc_status_name, is_control_label,
+};
 pub use packet::{Direction, FlowKey, PacketRow, Transport, is_encrypted_protocol};
 pub use procmap::{
     ProcessInfo, ProcessMap, SockProto, SocketEntry, parse_proc_net, socket_inode, summarize,

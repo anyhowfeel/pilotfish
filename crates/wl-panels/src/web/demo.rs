@@ -182,6 +182,7 @@ pub fn demo_streams() -> Vec<MessageStream> {
         label: label.into(),
         payload: payload.into(),
         bytes: payload.len() as u64,
+        control: wl_model::is_control_label(label),
     };
     let stream = |id, kind, host: &str, target: &str, status: &str, messages| MessageStream {
         id,
