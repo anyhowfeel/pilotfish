@@ -26,6 +26,7 @@ pub struct Prefs {
     /// Packet count of capture files opened before (canonical path -> packets).
     pub packet_counts: HashMap<PathBuf, u64>,
     pub filter_history: Vec<String>,
+    pub filter_presets: Vec<wl_panels::packets::SavedFilter>,
     pub layout: Option<wl_panels::packets::Layout>,
     /// Packet-list columns (order, visibility, custom fields) and time display format.
     pub table: wl_panels::packets::TablePrefs,
@@ -47,6 +48,7 @@ impl Default for Prefs {
             pinned: Vec::new(),
             packet_counts: HashMap::new(),
             filter_history: Vec::new(),
+            filter_presets: Vec::new(),
             layout: None,
             table: Default::default(),
             decode_as: Vec::new(),

@@ -167,6 +167,8 @@ impl App {
         app.packets.set_table_prefs(app.prefs.table.clone());
         app.packets
             .set_filter_history(app.prefs.filter_history.clone());
+        app.packets
+            .set_filter_presets(app.prefs.filter_presets.clone());
         let lookup = app.streams.clone();
         app.convs
             .set_stream_lookup(Box::new(move |k| lookup.borrow().get(k).copied()));

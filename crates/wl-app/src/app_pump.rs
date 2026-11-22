@@ -31,6 +31,13 @@ impl App {
         }
     }
 
+    pub(crate) fn save_presets(&mut self) {
+        if self.packets.filter_presets() != self.prefs.filter_presets && self.shot.is_none() {
+            self.prefs.filter_presets = self.packets.filter_presets().to_vec();
+            self.prefs.save();
+        }
+    }
+
     pub(crate) fn save_layout(&mut self) {
         let t = self.packets.table_prefs();
         if t != self.prefs.table {

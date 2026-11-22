@@ -245,6 +245,7 @@ impl eframe::App for App {
         wl_kit::widgets::toast::draw(&ctx);
         self.apply_select();
         self.save_layout();
+        self.save_presets();
         if let Some(shot) = &mut self.shot {
             shot.tick(&ctx);
         }

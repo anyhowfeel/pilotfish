@@ -90,6 +90,14 @@ impl PacketsView {
         self.filter_bar.set_history(items);
     }
 
+    pub fn filter_presets(&self) -> &[crate::packets::filter_presets::SavedFilter] {
+        self.filter_bar.presets()
+    }
+
+    pub fn set_filter_presets(&mut self, items: Vec<crate::packets::filter_presets::SavedFilter>) {
+        self.filter_bar.set_presets(items);
+    }
+
     pub fn set_filter_values(&mut self, values: std::sync::Arc<crate::features::ValueIndex>) {
         self.filter_bar.set_values(values);
     }
