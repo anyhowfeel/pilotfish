@@ -1,6 +1,6 @@
 //! Panel input (`WebData`) and output (`WebAction`).
 
-use wl_model::{HttpDetail, HttpExchange, TlsSession};
+use wl_model::{HttpDetail, HttpExchange, MessageStream, TlsSession};
 
 /// What the panel asks the app to do.
 #[derive(Debug, Clone, PartialEq)]
@@ -42,6 +42,7 @@ pub struct WebData<'a> {
     pub rev: u64,
     pub exchanges: &'a [HttpExchange],
     pub tls: &'a [TlsSession],
+    pub streams: &'a [MessageStream],
     /// Detail of the currently selected exchange, once loaded.
     pub detail: Option<&'a HttpDetail>,
     pub status: WebStatus<'a>,

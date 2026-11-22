@@ -5,7 +5,7 @@ use wl_panels::web::KeysInfo;
 #[derive(Default)]
 struct Fake {
     packets: u64,
-    reply: Option<(Vec<HttpExchange>, Vec<TlsSession>)>,
+    reply: Option<(Vec<HttpExchange>, Vec<TlsSession>, Vec<MessageStream>)>,
     requests: u32,
     active: Vec<bool>,
 }
@@ -14,7 +14,7 @@ impl WebBackend for Fake {
     fn request_web(&mut self) {
         self.requests += 1;
     }
-    fn poll_web(&mut self) -> Option<(Vec<HttpExchange>, Vec<TlsSession>)> {
+    fn poll_web(&mut self) -> Option<(Vec<HttpExchange>, Vec<TlsSession>, Vec<MessageStream>)> {
         self.reply.take()
     }
     fn request_http_detail(&mut self, _: &HttpExchange) {}
@@ -46,7 +46,8 @@ fn requests_on_activation_and_loads_reply() {
         link.data(&KeysInfo::default()).status,
         WebStatus::Loading
     ));
-    fake.reply = Some(demo_data());
+    let (ex, tls) = demo_data();
+    fake.reply = Some((ex, tls, Vec::new()));
     assert!(link.tick(&mut fake, true));
     assert_eq!(link.data(&KeysInfo::default()).exchanges.len(), 40);
     assert!(matches!(

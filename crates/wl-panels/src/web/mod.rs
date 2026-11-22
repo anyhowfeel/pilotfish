@@ -23,13 +23,14 @@ mod model;
 mod nav;
 mod objects;
 mod stats;
+mod streams;
 mod summary;
 mod table;
 mod table_cells;
 mod timing;
 
 pub use actions::{KeysInfo, WebAction, WebData, WebStatus};
-pub use demo::{demo_data, demo_detail};
+pub use demo::{demo_data, demo_detail, demo_streams};
 pub use objects::{
     ObjectsAction, ObjectsPanel, ObjectsState, PREVIEW_IMAGE_MAX, PREVIEW_TEXT_BYTES, Preview,
     PreviewData, PreviewKind, preview_kind,
@@ -52,12 +53,14 @@ use stats::{WebStats, aggregate};
 enum Tab {
     #[default]
     Exchanges,
+    Streams,
     Files,
 }
 
 pub struct WebPanel {
     tab: Tab,
     objects: ObjectsPanel,
+    streams: streams::StreamsPanel,
     filter: Filter,
     sort: SortState<SortCol>,
     selected: Option<Sel>,
@@ -80,6 +83,7 @@ impl Default for WebPanel {
         Self {
             tab: Tab::default(),
             objects: ObjectsPanel::default(),
+            streams: streams::StreamsPanel::default(),
             filter: Filter::default(),
             sort: SortState::new(SortCol::Time, false),
             selected: None,
@@ -116,6 +120,13 @@ impl WebPanel {
         self.selected = match spec.split_once(':') {
             Some(("http", n)) => n.parse().ok().map(Sel::Http),
             Some(("tls", n)) => n.parse().ok().map(Sel::Tls),
+            Some(("stream", n)) => {
+                self.tab = Tab::Streams;
+                if let Some(id) = n.parse().ok() {
+                    self.streams.select(id);
+                }
+                None
+            }
             Some(("files", n)) => {
                 self.tab = Tab::Files;
                 if let Ok(id) = n.parse() {
@@ -129,15 +140,23 @@ impl WebPanel {
     }
 
     pub fn ui(&mut self, ui: &mut Ui, d: &WebData) -> Vec<WebAction> {
-        let tabs = [(Tab::Exchanges, "Exchanges"), (Tab::Files, "Files")];
+        let tabs = [
+            (Tab::Exchanges, "Exchanges"),
+            (Tab::Streams, "Streams"),
+            (Tab::Files, "Files"),
+        ];
         let mut out = Vec::new();
         ui.horizontal_wrapped(|ui| {
-            segmented_w(ui, &mut self.tab, &tabs, 220.0);
+            segmented_w(ui, &mut self.tab, &tabs, 300.0);
             keys_bar::keys_bar(ui, d.keys, &mut out);
         });
         ui.add_space(spacing::SM);
         if self.tab == Tab::Files {
             out.extend(self.objects.ui(ui).into_iter().map(WebAction::Objects));
+            return out;
+        }
+        if self.tab == Tab::Streams {
+            out.extend(self.streams.ui(ui, d.streams));
             return out;
         }
         out.extend(self.exchanges_ui(ui, d));

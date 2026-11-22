@@ -3,8 +3,10 @@
 use std::time::{Duration, Instant};
 
 use eframe::egui;
-use wl_model::{HttpDetail, HttpExchange, TlsSession};
-use wl_panels::web::{KeysInfo, WebAction, WebData, WebStatus, demo_data, demo_detail};
+use wl_model::{HttpDetail, HttpExchange, MessageStream, TlsSession};
+use wl_panels::web::{
+    KeysInfo, WebAction, WebData, WebStatus, demo_data, demo_detail, demo_streams,
+};
 
 use crate::app::App;
 use crate::dispatch::Command;
@@ -17,7 +19,7 @@ const REFRESH_EVERY: Duration = Duration::from_millis(1500);
 /// What the Web page needs from the capture controller.
 pub trait WebBackend {
     fn request_web(&mut self);
-    fn poll_web(&mut self) -> Option<(Vec<HttpExchange>, Vec<TlsSession>)>;
+    fn poll_web(&mut self) -> Option<(Vec<HttpExchange>, Vec<TlsSession>, Vec<MessageStream>)>;
     fn request_http_detail(&mut self, ex: &HttpExchange);
     fn poll_http_detail(&mut self) -> Option<HttpDetail>;
     fn set_web_active(&mut self, active: bool);
@@ -29,6 +31,7 @@ pub trait WebBackend {
 pub struct WebLink {
     exchanges: Vec<HttpExchange>,
     tls: Vec<TlsSession>,
+    streams: Vec<MessageStream>,
     detail: Option<HttpDetail>,
     rev: u64,
     demo: bool,
@@ -49,6 +52,7 @@ impl WebLink {
         Self {
             exchanges,
             tls,
+            streams: if demo { demo_streams() } else { Vec::new() },
             detail: None,
             rev: 1,
             demo,
@@ -72,6 +76,7 @@ impl WebLink {
             rev: self.rev,
             exchanges: &self.exchanges,
             tls: &self.tls,
+            streams: &self.streams,
             detail: self.detail.as_ref(),
             status,
             keys,
@@ -85,14 +90,19 @@ impl WebLink {
         self.last_request = Some(Instant::now());
     }
 
+    fn clear_data(&mut self) {
+        self.exchanges.clear();
+        self.tls.clear();
+        self.streams.clear();
+        self.detail = None;
+        self.rev += 1;
+    }
+
     pub fn clear(&mut self) {
         if self.demo {
             return;
         }
-        self.exchanges.clear();
-        self.tls.clear();
-        self.detail = None;
-        self.rev += 1;
+        self.clear_data();
         self.loading = false;
         self.last_packets = 0;
         self.last_request = None;
@@ -116,10 +126,7 @@ impl WebLink {
         }
         let packets = b.packets();
         if packets == 0 && (!self.exchanges.is_empty() || !self.tls.is_empty()) {
-            self.exchanges.clear();
-            self.tls.clear();
-            self.detail = None;
-            self.rev += 1;
+            self.clear_data();
         }
         let stale = self
             .last_request
@@ -128,9 +135,10 @@ impl WebLink {
             self.request(b);
         }
         let mut changed = false;
-        if let Some((ex, tls)) = b.poll_web() {
+        if let Some((ex, tls, streams)) = b.poll_web() {
             self.exchanges = ex;
             self.tls = tls;
+            self.streams = streams;
             self.rev += 1;
             self.loading = false;
             changed = true;
@@ -185,7 +193,7 @@ impl WebBackend for Controller {
     fn request_web(&mut self) {
         Controller::request_web(self);
     }
-    fn poll_web(&mut self) -> Option<(Vec<HttpExchange>, Vec<TlsSession>)> {
+    fn poll_web(&mut self) -> Option<(Vec<HttpExchange>, Vec<TlsSession>, Vec<MessageStream>)> {
         Controller::poll_web(self)
     }
     fn request_http_detail(&mut self, ex: &HttpExchange) {

@@ -2,7 +2,10 @@
 
 use std::sync::Arc;
 
-use wl_model::{CertInfo, HttpDetail, HttpExchange, HttpMessage, TlsSession};
+use wl_model::{
+    CertInfo, HttpDetail, HttpExchange, HttpMessage, MessageStream, MsgDir, StreamKind,
+    StreamMessage, TlsSession,
+};
 
 /// One synthetic exchange (just the fields tests care about).
 pub fn exchange(
@@ -166,6 +169,91 @@ pub fn demo_data() -> (Vec<HttpExchange>, Vec<TlsSession>) {
         })
         .collect();
     (ex, tls)
+}
+
+/// A WebSocket chat, an SSE feed and a gRPC call for `--demo-web`.
+pub fn demo_streams() -> Vec<MessageStream> {
+    let msg = |frame: u64, dir, label: &str, payload: &str| StreamMessage {
+        frame,
+        rel: frame as f64 * 0.21,
+        dir,
+        label: label.into(),
+        payload: payload.into(),
+        bytes: payload.len() as u64,
+    };
+    let stream = |id, kind, host: &str, target: &str, status: &str, messages| MessageStream {
+        id,
+        stream: id as u32,
+        kind,
+        host: host.into(),
+        target: target.into(),
+        start_rel: id as f64 * 0.21,
+        status: status.into(),
+        messages,
+    };
+    vec![
+        stream(
+            12,
+            StreamKind::WebSocket,
+            "chat.example.com",
+            "/ws",
+            "closed 1000",
+            vec![
+                msg(
+                    14,
+                    MsgDir::ToServer,
+                    "text",
+                    r#"{"type":"join","room":"general"}"#,
+                ),
+                msg(
+                    15,
+                    MsgDir::ToClient,
+                    "text",
+                    r#"{"type":"joined","users":3}"#,
+                ),
+                msg(18, MsgDir::ToServer, "ping", "70 69 6e 67"),
+                msg(19, MsgDir::ToClient, "pong", "70 69 6e 67"),
+                msg(
+                    24,
+                    MsgDir::ToClient,
+                    "text",
+                    r#"{"type":"message","from":"ada","text":"hello"}"#,
+                ),
+                msg(30, MsgDir::ToServer, "close", "code 1000"),
+            ],
+        ),
+        stream(
+            40,
+            StreamKind::Sse,
+            "api.example.com",
+            "/events",
+            "200",
+            vec![
+                msg(42, MsgDir::ToClient, "message", "welcome"),
+                msg(45, MsgDir::ToClient, "tick #1", r#"{"n":1}"#),
+                msg(49, MsgDir::ToClient, "tick #2", r#"{"n":2}"#),
+            ],
+        ),
+        stream(
+            60,
+            StreamKind::Grpc,
+            "grpc.example.com:443",
+            "/helloworld.Greeter/SayHello",
+            "0 OK",
+            vec![
+                msg(
+                    60,
+                    MsgDir::ToServer,
+                    "request",
+                    "/helloworld.Greeter/SayHello",
+                ),
+                msg(60, MsgDir::ToServer, "message", "world"),
+                msg(61, MsgDir::ToClient, "response", "HTTP 200"),
+                msg(61, MsgDir::ToClient, "message", "Hello world"),
+                msg(61, MsgDir::ToClient, "trailers", "grpc-status 0 OK OK"),
+            ],
+        ),
+    ]
 }
 
 /// Synthetic request/response detail for an exchange.
