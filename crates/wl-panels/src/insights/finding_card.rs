@@ -1,8 +1,8 @@
 //! One finding = one card: severity dot + title + muted description + evidence chips on the
 //! left, right-anchored equal-width actions (they wrap under the text when the card is narrow).
 use wl_kit::egui::{
-    self, Align, Button, FontId, Frame, Id, Layout, Margin, Rect, RichText, TextWrapMode, Ui,
-    text::LayoutJob, vec2,
+    self, Align, Button, FontId, Frame, Id, Layout, Margin, Rect, Response, RichText, TextWrapMode,
+    Ui, text::LayoutJob, vec2,
 };
 use wl_kit::theme::{Palette, RADIUS, spacing};
 use wl_kit::widgets::{Severity, accent_card, chip, chip_copy, severity_dot, toast};
@@ -11,6 +11,7 @@ use wl_model::HealthInsight;
 use super::actions::InsightsAction;
 use super::category::Category;
 use super::logic::severity_of;
+use super::rules::mute_choices;
 
 const ACTION_W: f32 = 132.0;
 const BTN_H: f32 = 30.0;
@@ -43,8 +44,11 @@ pub fn finding_card(
             ui.vertical(|ui| {
                 ui.set_width(text_w);
                 ui.spacing_mut().item_spacing.y = spacing::XS + 2.0;
-                title_row(ui, f, sev);
-                description(ui, &f.explanation, text_w, open);
+                let title = title_row(ui, f, sev);
+                let desc = description(ui, &f.explanation, text_w, open);
+                for target in [title, desc] {
+                    mute_menu(target, f, actions);
+                }
                 evidence(ui, f, text_w);
                 if open {
                     hint(ui, cat);
@@ -65,7 +69,7 @@ pub fn finding_card(
     card.response.rect
 }
 
-fn title_row(ui: &mut Ui, f: &HealthInsight, sev: Severity) {
+fn title_row(ui: &mut Ui, f: &HealthInsight, sev: Severity) -> Response {
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = spacing::SM;
         severity_dot(ui, sev, 10.0);
@@ -76,13 +80,26 @@ fn title_row(ui: &mut Ui, f: &HealthInsight, sev: Severity) {
                     .size(15.0)
                     .color(Palette::text()),
             )
-            .wrap_mode(TextWrapMode::Wrap),
-        );
+            .wrap_mode(TextWrapMode::Wrap)
+            .sense(egui::Sense::click()),
+        )
+    })
+    .inner
+}
+
+fn mute_menu(target: Response, f: &HealthInsight, actions: &mut Vec<InsightsAction>) {
+    target.context_menu(|ui| {
+        for choice in mute_choices(f) {
+            if ui.button(choice.label).clicked() {
+                actions.push(InsightsAction::Mute(choice.pattern));
+                ui.close();
+            }
+        }
     });
 }
 
 /// Muted description, clamped to two rows unless `open`.
-fn description(ui: &mut Ui, text: &str, width: f32, open: bool) {
+fn description(ui: &mut Ui, text: &str, width: f32, open: bool) -> Response {
     let mut job = LayoutJob::simple(
         text.to_owned(),
         FontId::proportional(13.5),
@@ -94,8 +111,9 @@ fn description(ui: &mut Ui, text: &str, width: f32, open: bool) {
         job.wrap.overflow_character = Some('\u{2026}');
     }
     let galley = ui.painter().layout_job(job);
-    let (rect, _) = ui.allocate_exact_size(galley.size(), egui::Sense::hover());
+    let (rect, resp) = ui.allocate_exact_size(galley.size(), egui::Sense::click());
     ui.painter().galley(rect.min, galley, Palette::muted());
+    resp
 }
 
 fn evidence(ui: &mut Ui, f: &HealthInsight, width: f32) {

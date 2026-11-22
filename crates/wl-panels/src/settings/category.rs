@@ -6,6 +6,7 @@ pub enum Category {
     Capture,
     Display,
     Names,
+    Insights,
     Locations,
     Performance,
     Shortcuts,
@@ -13,11 +14,12 @@ pub enum Category {
 }
 
 impl Category {
-    pub const ALL: [Category; 8] = [
+    pub const ALL: [Category; 9] = [
         Category::Appearance,
         Category::Capture,
         Category::Display,
         Category::Names,
+        Category::Insights,
         Category::Locations,
         Category::Performance,
         Category::Shortcuts,
@@ -30,6 +32,7 @@ impl Category {
             Category::Capture => "Capture",
             Category::Display => "Display",
             Category::Names => "Names",
+            Category::Insights => "Insights",
             Category::Locations => "Locations",
             Category::Performance => "Performance",
             Category::Shortcuts => "Shortcuts",

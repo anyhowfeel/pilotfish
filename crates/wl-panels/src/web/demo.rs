@@ -49,6 +49,8 @@ pub fn session(frame: u64, sni: &str) -> TlsSession {
         src: "192.168.1.20".into(),
         dst: "93.184.216.34".into(),
         bytes: 48_000 + frame * 1300,
+        client: None,
+        threat: None,
     }
 }
 

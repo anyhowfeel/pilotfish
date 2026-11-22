@@ -11,6 +11,16 @@ pub trait NameResolver {
         None
     }
 
+    /// Name of the offline blocklist that lists `addr`. Must not block.
+    fn threat(&self, _addr: &str) -> Option<Arc<str>> {
+        None
+    }
+
+    /// True when threat lists are loaded (the Hosts table then shows a Threat column).
+    fn has_threats(&self) -> bool {
+        false
+    }
+
     /// Why country / AS data is unavailable (shown instead of the Location column); `None`
     /// when a database is loaded.
     fn geo_hint(&self) -> Option<String> {

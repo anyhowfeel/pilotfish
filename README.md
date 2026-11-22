@@ -198,8 +198,10 @@ Tests that need `tshark` or loopback capture rights skip themselves when those a
 - Files over a few hundred thousand packets load quickly but `tshark` itself uses a lot of
   memory on them.
 - The filter suggestions after an operator cover addresses and ports, not names.
-- The findings in Insights are heuristics with fixed thresholds (for example 20 ports for a scan, 8
-  connections for a steady rhythm); expect false positives from polling and keep-alives.
+- The findings in Insights are heuristics with thresholds you can tune in Settings > Insights (by default 20
+  ports for a scan, 8 connections for a steady rhythm); expect false positives from polling and keep-alives.
+- Threat lists are matched offline from files you provide; they match exact addresses and domains (and their parent
+  domains), not address ranges. Credential detection only sees cleartext protocols.
 - HTTP/2 and QUIC handling is best effort. Chunked bodies without a `Content-Length` are
   only partly accounted for.
 - Windows and macOS have not been tried.

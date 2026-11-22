@@ -21,6 +21,7 @@ pub mod health;
 #[cfg(test)]
 mod health_tests;
 mod palette_items;
+mod security;
 mod stream_text;
 pub mod stream_view;
 
@@ -32,5 +33,5 @@ pub use detail_filter::{
     FieldFilterCandidate, FilterCombine, build_expression, detail_filter_menu,
     extract_filter_candidate,
 };
-pub use health::synthesize_insights;
+pub use health::{InsightContext, synthesize_insights};
 pub use stream_view::{StreamView, StreamViewAction};

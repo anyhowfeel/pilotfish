@@ -5,9 +5,11 @@ mod analysis;
 mod backend;
 mod behavior;
 mod capture_options;
+mod credential;
 mod detail;
 mod extras;
 mod flow;
+mod intel;
 mod io_graph;
 mod packet;
 mod stats;
@@ -21,9 +23,11 @@ pub use backend::{
 };
 pub use behavior::{BehaviorData, Channel, ChannelKind, Proto};
 pub use capture_options::{AutoStop, CaptureOptions, RingBuffer, SNAPLEN_MAX};
+pub use credential::{CredKind, Credential, SecurityData, mask};
 pub use detail::{DetailNode, FrameDetail};
 pub use extras::{DecodeAs, DnsQuery, ExportObject, ObjectSet, Rcode, sanitize_filename};
 pub use flow::{FlowEvent, FlowEvents, FlowFlags, FlowSel, MAX_FLOW_EVENTS};
+pub use intel::{Fingerprint, Indicator, ThreatIntel};
 pub use io_graph::{CaptureProperties, DeltaStat, InterfaceInfo, IoGraph, IoSeries, IoSpec};
 pub use packet::{Direction, FlowKey, PacketRow, Transport, is_encrypted_protocol};
 pub use stats::{

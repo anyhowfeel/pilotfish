@@ -81,6 +81,12 @@ pub struct TlsSession {
     pub src: Arc<str>,
     pub dst: Arc<str>,
     pub bytes: u64,
+    /// Application named by an offline JA4DB fingerprint match.
+    #[serde(default)]
+    pub client: Option<Arc<str>>,
+    /// Blocklist that lists this session's fingerprint, server name or server address.
+    #[serde(default)]
+    pub threat: Option<Arc<str>>,
 }
 
 /// Headers + start line of one HTTP message, for the detail view (display order preserved).

@@ -85,6 +85,12 @@ fn tls_rows(t: &TlsSession) -> Vec<(String, String)> {
             rows.push(r(label, v.to_string()));
         }
     }
+    if let Some(c) = &t.client {
+        rows.push(r("Known client", c.to_string()));
+    }
+    if let Some(l) = &t.threat {
+        rows.push(r("Threat list", l.to_string()));
+    }
     rows.push(r("Connection", format!("{} to {}", t.src, t.dst)));
     rows.push(r("Bytes", format::bytes(t.bytes)));
     rows.push(r("First frame", format!("#{}", t.first_frame)));
@@ -137,4 +143,22 @@ pub fn placeholder(ui: &mut Ui, text: &str) {
             ui.label(RichText::new(text).color(Palette::muted()));
         },
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn intel_matches_add_rows_to_the_handshake_table() {
+        let mut t = super::super::demo::session(1, "example.com");
+        let labels =
+            |t: &TlsSession| -> Vec<String> { tls_rows(t).into_iter().map(|(k, _)| k).collect() };
+        assert!(!labels(&t).contains(&"Threat list".to_owned()));
+        t.client = Some("Chrome".into());
+        t.threat = Some("sslbl".into());
+        let rows = tls_rows(&t);
+        assert!(rows.contains(&("Known client".to_owned(), "Chrome".to_owned())));
+        assert!(rows.contains(&("Threat list".to_owned(), "sslbl".to_owned())));
+    }
 }

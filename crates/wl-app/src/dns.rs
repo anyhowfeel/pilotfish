@@ -8,6 +8,7 @@ use eframe::egui;
 use wl_panels::overview::{GeoInfo, NameResolver};
 
 use crate::geo::GeoDb;
+use crate::intel_store::IntelHandle;
 
 const MAX_CACHE: usize = 4096;
 const QUEUE_CAP: usize = 256;
@@ -27,6 +28,7 @@ pub struct AsyncResolver {
     /// Settings > Names > "Resolve DNS names": off = no lookups (cached names still show).
     enabled: Arc<std::sync::atomic::AtomicBool>,
     geo: Arc<std::sync::RwLock<Option<Arc<GeoDb>>>>,
+    intel: IntelHandle,
 }
 
 impl AsyncResolver {
@@ -54,6 +56,7 @@ impl AsyncResolver {
             done_rx,
             enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             geo: Arc::new(std::sync::RwLock::new(GeoDb::discover())),
+            intel: IntelHandle::default(),
         }
     }
 
@@ -66,6 +69,11 @@ impl AsyncResolver {
 
     fn geo_db(&self) -> Option<Arc<GeoDb>> {
         self.geo.read().ok()?.clone()
+    }
+
+    /// Shares the threat lists the Hosts table marks addresses with.
+    pub fn set_intel(&mut self, intel: IntelHandle) {
+        self.intel = intel;
     }
 
     pub fn set_enabled(&self, on: bool) {
@@ -85,6 +93,14 @@ impl AsyncResolver {
 impl NameResolver for AsyncResolver {
     fn geo(&self, addr: &str) -> Option<GeoInfo> {
         self.geo_db()?.lookup(addr)
+    }
+
+    fn threat(&self, addr: &str) -> Option<Arc<str>> {
+        self.intel.read().ok()?.ip(addr).map(Arc::from)
+    }
+
+    fn has_threats(&self) -> bool {
+        self.intel.read().is_ok_and(|i| !i.is_empty())
     }
 
     fn geo_hint(&self) -> Option<String> {

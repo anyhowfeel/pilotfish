@@ -5,13 +5,14 @@ use std::sync::Arc;
 use crossbeam_channel::{Receiver, Sender, bounded};
 use eframe::egui;
 use wl_model::{
-    BehaviorData, CaptureBackend, CaptureError, ExpertReport, HealthInsight, PacketRow,
-    ProtocolHierarchy, StatsSnapshot, StreamConversation, StreamFormat, StreamProtocol,
+    BehaviorData, CaptureBackend, CaptureError, ExpertReport, PacketRow, ProtocolHierarchy,
+    SecurityData, StatsSnapshot, StreamConversation, StreamFormat, StreamProtocol, ThreatIntel,
 };
 use wl_panels::features::{
-    BookmarkStore, CommandPalette, FieldCatalog, InsightsAction, InsightsPanel, PaletteAction,
-    PalettePage, StreamView, StreamViewAction, synthesize_insights,
+    BookmarkStore, CommandPalette, FieldCatalog, InsightsPanel, PaletteAction, PalettePage,
+    StreamView, StreamViewAction,
 };
+use wl_panels::insights::InsightRules;
 
 use crate::export_data::{write_html_report, write_packets_csv, write_stats_json};
 use crate::page::Page;
@@ -21,6 +22,7 @@ enum Msg {
     Stream(Result<StreamConversation, CaptureError>),
     Insights(Option<ExpertReport>, Option<ProtocolHierarchy>),
     Behavior(BehaviorData),
+    Security(SecurityData),
     ExportDone(Result<String, String>),
 }
 
@@ -44,6 +46,8 @@ pub enum HubCommand {
 
 #[path = "features_hub_export.rs"]
 mod export;
+#[path = "features_hub_insights.rs"]
+mod insights_job;
 
 pub struct FeaturesHub {
     tshark: Option<Arc<wl_tshark::TsharkBackend>>,
@@ -56,6 +60,9 @@ pub struct FeaturesHub {
     pub expert: Option<ExpertReport>,
     pub phs: Option<ProtocolHierarchy>,
     pub behavior: Option<BehaviorData>,
+    pub security: Option<SecurityData>,
+    pub intel: Arc<ThreatIntel>,
+    pub rules: InsightRules,
     tx: Sender<Msg>,
     rx: Receiver<Msg>,
     pub notice: Option<String>,
@@ -86,6 +93,9 @@ impl FeaturesHub {
             expert: None,
             phs: None,
             behavior: None,
+            security: None,
+            intel: Arc::default(),
+            rules: InsightRules::default(),
             tx,
             rx,
             notice: None,
@@ -93,19 +103,11 @@ impl FeaturesHub {
         }
     }
 
-    pub(crate) fn insights_for(&self, stats: &StatsSnapshot) -> Vec<HealthInsight> {
-        synthesize_insights(
-            self.expert.as_ref(),
-            self.phs.as_ref(),
-            self.behavior.as_ref(),
-            stats,
-        )
-    }
-
     pub fn clear_capture(&mut self) {
         self.expert = None;
         self.phs = None;
         self.behavior = None;
+        self.security = None;
         self.stream_view.close();
     }
 
@@ -139,6 +141,7 @@ impl FeaturesHub {
             });
             Msg::Behavior(BehaviorData { channels, dns })
         });
+        self.spawn_security(&file, &ctx);
     }
 
     pub fn open_stream(
@@ -177,6 +180,7 @@ impl FeaturesHub {
                     self.phs = p;
                 }
                 Msg::Behavior(b) => self.behavior = Some(b),
+                Msg::Security(s) => self.security = Some(s),
                 Msg::ExportDone(Ok(n)) => self.notice = Some(n),
                 Msg::ExportDone(Err(e)) => self.error = Some(e),
             }
@@ -221,16 +225,6 @@ impl FeaturesHub {
             PaletteAction::DecodeAs => HubCommand::DecodeAs,
             PaletteAction::DnsLog => HubCommand::DnsLog,
         })
-    }
-
-    pub fn insights_ui(&mut self, ui: &mut egui::Ui, stats: &StatsSnapshot) -> Vec<InsightsAction> {
-        self.insights.ui(
-            ui,
-            stats,
-            self.expert.as_ref(),
-            self.phs.as_ref(),
-            self.behavior.as_ref(),
-        )
     }
 }
 

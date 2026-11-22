@@ -11,4 +11,6 @@ pub enum InsightsAction {
     LoadDns,
     /// Select this frame in Packets and switch to that page.
     ShowInPackets(u64),
+    /// Hide findings whose title matches this host or pattern from now on.
+    Mute(String),
 }

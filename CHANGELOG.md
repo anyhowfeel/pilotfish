@@ -5,6 +5,18 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Offline threat lists.** Files dropped in the `intel` folder (opened from Settings > Locations, where files can also
+  be added) are matched against the capture without any network call. A JA4DB `.json` export names the application
+  behind a TLS fingerprint, and text or CSV blocklists (abuse.ch formats work) list addresses, domains and JA3 / JA4
+  fingerprints. Hosts shows a Threat column, the Web TLS rows and details show the known client and any listing, and
+  Insights reports blocklisted addresses and domains and malicious fingerprints.
+- **Cleartext credentials in Insights.** HTTP Basic logins, bearer tokens, API keys in headers and query strings, FTP,
+  POP3 and SMTP logins and NTLM authentications are reported with the secret masked. Settings > Insights can show the
+  secrets, but the exported reports always mask them.
+- **Tunable Insights.** Settings > Insights sets the thresholds of the port scan, sweep, steady rhythm and long DNS name
+  findings. Right-clicking a finding mutes a host or a kind of finding, and the muted list is managed on the same page.
+
 ### Changed
 - **New screenshots in the README.** It shows nine pages instead of six (Hosts with its locations, Insights and the
   Locations settings were added), in both themes, all taken on an invented home network.

@@ -3,8 +3,10 @@
 use wl_kit::format;
 use wl_model::{
     BehaviorData, ExpertReport, ExpertSeverity, HealthInsight, InsightSeverity, ProtocolHierarchy,
-    StatsSnapshot,
+    SecurityData, StatsSnapshot, ThreatIntel,
 };
+
+use crate::insights::InsightRules;
 
 fn has_any(s: &str, needles: &[&str]) -> bool {
     needles.iter().any(|k| s.contains(k))
@@ -154,12 +156,21 @@ fn analyze_expert(rep: &ExpertReport, total_packets: u64, out: &mut Vec<HealthIn
     }
 }
 
+/// What the security and tuning parts of the findings are computed from.
+#[derive(Clone, Copy)]
+pub struct InsightContext<'a> {
+    pub security: Option<&'a SecurityData>,
+    pub intel: &'a ThreatIntel,
+    pub rules: &'a InsightRules,
+}
+
 /// Synthesizes prioritized plain-language diagnostic cards with one-click Wireshark filters.
 pub fn synthesize_insights(
     expert: Option<&ExpertReport>,
     phs: Option<&ProtocolHierarchy>,
     behavior: Option<&BehaviorData>,
     stats: &StatsSnapshot,
+    cx: &InsightContext,
 ) -> Vec<HealthInsight> {
     let mut out = Vec::new();
     let total_packets = stats.total_packets.max(phs.map_or(0, |p| p.total_frames));
@@ -203,8 +214,17 @@ pub fn synthesize_insights(
     }
 
     if let Some(data) = behavior {
-        super::behavior::detect(data, &mut out);
+        super::behavior::detect(data, &cx.rules.thresholds, &mut out);
     }
+    let inputs = super::security::Inputs {
+        security: cx.security,
+        intel: cx.intel,
+        hosts: &stats.hosts,
+        dns: behavior.map_or(&[][..], |b| &b.dns),
+        reveal_secrets: cx.rules.reveal_secrets,
+    };
+    super::security::detect(&inputs, &mut out);
+    out.retain(|f| !cx.rules.hides(f));
 
     if out.is_empty() && total_packets > 0 {
         let n = format::count(total_packets);

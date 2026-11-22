@@ -32,6 +32,7 @@ mod geo_store;
 mod graphs_hub;
 mod graphs_link;
 mod icons;
+mod intel_store;
 mod metrics;
 mod missing;
 mod page;

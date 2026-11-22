@@ -45,7 +45,11 @@ fn dns(name: &str) -> DnsQuery {
 
 fn run(channels: Vec<Channel>, dns: Vec<DnsQuery>) -> Vec<HealthInsight> {
     let mut out = Vec::new();
-    detect(&BehaviorData { channels, dns }, &mut out);
+    detect(
+        &BehaviorData { channels, dns },
+        &Thresholds::default(),
+        &mut out,
+    );
     out
 }
 
@@ -215,3 +219,6 @@ fn long_dns_names_scale_with_count() {
     assert_eq!(more[0].severity, InsightSeverity::Warning);
     assert!(run(Vec::new(), vec![dns("www.example.com")]).is_empty());
 }
+
+#[path = "behavior_threshold_tests.rs"]
+mod thresholds;

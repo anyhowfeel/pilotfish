@@ -4,7 +4,8 @@ use wl_model::{
     ExpertEntry, ExpertReport, ExpertSeverity, HostStat, InsightSeverity, StatsSnapshot,
 };
 
-use crate::features::health::synthesize_insights;
+use crate::features::health::{InsightContext, synthesize_insights};
+use crate::test_util::plain;
 
 fn entry(severity: ExpertSeverity, frequency: u64, protocol: &str, summary: &str) -> ExpertEntry {
     ExpertEntry {
@@ -42,7 +43,7 @@ fn flags_retransmissions_dns_errors_and_dominant_talker() {
         }],
         ..Default::default()
     };
-    let insights = synthesize_insights(Some(&rep), None, None, &stats);
+    let insights = synthesize_insights(Some(&rep), None, None, &stats, &plain());
     assert!(
         insights
             .iter()
@@ -61,7 +62,44 @@ fn healthy_capture_produces_all_clear_card() {
         total_bytes: 2048,
         ..Default::default()
     };
-    let insights = synthesize_insights(Some(&ExpertReport::default()), None, None, &stats);
+    let insights =
+        synthesize_insights(Some(&ExpertReport::default()), None, None, &stats, &plain());
     assert_eq!(insights.len(), 1);
     assert!(insights[0].title.contains("healthy"));
+}
+
+fn retrans_stats() -> (ExpertReport, StatsSnapshot) {
+    let rep = ExpertReport {
+        entries: vec![entry(ExpertSeverity::Warn, 5, "TCP", "TCP Retransmission")],
+    };
+    let stats = StatsSnapshot {
+        total_packets: 100,
+        total_bytes: 10_000,
+        ..Default::default()
+    };
+    (rep, stats)
+}
+
+#[test]
+fn muted_findings_are_hidden_and_the_all_clear_takes_their_place() {
+    let (rep, stats) = retrans_stats();
+    let intel = wl_model::ThreatIntel::default();
+    let titles = |rules: &crate::insights::InsightRules| {
+        let cx = InsightContext {
+            security: None,
+            intel: &intel,
+            rules,
+        };
+        synthesize_insights(Some(&rep), None, None, &stats, &cx)
+            .into_iter()
+            .map(|f| f.title)
+            .collect::<Vec<_>>()
+    };
+    let mut rules = crate::insights::InsightRules::default();
+    assert!(titles(&rules)[0].contains("TCP packet loss"));
+    rules.mute("packet loss");
+    rules.mute("anomaly rate");
+    let after = titles(&rules);
+    assert_eq!(after.len(), 1);
+    assert!(after[0].contains("healthy"), "{after:?}");
 }
