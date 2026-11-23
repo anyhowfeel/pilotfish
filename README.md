@@ -76,14 +76,17 @@ Each [release](https://github.com/anyhowfeel/pilotfish/releases) contains, next 
 
 | Platform | File | Notes |
 | --- | --- | --- |
-| Debian, Ubuntu | `pilotfish_<version>_amd64.deb` / `_arm64.deb` | `sudo apt install ./pilotfish_*.deb` pulls in `tshark`. |
+| Debian, Ubuntu | `pilotfish_<version>_amd64.deb` / `_arm64.deb` | `sudo apt install ./pilotfish_*.deb` also installs the recommended `tshark`. |
 | Arch Linux | `pilotfish-<version>-1-x86_64.pkg.tar.zst`, or `packaging/arch/PKGBUILD` | `sudo pacman -U pilotfish-*.pkg.tar.zst` (the package is not signed), or `cd packaging/arch && makepkg -si` to build it from the tagged source. |
 | Other Linux | `pilotfish-<tag>-linux-x86_64.tar.gz`, `-linux-aarch64.tar.gz` | Unpack and run `./pilotfish`. |
 | Windows | `pilotfish-<version>-windows-x86_64-setup.exe` | Installer; a `.zip` with the bare executable is also provided. |
 | macOS | `pilotfish-<version>-macos-arm64.dmg`, `-macos-x86_64.dmg` | Drag `pilotfish` to `Applications`. The app is not signed: on first launch use right-click, Open. |
 
 Wireshark's command-line tools (`tshark`, `dumpcap`) must be installed separately on Windows and
-macOS. These packages are built by CI and have not been tested on every platform.
+macOS. The Linux and Windows files are built in containers (see [docs/releasing.md](docs/releasing.md)) and
+the macOS images and the Windows installer by a workflow when a release is published. They have not been tested on every platform. On
+macOS, pilotfish also looks for the tools in the Wireshark app and in the Homebrew folders, so it finds them
+when started from the Finder.
 
 ## Requirements
 
@@ -162,8 +165,9 @@ Environment variables:
   optional time-window selection (to the millisecond) on the throughput chart. Hosts show the
   country and network of public addresses when a local `.mmdb` database is present (see below).
 - **Graphs**: I/O graph with several display-filter series.
-- **Map**: force-directed graph of host-to-host traffic, link width by volume, optional highlight
-  of encrypted flows.
+- **Map**: graph of host-to-host traffic, link width by volume, optional highlight of encrypted
+  flows. The default Planar layout draws the graph without crossing links when that is possible
+  and keeps the crossings to a minimum when it is not; Force is the free-moving alternative.
 - **Flows**: sequence diagram of a conversation, plus TCP time-sequence, throughput, RTT and
   window-size graphs.
 - **Web**: HTTP requests paired with responses (headers, pretty or raw JSON, readable HTML,
@@ -181,6 +185,9 @@ Shift+click on a sidebar entry opens that page in a separate window.
 On the throughput and I/O graphs, drag to select a time window. On the TCP graphs, drag a box to zoom and
 double-click to reset.
 
+On the throughput and I/O graphs, drag to select a time window. On the TCP graphs, drag a box to zoom and
+double-click to reset.
+
 ### Country and network of hosts
 
 Open Settings > Locations to download the free DB-IP Country and ASN databases (about 4 and 5 MB),
@@ -194,11 +201,12 @@ The country and network shown in the screenshots come from the DB-IP Lite databa
 
 ## Releases
 
-Tagging `vX.Y.Z` makes the CI build and publish binaries for Linux (x86_64 and aarch64, plus
-a build made on Arch Linux), macOS (Apple silicon and Intel) and Windows (x86_64), together
-with a `.deb` package for each Linux architecture, a Windows installer, macOS disk images and
-a `SHA256SUMS` file. Those builds are not tested beyond compiling; `tshark` still has to be
-installed separately on Windows and macOS.
+A release has binaries for Linux (x86_64 and aarch64, plus a build made on Arch Linux), macOS (Apple
+silicon and Intel) and Windows (x86_64), with a `.deb` package for each Linux architecture, a Windows
+installer, macOS disk images and a `SHA256SUMS` file. The Linux and Windows files are built locally in
+containers with `tools/release.sh`; publishing the release starts a workflow that adds the macOS images and
+the installer. Those builds are not tested beyond compiling; `tshark` still has to be installed separately on
+Windows and macOS.
 
 ## Layout of the repository
 

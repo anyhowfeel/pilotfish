@@ -3857,7 +3857,7 @@ checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
 
 [[package]]
 name = "wl-app"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "chrono",
  "clap",
@@ -3905,7 +3905,7 @@ dependencies = [
 
 [[package]]
 name = "wl-hybrid"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "crossbeam-channel",
  "tempfile",
@@ -3916,7 +3916,7 @@ dependencies = [
 
 [[package]]
 name = "wl-kit"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "eframe",
  "egui_extras",
@@ -3928,7 +3928,7 @@ dependencies = [
 
 [[package]]
 name = "wl-model"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "crossbeam-channel",
  "serde",
@@ -3938,7 +3938,7 @@ dependencies = [
 
 [[package]]
 name = "wl-native"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "chrono",
  "crossbeam-channel",
@@ -3951,7 +3951,7 @@ dependencies = [
 
 [[package]]
 name = "wl-panels"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "chrono",
  "eframe",
@@ -3970,18 +3970,18 @@ dependencies = [
 
 [[package]]
 name = "wl-planar"
-version = "0.5.0"
+version = "0.6.0"
 
 [[package]]
 name = "wl-stats"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "wl-model",
 ]
 
 [[package]]
 name = "wl-tshark"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "base64 0.22.1",
  "crossbeam-channel",

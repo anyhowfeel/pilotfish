@@ -1,6 +1,6 @@
 # Maintainer: anyhowfeel <346877873+anyhowfeel@users.noreply.github.com>
 pkgname=pilotfish
-pkgver=0.5.0
+pkgver=0.6.0
 pkgrel=1
 pkgdesc="Prototype desktop packet viewer on top of tshark, written in Rust with egui"
 arch=('x86_64' 'aarch64')
