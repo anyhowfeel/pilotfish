@@ -5,6 +5,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- **Copying works with the system clipboard.** Ctrl+C on selected text and every Copy button only reached a
+  clipboard inside pilotfish, because the build left out the clipboard support of the window library, so
+  nothing could be pasted into another program. It is enabled again, on Wayland and X11.
+
 ## [0.6.0] - 2026-11-23
 
 ### Added
