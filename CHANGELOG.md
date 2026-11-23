@@ -5,6 +5,51 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-23
+
+### Added
+- **Live captures are saved by default.** A capture is kept as `capture-<date>-<time>-<interface>.pcapng` in
+  `Documents/pilotfish/captures`, appears in Recent files, and never overwrites an existing file. Settings >
+  Capture > Saved captures sets the folder or turns it off, in which case the capture stays a temporary file
+  as before. A path typed in Output > Save to still wins, and a ring buffer always keeps its files.
+- **A Reset view button on the map** (key `R`). It fits the graph, frees the hosts you moved so the layout starts
+  afresh, and clears the selection, the search and the filters. The layout mode and the Labels, Directions and
+  Encrypted switches stay as you set them.
+- **Several links can be selected on the map.** Shift+click on a link adds it to the selection or takes it out
+  again. The card then shows the totals and the list of the links, and Filter packets keeps the packets of any
+  of them (each pair of hosts, joined with OR), which makes it quick to compare a few conversations.
+- **A Reset zoom button on the TCP graphs.** A box dragged on a chart of Flows zooms in; the button next to the
+  chips brings the whole stream back, and a double click on the chart still does. Nothing said how to come back.
+
+### Changed
+- **The arrows on the map say what the traffic did.** The arrow sits in the middle of its link: one head when
+  not a byte went the other way, two heads back to back with the line showing between them when the traffic
+  went both ways, as a TCP stream does, the head of the busier direction being the larger one. The heads are
+  clearly wider than the line, stay clear of the ring around a busy host, are drawn after every link so that
+  none is painted over, and slide along their link when another arrow is in the way, the widest links being
+  served first. A link with no free place goes without an arrow. The lock of an encrypted link moves aside
+  while the arrows are on.
+
+### Fixed
+- **Copying works with the system clipboard.** Ctrl+C on selected text and every Copy button only reached a
+  clipboard inside pilotfish, because the build left out the clipboard support of the window library, so
+  nothing could be pasted into another program. It is enabled again, on Wayland and X11.
+- **The Web page follows the display filter.** Exchanges, HTTPS sessions and Streams were always those of the
+  whole capture, even with a filter applied on the Packets page or from the map. They now keep only what the
+  filter lets through, the frame numbers staying those of the whole capture. An exchange is kept when its
+  frames pass the filter, so a filter on a field that only the request has (`http.host`) can drop the
+  response. The Files tab still lists every object.
+- **The TCP graphs draw lines as lines.** On a stream that lasts a few milliseconds the ACK line of the
+  time-sequence graph, which has two points at the same time, was drawn as a filled polygon.
+- **The TCP graphs say what the connection did.** The ACK line of the time-sequence graph and the advertised
+  window are drawn as steps, since a value holds until the next packet, instead of slanted lines between
+  packets. A stream that lasts a few milliseconds has a throughput curve, drawn as flat stretches over their
+  bucket, instead of a lone point (the narrowest bucket goes from 10 ms to 0.1 ms).
+- **The I/O graph no longer draws needles under the zero line.** On a long capture with many short buckets, the
+  needles went far below the baseline. The line is now reduced to about two points per pixel column, keeping the
+  highest and the lowest value of each, so no spike is lost. It also leaves a gap under the series rows, and the
+  axis of the graphs no longer repeats the zero label below the baseline.
+
 ## [0.6.0] - 2026-11-23
 
 ### Added
@@ -234,7 +279,8 @@ First public prototype of wirelens, a desktop packet viewer written in Rust with
 - **Release binaries** built by the CI for Linux (`x86_64`, `aarch64`, Arch Linux), macOS (`arm64`, `x86_64`) and
   Windows (`x86_64`).
 
-[Unreleased]: https://github.com/anyhowfeel/pilotfish/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/anyhowfeel/pilotfish/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/anyhowfeel/pilotfish/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/anyhowfeel/pilotfish/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/anyhowfeel/pilotfish/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/anyhowfeel/pilotfish/compare/v0.3.0...v0.4.0

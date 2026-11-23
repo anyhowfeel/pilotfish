@@ -67,6 +67,7 @@ pub fn tcp_samples(
     all.extend(["-o".into(), "tcp.desegment_tcp_streams:FALSE".into()]);
     let filter = format!("tcp && ({filter})");
     let pass = Pass {
+        scope: None,
         file,
         filter: &filter,
         fields: &FIELDS,

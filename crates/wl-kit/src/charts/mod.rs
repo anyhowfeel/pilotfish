@@ -22,4 +22,4 @@ pub use layout::{fraction, segment_widths};
 pub use select::{MIN_WINDOW, TimeSelection};
 pub use throughput::{throughput_chart, throughput_chart_select};
 pub use unit::{Unit, compact};
-pub use xy::{Marker, SeriesStyle, XySeries, xy_chart};
+pub use xy::{Marker, SeriesStyle, XySeries, xy_chart, xy_chart_with_reset};

@@ -81,6 +81,7 @@ impl TopologyView {
             rect,
             zoom: self.vp.zoom,
             sel,
+            multi: &self.buf.multi,
             hover,
             directions: self.opts.directions,
             encrypted: self.opts.encrypted,

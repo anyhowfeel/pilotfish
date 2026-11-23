@@ -34,6 +34,8 @@ pub struct Layout {
     targets: Vec<Vec2>,
     planar: PlanarState,
     moving: bool,
+    /// The next `sync` starts from scratch: no remembered position, no pin.
+    forget_next: bool,
 }
 
 fn hash_angle(s: &str) -> f32 {
@@ -53,6 +55,12 @@ impl Layout {
         self.mode
     }
 
+    /// Forgets every remembered position and pin: the next `sync` lays the graph out afresh.
+    pub fn forget(&mut self) {
+        self.forget_next = true;
+        self.planar.reset();
+    }
+
     pub fn set_mode(&mut self, m: Mode, g: &Graph) {
         if m != self.mode {
             self.planar.reset();
@@ -64,6 +72,9 @@ impl Layout {
     /// Call when the graph changed: re-seeds positions and restarts relaxation.
     pub fn sync(&mut self, g: &Graph) {
         self.remember();
+        if std::mem::take(&mut self.forget_next) {
+            self.stored.clear();
+        }
         let mut placed: Vec<Option<Vec2>> = vec![None; g.nodes.len()];
         let mut fresh = false;
         for (i, n) in g.nodes.iter().enumerate() {

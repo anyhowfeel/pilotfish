@@ -18,6 +18,7 @@ pub fn credentials(
     opts: &[String],
 ) -> Result<Vec<Credential>, CaptureError> {
     let pass = Pass {
+        scope: None,
         file,
         filter: FILTER,
         fields: &FIELDS,

@@ -15,6 +15,8 @@ pub enum Glyph {
     Minus,
     /// Four corner brackets: "fit to view".
     Fit,
+    /// Circular arrow: "reset the view".
+    Reset,
     /// Diagonal cross: remove / close.
     Cross,
     /// Open eye: visible.
@@ -56,6 +58,22 @@ pub fn paint_glyph(p: &Painter, glyph: Glyph, r: Rect, c: Color32) {
                 p.line_segment([corner, pos2(corner.x - sx * k, corner.y)], s);
                 p.line_segment([corner, pos2(corner.x, corner.y - sy * k)], s);
             }
+        }
+        Glyph::Reset => {
+            let r = u * 0.85;
+            let arc: Vec<Pos2> = (0..=18)
+                .map(|i| {
+                    let a = (45.0 + 270.0 * (i as f32 / 18.0)).to_radians();
+                    pos2(m.x + r * a.cos(), m.y - r * a.sin())
+                })
+                .collect();
+            p.add(Shape::line(arc.clone(), s));
+            let (end, before) = (arc[arc.len() - 1], arc[arc.len() - 2]);
+            let d = (end - before).normalized();
+            let n = vec2(-d.y, d.x);
+            let k = u * 0.6;
+            p.line_segment([end, end - d * k + n * k * 0.7], s);
+            p.line_segment([end, end - d * k - n * k * 0.7], s);
         }
         Glyph::Cross => {
             let d = u * 0.8;

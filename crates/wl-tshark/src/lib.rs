@@ -181,14 +181,49 @@ impl CaptureBackend for TsharkBackend {
 
     fn http_exchanges(&self, file: &Path) -> Result<Vec<HttpExchange>, CaptureError> {
         self.scans.http.get_or_scan(file, || {
-            http_scan::http_exchanges(&self.tools, file, &self.dissect_opts())
+            http_scan::http_exchanges(&self.tools, file, &self.dissect_opts(), None)
         })
+    }
+
+    fn http_exchanges_scoped(
+        &self,
+        file: &Path,
+        scope: Option<&str>,
+    ) -> Result<Vec<HttpExchange>, CaptureError> {
+        match scope.map(str::trim).filter(|s| !s.is_empty()) {
+            None => self.http_exchanges(file),
+            // A narrowed scan is not what the shared memo holds.
+            Some(f) => http_scan::http_exchanges(&self.tools, file, &self.dissect_opts(), Some(f)),
+        }
     }
 
     fn tls_sessions(&self, file: &Path) -> Result<Vec<TlsSession>, CaptureError> {
         self.scans.tls.get_or_scan(file, || {
-            tls_scan::tls_sessions(&self.tools, &self.scans.certs, file, &self.dissect_opts())
+            tls_scan::tls_sessions(
+                &self.tools,
+                &self.scans.certs,
+                file,
+                &self.dissect_opts(),
+                None,
+            )
         })
+    }
+
+    fn tls_sessions_scoped(
+        &self,
+        file: &Path,
+        scope: Option<&str>,
+    ) -> Result<Vec<TlsSession>, CaptureError> {
+        match scope.map(str::trim).filter(|s| !s.is_empty()) {
+            None => self.tls_sessions(file),
+            Some(f) => tls_scan::tls_sessions(
+                &self.tools,
+                &self.scans.certs,
+                file,
+                &self.dissect_opts(),
+                Some(f),
+            ),
+        }
     }
 
     fn http_detail(&self, file: &Path, ex: &HttpExchange) -> Result<HttpDetail, CaptureError> {
@@ -215,7 +250,16 @@ impl CaptureBackend for TsharkBackend {
     }
 
     fn message_streams(&self, file: &Path) -> Result<Vec<MessageStream>, CaptureError> {
-        msg_scan::message_streams(&self.tools, file, &self.dissect_opts())
+        msg_scan::message_streams(&self.tools, file, &self.dissect_opts(), None)
+    }
+
+    fn message_streams_scoped(
+        &self,
+        file: &Path,
+        scope: Option<&str>,
+    ) -> Result<Vec<MessageStream>, CaptureError> {
+        let scope = scope.map(str::trim).filter(|s| !s.is_empty());
+        msg_scan::message_streams(&self.tools, file, &self.dissect_opts(), scope)
     }
 
     fn flow_events(&self, file: &Path, filter: &str) -> Result<FlowEvents, CaptureError> {
@@ -268,7 +312,7 @@ impl CaptureBackend for TsharkBackend {
             cap: objects::SIZE_CAP,
         };
         objects::export(&req, || {
-            http_scan::http_exchanges(&self.tools, file, &opts).unwrap_or_default()
+            http_scan::http_exchanges(&self.tools, file, &opts, None).unwrap_or_default()
         })
     }
 

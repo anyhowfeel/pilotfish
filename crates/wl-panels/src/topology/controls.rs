@@ -27,6 +27,8 @@ pub const ZOOM_STEP: f32 = 1.25;
 pub struct Cmd {
     pub zoom: Option<f32>,
     pub fit: bool,
+    /// Forget the moved hosts, the selection, the search and the filters, then fit.
+    pub reset: bool,
     pub search_enter: bool,
     /// Occupied area (for keeping the fitted graph clear of it).
     pub rect: Option<Rect>,
@@ -111,7 +113,7 @@ pub fn controls(
         ui.set_width(w);
         ui.spacing_mut().item_spacing = vec2(spacing::SM, spacing::SM);
         ui.horizontal(|ui| {
-            let mut fixed = 3.0 * 28.0 + 4.0 * spacing::SM;
+            let mut fixed = 4.0 * 28.0 + 5.0 * spacing::SM;
             fixed += if compact { OPTIONS_W } else { SEG_W };
             let r = ui.add(
                 TextEdit::singleline(search)
@@ -133,6 +135,12 @@ pub fn controls(
                 cmd.zoom = Some(ZOOM_STEP);
             }
             cmd.fit = icon_button(ui, "Fit to view  0", Glyph::Fit).clicked();
+            cmd.reset = icon_button(
+                ui,
+                "Reset view  R: fit, forget moved hosts, clear selection, search and filters",
+                Glyph::Reset,
+            )
+            .clicked();
         });
         if compact && !*open {
             return;

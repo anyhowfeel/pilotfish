@@ -155,7 +155,10 @@ Environment variables:
   promiscuous, snap length, ring buffer, auto-stop), recent files. A remote host can be captured
   over `ssh` (key or agent login, `tcpdump` on the other side, optional `sudo -n`). During a local
   live capture on Linux, Hosts, Conversations, Flows and the Map name the process behind each socket
-  (read from `/proc`; processes of other users stay unnamed).
+  (read from `/proc`; processes of other users stay unnamed). A live capture is kept as
+  `capture-<date>-<time>-<interface>.pcapng` in `Documents/pilotfish/captures`; Settings > Capture changes
+  the folder or turns this off (the capture is then a temporary file, deleted when pilotfish closes), and a
+  path typed in Output > Save to wins for that capture.
 - **Packets**: virtualized packet list that stays responsive with about a million rows, display
   filter bar with field completion (and, after an operator, the hosts and ports of the capture)
   plus quick-filter chips, find (string, regex, hex),
@@ -166,13 +169,14 @@ Environment variables:
   country and network of public addresses when a local `.mmdb` database is present (see below).
 - **Graphs**: I/O graph with several display-filter series.
 - **Map**: graph of host-to-host traffic, link width by volume, optional highlight of encrypted
-  flows. The default Planar layout draws the graph without crossing links when that is possible
+  flows. Shift+click on links picks several of them, and the card then filters the packets of all of
+  them at once. The default Planar layout draws the graph without crossing links when that is possible
   and keeps the crossings to a minimum when it is not; Force is the free-moving alternative.
 - **Flows**: sequence diagram of a conversation, plus TCP time-sequence, throughput, RTT and
   window-size graphs.
 - **Web**: HTTP requests paired with responses (headers, pretty or raw JSON, readable HTML,
   image preview, `curl` export) and TLS sessions (SNI, version, cipher, ALPN, JA3 / JA4 fingerprints) for HTTPS;
-  extracted objects.
+  extracted objects. Exchanges, sessions and streams follow the display filter that is applied.
 - **Insights**: plain-language findings (including port scans, sweeps, beaconing and odd DNS
   names), expert info, protocol hierarchy, DNS log.
 - **Diff**: compares the open capture with a second one (`--diff FILE` or the Choose capture

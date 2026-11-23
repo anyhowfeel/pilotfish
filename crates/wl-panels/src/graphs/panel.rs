@@ -208,6 +208,8 @@ impl GraphsPanel {
         if let Some(i) = remove {
             self.defs.remove(i);
         }
+        // The gap after an item is the spacing in force when it was placed: leave room before the chart.
+        ui.add_space(spacing::SM);
         ui.spacing_mut().item_spacing.y = spacing::SM;
     }
 

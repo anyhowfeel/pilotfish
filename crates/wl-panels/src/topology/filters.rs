@@ -20,9 +20,33 @@ pub fn pair(a: &str, b: &str) -> String {
     format!("{} && {}", clause(a), clause(b))
 }
 
+/// Every packet exchanged by any of the pairs `(a, b)`.
+pub fn any_pair<A: AsRef<str>, B: AsRef<str>>(pairs: &[(A, B)]) -> String {
+    match pairs {
+        [(a, b)] => pair(a.as_ref(), b.as_ref()),
+        _ => pairs
+            .iter()
+            .map(|(a, b)| format!("({})", pair(a.as_ref(), b.as_ref())))
+            .collect::<Vec<_>>()
+            .join(" || "),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn several_pairs_are_joined_with_or() {
+        assert_eq!(
+            any_pair(&[("10.0.0.1", "10.0.0.2")]),
+            "ip.addr == 10.0.0.1 && ip.addr == 10.0.0.2"
+        );
+        assert_eq!(
+            any_pair(&[("10.0.0.1", "10.0.0.2"), ("10.0.0.3", "2001:db8::1")]),
+            "(ip.addr == 10.0.0.1 && ip.addr == 10.0.0.2) || (ip.addr == 10.0.0.3 && ipv6.addr == 2001:db8::1)"
+        );
+    }
 
     #[test]
     fn builds_per_address_family() {

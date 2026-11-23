@@ -52,6 +52,10 @@ pub struct Settings {
     /// Defaults of Capture > Options (filter, promiscuous, snaplen, ring buffer, auto-stop ...).
     pub capture: CaptureOptions,
     pub temp_dir: String,
+    /// Keep every live capture as a file in `capture_dir` (off: a temporary file, deleted on exit).
+    pub autosave_captures: bool,
+    /// Folder of the saved captures; empty = `Documents/pilotfish/captures`.
+    pub capture_dir: String,
     /// Folder holding tshark and dumpcap; empty searches PATH and the usual install folders.
     pub wireshark_dir: String,
     // Display
@@ -87,6 +91,8 @@ impl Default for Settings {
             default_interface: String::new(),
             capture: CaptureOptions::default(),
             temp_dir: String::new(),
+            autosave_captures: true,
+            capture_dir: String::new(),
             wireshark_dir: String::new(),
             time_format: TimeFormat::Relative,
             clock_zone: ClockZone::Local,

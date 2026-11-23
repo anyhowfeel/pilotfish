@@ -15,7 +15,7 @@ const WIDTH: f32 = 250.0;
 
 pub fn show(resp: &Response, g: &Graph, hover: Resolved, r: &dyn NameResolver) {
     match hover {
-        Resolved::None => {}
+        Resolved::None | Resolved::Many => {}
         Resolved::Node(i) => {
             resp.clone().on_hover_ui_at_pointer(|ui| node(ui, g, i, r));
         }

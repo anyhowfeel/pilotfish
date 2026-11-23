@@ -167,6 +167,7 @@ pub fn behavior_channels(
     let mut all = opts.to_vec();
     all.extend(["-o".into(), "tcp.desegment_tcp_streams:FALSE".into()]);
     let pass = Pass {
+        scope: None,
         file,
         filter: FILTER,
         fields: &FIELDS,

@@ -1,10 +1,10 @@
 //! TCP stream graph tabs: direction picker, summary chips and the XY chart of one graph.
 
-use wl_kit::charts::{Marker, SeriesStyle, XySeries, xy_chart};
+use wl_kit::charts::{Marker, SeriesStyle, XySeries, xy_chart_with_reset};
 use wl_kit::egui::{RichText, Ui};
 use wl_kit::format;
 use wl_kit::theme::{Palette, spacing};
-use wl_kit::widgets::{chip_dot, empty_state, segmented_w};
+use wl_kit::widgets::{Glyph, chip_dot, empty_state, icon_button, segmented_w};
 use wl_model::TcpSamples;
 
 use super::tabs::Tab;
@@ -64,7 +64,8 @@ fn y_formatter(tab: Tab) -> fn(f64) -> String {
     }
 }
 
-fn summary_chips(ui: &mut Ui, s: &Summary) {
+/// The chips of the stream, then the button that brings a zoomed chart back (true when clicked).
+fn summary_chips(ui: &mut Ui, s: &Summary) -> bool {
     let danger = |n: usize| (n > 0).then(Palette::danger);
     let warn = |n: usize| (n > 0).then(Palette::warn);
     let mut chips = vec![
@@ -85,12 +86,20 @@ fn summary_chips(ui: &mut Ui, s: &Summary) {
             None,
         ));
     }
+    let mut reset = false;
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing = wl_kit::egui::vec2(spacing::SM, spacing::SM);
         for (text, dot) in chips {
             chip_dot(ui, &text, false, dot);
         }
+        reset = icon_button(
+            ui,
+            "Reset zoom: a box dragged on the chart zooms in, a double click also comes back",
+            Glyph::Reset,
+        )
+        .clicked();
     });
+    reset
 }
 
 impl TcpView {
@@ -141,7 +150,7 @@ impl TcpView {
         }
         self.dir = Some(d);
         ui.add_space(spacing::SM);
-        summary_chips(ui, &series::summary(s, d));
+        let reset_zoom = summary_chips(ui, &series::summary(s, d));
         ui.add_space(spacing::SM);
         let key = (rev, tab, d);
         if self.cache.as_ref().map(|c| c.0) != Some(key) {
@@ -162,7 +171,7 @@ impl TcpView {
         let used = ui.cursor().min.y - top;
         let h = (page_h - used).max(MIN_CHART_H);
         let plot_id = format!("{id}-{tab:?}-{d}");
-        xy_chart(ui, &plot_id, plot, &y_formatter(tab), h);
+        xy_chart_with_reset(ui, &plot_id, plot, &y_formatter(tab), h, reset_zoom);
     }
 }
 

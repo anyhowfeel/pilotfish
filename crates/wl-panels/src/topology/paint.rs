@@ -19,6 +19,8 @@ pub struct Scene<'a> {
     pub rect: Rect,
     pub zoom: f32,
     pub sel: Resolved,
+    /// Links of the selection when several are picked.
+    pub multi: &'a [usize],
     pub hover: Resolved,
     pub directions: bool,
     pub encrypted: bool,
@@ -50,14 +52,18 @@ pub fn half_width(t: f32, zoom: f32) -> f32 {
 
 pub fn links(p: &Painter, s: &Scene, buf: &Buffers) {
     let mut flowing = 0;
+    // The arrows come after every stroke, or the next link would be drawn over the last one.
+    let mut arrows: Vec<(arrow::Link, Color32)> = Vec::new();
     let focus = s.sel != Resolved::None;
     for (i, l) in s.g.links.iter().enumerate() {
         let (a, b) = (buf.screen[l.a], buf.screen[l.b]);
         if a == b || !s.rect.expand(40.0).intersects(Rect::from_two_pos(a, b)) {
             continue;
         }
-        let lit = s.sel.touches_link(s.g, i);
-        let hot = s.hover == Resolved::Link(i) || s.sel == Resolved::Link(i);
+        let lit = s.sel.touches_link(s.g, s.multi, i);
+        let hot = s.hover == Resolved::Link(i)
+            || s.sel == Resolved::Link(i)
+            || (s.sel == Resolved::Many && s.multi.contains(&i));
         let secure = s.encrypted && l.encrypted;
         // "Encrypted" mode: everything that is not encrypted fades out.
         let k = if (focus && !lit) || (s.encrypted && !secure) {
@@ -74,18 +80,29 @@ pub fn links(p: &Painter, s: &Scene, buf: &Buffers) {
         let w = half_width(l.t, s.zoom) * 2.0 + if hot { 1.5 } else { 0.0 };
         p.line_segment([a, b], Stroke::new(w, color));
         if secure && k == 1.0 {
-            // Lock at the middle of the link, on a disc that keeps it readable over the line.
-            let m = a + (b - a) * 0.5;
+            // Lock on a disc that keeps it readable over the line, off the middle when the arrow is there.
+            let m = a + (b - a) * if s.directions { 0.3 } else { 0.5 };
             p.circle_filled(m, 8.5, Palette::panel());
             paint_lock(p, m, 11.0, color);
         }
         let (from, to, share) = dominant(s.g, i);
         let (pf, pt) = (buf.screen[from], buf.screen[to]);
-        if s.directions && share >= 0.62 && k == 1.0 {
+        if s.directions && k == 1.0 {
             let reach = (buf.discs[from].1, buf.discs[to].1);
-            if let Some(tri) = arrow::head(pf, pt, reach, w) {
-                arrow(p, tri, color);
-            }
+            // One way only when not a single byte went the other way.
+            let way = if l.a_to_b == 0 || l.a_to_b >= l.bytes {
+                arrow::Way::OneWay
+            } else {
+                arrow::Way::TwoWay(share)
+            };
+            let link = arrow::Link {
+                from: pf,
+                to: pt,
+                reach,
+                width: w,
+                way,
+            };
+            arrows.push((link, color));
         }
         if s.animate && flowing < MAX_FLOWING && l.t >= 0.35 && k == 1.0 {
             flowing += 1;
@@ -100,10 +117,16 @@ pub fn links(p: &Painter, s: &Scene, buf: &Buffers) {
             ));
         }
     }
+    let links: Vec<arrow::Link> = arrows.iter().map(|(l, _)| *l).collect();
+    for (placed, (_, color)) in arrow::place(&links).into_iter().zip(arrows) {
+        for head in placed.iter().flat_map(arrow::Arrow::heads) {
+            draw_head(p, head, color);
+        }
+    }
 }
 
-/// The head is opaque and outlined in the panel color so it stands out from the line it ends.
-fn arrow(p: &Painter, tri: [Pos2; 3], color: Color32) {
+/// A head is opaque and outlined in the panel color so it stands out from the line it sits on.
+fn draw_head(p: &Painter, tri: [Pos2; 3], color: Color32) {
     let solid = Color32::from_rgb(color.r(), color.g(), color.b());
     p.add(Shape::convex_polygon(
         tri.to_vec(),
@@ -118,7 +141,7 @@ pub fn nodes(p: &Painter, s: &Scene, buf: &Buffers) {
         if !s.rect.expand(r + 8.0).contains(c) {
             continue;
         }
-        let k = if s.sel.touches_node(s.g, i) {
+        let k = if s.sel.touches_node(s.g, s.multi, i) {
             1.0
         } else {
             NODE_DIM
@@ -151,7 +174,7 @@ pub fn labels(p: &Painter, s: &Scene, buf: &Buffers) {
         let Some(g) = buf.galleys.get(*i).and_then(|g| g.as_ref()) else {
             continue;
         };
-        let dim = !s.sel.touches_node(s.g, *i);
+        let dim = !s.sel.touches_node(s.g, s.multi, *i);
         let pill = rect.expand2(vec2(3.0, 1.0));
         let bg = if dim { 60 } else { 205 };
         p.rect_filled(pill, CornerRadius::same(4), tint(Palette::panel(), bg));

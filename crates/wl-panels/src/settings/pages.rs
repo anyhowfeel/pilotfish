@@ -85,6 +85,23 @@ pub fn capture(ui: &mut Ui, s: &mut Settings) {
             "e.g. port 53",
         );
     });
+    settings_card(ui, "Saved captures", |ui| {
+        toggle_row(
+            ui,
+            true,
+            "Save captures automatically",
+            "Keeps each live capture as a .pcapng file. Off keeps it in a temporary file that is deleted when pilotfish closes.",
+            &mut s.autosave_captures,
+        );
+        text_row(
+            ui,
+            false,
+            "Folder",
+            "Where the saved captures go. A path typed in Output > Save to wins for that capture.",
+            &mut s.capture_dir,
+            "Documents/pilotfish/captures",
+        );
+    });
     settings_card(ui, "Wireshark", |ui| {
         text_row(
             ui,

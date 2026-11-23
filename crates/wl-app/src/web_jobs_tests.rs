@@ -15,6 +15,8 @@ use crate::worker::Controller;
 #[derive(Default)]
 struct Stub {
     scans: AtomicUsize,
+    /// The display filter each scan was asked to keep.
+    scopes: std::sync::Mutex<Vec<Option<String>>>,
 }
 
 fn exchange(id: u64) -> HttpExchange {
@@ -57,6 +59,17 @@ impl CaptureBackend for Stub {
         let n = self.scans.fetch_add(1, Ordering::SeqCst) as u64;
         Ok(vec![exchange(n + 1)])
     }
+    fn http_exchanges_scoped(
+        &self,
+        file: &Path,
+        scope: Option<&str>,
+    ) -> Result<Vec<HttpExchange>, CaptureError> {
+        self.scopes
+            .lock()
+            .expect("lock")
+            .push(scope.map(str::to_owned));
+        self.http_exchanges(file)
+    }
     fn tls_sessions(&self, _: &Path) -> Result<Vec<TlsSession>, CaptureError> {
         Ok(vec![])
     }
@@ -91,16 +104,16 @@ fn scans_only_when_active_and_once_for_files() {
     let stub = Arc::new(Stub::default());
     let mut s = WebState::new(stub.clone());
     let (file, t0) = (Some(PathBuf::from("a.pcapng")), Instant::now());
-    s.tick(file.clone(), false, t0);
+    s.tick(file.clone(), None, false, t0);
     assert_eq!(
         stub.scans.load(Ordering::SeqCst),
         0,
         "inactive page never scans"
     );
     s.set_active(true, false);
-    s.tick(file.clone(), false, t0);
+    s.tick(file.clone(), None, false, t0);
     wait_idle(&s);
-    s.tick(file.clone(), false, t0 + Duration::from_secs(60));
+    s.tick(file.clone(), None, false, t0 + Duration::from_secs(60));
     wait_idle(&s);
     assert_eq!(
         stub.scans.load(Ordering::SeqCst),
@@ -112,7 +125,7 @@ fn scans_only_when_active_and_once_for_files() {
     assert_eq!((ex.len(), tls.len()), (1, 0));
     assert!(s.jobs.take_web().is_none(), "result is handed out once");
     s.on_new_capture();
-    s.tick(file, false, t0);
+    s.tick(file, None, false, t0);
     wait_idle(&s);
     assert_eq!(stub.scans.load(Ordering::SeqCst), 2, "new capture rescans");
 }
@@ -123,16 +136,16 @@ fn live_capture_refreshes_every_three_seconds() {
     let mut s = WebState::new(stub.clone());
     let (file, t0) = (Some(PathBuf::from("live.pcapng")), Instant::now());
     s.set_active(true, true);
-    s.tick(file.clone(), true, t0);
+    s.tick(file.clone(), None, true, t0);
     wait_idle(&s);
-    s.tick(file.clone(), true, t0 + Duration::from_secs(1));
+    s.tick(file.clone(), None, true, t0 + Duration::from_secs(1));
     wait_idle(&s);
     assert_eq!(stub.scans.load(Ordering::SeqCst), 1);
-    s.tick(file.clone(), true, t0 + LIVE_REFRESH);
+    s.tick(file.clone(), None, true, t0 + LIVE_REFRESH);
     wait_idle(&s);
     assert_eq!(stub.scans.load(Ordering::SeqCst), 2);
     s.on_stop(true);
-    s.tick(file, false, t0 + Duration::from_secs(4));
+    s.tick(file, None, false, t0 + Duration::from_secs(4));
     wait_idle(&s);
     assert_eq!(
         stub.scans.load(Ordering::SeqCst),
@@ -154,7 +167,7 @@ fn stale_results_are_dropped_and_detail_latest_wins() {
     .and_then(|d| d.request)
     .map(|m| m.start_line);
     assert_eq!(line.as_deref(), Some("GET /2"));
-    jobs.request(PathBuf::from("f"));
+    jobs.request(PathBuf::from("f"), None);
     jobs.invalidate();
     std::thread::sleep(Duration::from_millis(100));
     jobs.drain();
@@ -192,4 +205,19 @@ fn controller_serves_real_exchanges_and_detail() {
         Some(format!("GET {} HTTP/1.1", ex[0].uri))
     );
     assert!(c.error().is_none());
+}
+
+#[test]
+fn the_scan_is_asked_to_keep_only_what_the_display_filter_lets_through() {
+    let stub = Arc::new(Stub::default());
+    let mut s = WebState::new(stub.clone());
+    let (file, t0) = (Some(PathBuf::from("a.pcapng")), Instant::now());
+    s.set_active(true, false);
+    s.tick(file.clone(), Some("ip.addr == 10.0.0.1".into()), false, t0);
+    wait_idle(&s);
+    s.on_new_capture();
+    s.tick(file, None, false, t0);
+    wait_idle(&s);
+    let seen = stub.scopes.lock().expect("lock").clone();
+    assert_eq!(seen, vec![Some("ip.addr == 10.0.0.1".to_owned()), None]);
 }

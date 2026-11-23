@@ -22,7 +22,8 @@ pub struct Pts {
 
 /// Number of throughput buckets across the stream.
 const BUCKETS: f64 = 48.0;
-const MIN_BUCKET_S: f64 = 0.01;
+/// Narrowest throughput bucket: a stream that lasts a couple of milliseconds still gets a curve.
+const MIN_BUCKET_S: f64 = 0.0001;
 
 fn forward(s: &TcpSamples, a_to_b: bool) -> impl Iterator<Item = &TcpSample> {
     s.samples.iter().filter(move |x| x.from_a == a_to_b)
@@ -42,6 +43,20 @@ fn pts(name: &'static str, role: Role, points: Vec<[f64; 2]>) -> Pts {
     Pts { name, role, points }
 }
 
+/// The points of a value that holds until the next one replaces it (an acknowledgement number, an
+/// advertised window): flat to the next time, then straight up or down, never a slanted line that
+/// would show a value the connection never had.
+fn steps(points: Vec<[f64; 2]>) -> Vec<[f64; 2]> {
+    let mut out = Vec::with_capacity(points.len() * 2);
+    for (i, p) in points.iter().enumerate() {
+        if let Some(prev) = i.checked_sub(1).map(|j| points[j]) {
+            out.push([p[0], prev[1]]);
+        }
+        out.push(*p);
+    }
+    out
+}
+
 /// Stevens time-sequence: end of every data segment, the ACK line of the peer and the marks.
 pub fn time_sequence(s: &TcpSamples, a_to_b: bool) -> Vec<Pts> {
     let end = |x: &TcpSample| [x.rel, (x.seq + u64::from(x.len)) as f64];
@@ -52,7 +67,7 @@ pub fn time_sequence(s: &TcpSamples, a_to_b: bool) -> Vec<Pts> {
         pts(
             "ACK (peer)",
             Role::Ack,
-            acks().map(|x| [x.rel, x.ack as f64]).collect(),
+            steps(acks().map(|x| [x.rel, x.ack as f64]).collect()),
         ),
         pts(
             "Retransmission",
@@ -94,10 +109,14 @@ pub fn throughput(s: &TcpSamples, a_to_b: bool) -> Vec<Pts> {
             re[i] += f64::from(x.len);
         }
     }
+    // A bucket is a flat stretch over its whole width, so one bucket is still a visible line.
     let line = |v: &[f64]| -> Vec<[f64; 2]> {
         v.iter()
             .enumerate()
-            .map(|(i, b)| [t0 + (i as f64 + 0.5) * w, b / w])
+            .flat_map(|(i, b)| {
+                let rate = b / w;
+                [[t0 + i as f64 * w, rate], [t0 + (i as f64 + 1.0) * w, rate]]
+            })
             .collect()
     };
     let mut out = vec![pts("Throughput", Role::Main, line(&all))];
@@ -122,7 +141,7 @@ pub fn window(s: &TcpSamples, a_to_b: bool) -> Vec<Pts> {
         pts(
             "Advertised window",
             Role::Main,
-            adv().map(|x| [x.rel, x.window as f64]).collect(),
+            steps(adv().map(|x| [x.rel, x.window as f64]).collect()),
         ),
         pts(
             "Zero window",
@@ -211,7 +230,8 @@ mod tests {
     fn time_sequence_has_data_acks_and_marks() {
         let s = time_sequence(&sample_set(), true);
         assert_eq!(s[0].points, [[0.0, 100.0], [0.1, 200.0], [0.5, 200.0]]);
-        assert_eq!(s[1].points, [[0.3, 200.0], [0.4, 200.0]]);
+        // The acknowledgement holds until the next one: no slanted line between the two.
+        assert_eq!(s[1].points, [[0.3, 200.0], [0.4, 200.0], [0.4, 200.0]]);
         assert_eq!(s[2].points, [[0.5, 200.0]]);
         assert_eq!(s[3].points, [[0.4, 200.0]]);
     }
@@ -221,7 +241,8 @@ mod tests {
         let set = sample_set();
         let s = throughput(&set, true);
         let w = bucket_width(1.0);
-        let total: f64 = s[0].points.iter().map(|p| p[1] * w).sum();
+        // Two points per bucket, one at each end of its flat stretch.
+        let total: f64 = s[0].points.chunks(2).map(|c| c[0][1] * w).sum();
         assert!((total - 300.0).abs() < 1e-6, "{total}");
         assert_eq!(s[1].role, Role::Retransmission);
     }
@@ -230,11 +251,61 @@ mod tests {
     fn rtt_window_and_summary() {
         let set = sample_set();
         assert_eq!(rtt(&set, true)[0].points, [[0.3, 50.0]]);
-        assert_eq!(window(&set, true)[0].points.len(), 2);
+        assert_eq!(window(&set, true)[0].points.len(), 3);
         let sum = summary(&set, true);
         assert_eq!((sum.segments, sum.bytes), (3, 300));
         assert_eq!((sum.retransmissions, sum.dup_acks), (1, 1));
         assert_eq!(sum.rtt_mean_ms, Some(50.0));
+    }
+
+    #[test]
+    fn a_value_that_holds_is_drawn_as_steps() {
+        let up = steps(vec![[0.0, 1.0], [1.0, 5.0], [3.0, 2.0]]);
+        assert_eq!(
+            up,
+            [[0.0, 1.0], [1.0, 1.0], [1.0, 5.0], [3.0, 5.0], [3.0, 2.0]]
+        );
+        assert!(steps(vec![]).is_empty());
+        assert_eq!(steps(vec![[2.0, 7.0]]), [[2.0, 7.0]]);
+    }
+
+    #[test]
+    fn a_stream_of_two_milliseconds_still_has_a_throughput_curve() {
+        let ack = FlowFlags::ACK;
+        let set = TcpSamples {
+            samples: (0..10_u32)
+                .map(|i| smp(f64::from(i) * 0.0002, true, u64::from(i) * 6400, 6400, ack))
+                .collect(),
+            ..Default::default()
+        };
+        let s = throughput(&set, true);
+        let pts = &s[0].points;
+        assert!(pts.len() >= 20, "{} points", pts.len());
+        assert!(
+            pts.windows(2).all(|p| p[0][0] <= p[1][0]),
+            "time never goes back"
+        );
+        assert_eq!(
+            bucket_width(0.0018),
+            MIN_BUCKET_S,
+            "a short stream gets the narrowest bucket"
+        );
+        let total: f64 = pts.chunks(2).map(|c| c[0][1] * (c[1][0] - c[0][0])).sum();
+        assert!((total - 64_000.0).abs() < 1e-3, "{total}");
+    }
+
+    #[test]
+    fn a_single_bucket_is_a_flat_line_not_a_lone_point() {
+        let ack = FlowFlags::ACK;
+        let set = TcpSamples {
+            samples: vec![
+                smp(0.0, true, 0, 1000, ack),
+                smp(0.00005, true, 1000, 1000, ack),
+            ],
+            ..Default::default()
+        };
+        let pts = &throughput(&set, true)[0].points;
+        assert!(pts.len() >= 2 && pts[1][0] > pts[0][0], "{pts:?}");
     }
 
     #[test]

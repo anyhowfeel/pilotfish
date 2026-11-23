@@ -45,6 +45,7 @@ pub fn dns_queries(
     opts: &[String],
 ) -> Result<Vec<DnsQuery>, CaptureError> {
     let pass = Pass {
+        scope: None,
         file,
         filter: "dns",
         fields: &FIELDS,

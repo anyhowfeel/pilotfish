@@ -3,6 +3,7 @@
 use wl_kit::egui::{self, CursorIcon, Rect, Response, Ui};
 
 use super::frame::Drag;
+use super::model::Filters;
 use super::state::{Resolved, Selection};
 use super::{TopologyView, controls, hit};
 
@@ -40,10 +41,15 @@ impl TopologyView {
                 _ => self.auto_fit = true,
             }
         } else if resp.clicked() {
+            // Shift+click on links builds a selection of several links; a click on the background
+            // with Shift held does not drop it.
+            let shift = ui.input(|i| i.modifiers.shift);
             self.sel = match hover {
+                Resolved::Link(l) if shift => self.sel.toggled_link(g, l),
                 Resolved::Node(i) => Selection::Node(g.nodes[i].addr.clone()),
                 Resolved::Link(l) => Selection::of_link(g, l),
-                Resolved::None => Selection::None,
+                Resolved::None | Resolved::Many if shift => self.sel.clone(),
+                Resolved::None | Resolved::Many => Selection::None,
             };
         }
         let (scroll, zoom) = ui.input(|i| (i.smooth_scroll_delta.y, i.zoom_delta()));
@@ -61,13 +67,14 @@ impl TopologyView {
     fn keys(&mut self, ui: &Ui, rect: Rect) {
         use egui::Key;
         let ctx = ui.ctx();
-        let (esc, plus, minus, zero) = ctx.input(|i| {
+        let (esc, plus, minus, zero, reset) = ctx.input(|i| {
             let free = !i.modifiers.command;
             (
                 i.key_pressed(Key::Escape),
                 free && (i.key_pressed(Key::Plus) || i.key_pressed(Key::Equals)),
                 free && i.key_pressed(Key::Minus),
                 free && i.key_pressed(Key::Num0),
+                free && i.key_pressed(Key::R),
             )
         });
         if esc {
@@ -86,6 +93,22 @@ impl TopologyView {
         if zero {
             self.auto_fit = true;
         }
+        if reset {
+            self.reset_view();
+        }
+    }
+
+    /// Back to the starting view: fitted, every host free, nothing selected, searched or filtered. The
+    /// layout mode and the display switches (labels, directions, encrypted) are preferences and stay.
+    pub(super) fn reset_view(&mut self) {
+        self.sel = Selection::None;
+        self.search.clear();
+        self.drag = None;
+        self.opts.filters = Filters::default();
+        self.layout.forget();
+        // The graph is built again with the default filters, and laid out from scratch.
+        self.key = None;
+        self.auto_fit = true;
     }
 
     pub(super) fn apply(&mut self, cmd: controls::Cmd, rect: Rect) {
@@ -94,6 +117,9 @@ impl TopologyView {
             self.auto_fit = false;
         }
         self.auto_fit |= cmd.fit;
+        if cmd.reset {
+            self.reset_view();
+        }
         if cmd.search_enter
             && let Some(&i) = self.buf.matches.first()
         {
