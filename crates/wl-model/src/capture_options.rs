@@ -39,7 +39,8 @@ pub struct CaptureOptions {
     pub ring: RingBuffer,
     pub stop: AutoStop,
     pub remote: RemoteTarget,
-    /// Where to keep the capture (ring buffer base name when the ring is enabled). Empty = temp.
+    /// Where to keep the capture (ring buffer base name when the ring is enabled). Empty = the saved
+    /// captures folder of the settings, or a temporary file when automatic saving is off.
     pub save_to: String,
 }
 
@@ -91,9 +92,6 @@ impl CaptureOptions {
         if self.interfaces.is_empty() {
             return Some("Select at least one interface.");
         }
-        if self.ring.enabled && self.save_to.trim().is_empty() {
-            return Some("A ring buffer needs a save-to path.");
-        }
         if self.ring.enabled && self.ring.file_mb == 0 && self.ring.secs == 0 {
             return Some("A ring buffer needs a file size or duration limit.");
         }
@@ -124,9 +122,11 @@ mod tests {
         o.interfaces.push("lo".into());
         assert_eq!(o.problem(), None);
         o.ring.enabled = true;
-        assert!(o.problem().is_some_and(|p| p.contains("save-to")));
-        o.save_to = "/tmp/x.pcapng".into();
-        assert_eq!(o.problem(), None);
+        assert_eq!(
+            o.problem(),
+            None,
+            "the app picks the folder of a ring buffer"
+        );
         o.ring.file_mb = 0;
         assert!(o.problem().is_some_and(|p| p.contains("limit")));
     }

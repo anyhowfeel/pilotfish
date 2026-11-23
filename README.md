@@ -155,7 +155,10 @@ Environment variables:
   promiscuous, snap length, ring buffer, auto-stop), recent files. A remote host can be captured
   over `ssh` (key or agent login, `tcpdump` on the other side, optional `sudo -n`). During a local
   live capture on Linux, Hosts, Conversations, Flows and the Map name the process behind each socket
-  (read from `/proc`; processes of other users stay unnamed).
+  (read from `/proc`; processes of other users stay unnamed). A live capture is kept as
+  `capture-<date>-<time>-<interface>.pcapng` in `Documents/pilotfish/captures`; Settings > Capture changes
+  the folder or turns this off (the capture is then a temporary file, deleted when pilotfish closes), and a
+  path typed in Output > Save to wins for that capture.
 - **Packets**: virtualized packet list that stays responsive with about a million rows, display
   filter bar with field completion (and, after an operator, the hosts and ports of the capture)
   plus quick-filter chips, find (string, regex, hex),

@@ -61,7 +61,23 @@ impl App {
                     ..options.clone()
                 };
                 self.prefs.save();
-                self.ctrl.start(CaptureSource::Capture(options), None);
+                // The path of an automatically saved capture is not a default for the next one.
+                let mut run = options;
+                let saved = crate::autosave::plan(
+                    &run,
+                    self.prefs.settings.autosave_captures,
+                    &self.prefs.settings.capture_dir,
+                    chrono::Local::now(),
+                    &|p| p.exists(),
+                );
+                if let Some(path) = &saved {
+                    run.save_to = path.display().to_string();
+                }
+                self.ctrl.start(CaptureSource::Capture(run), None);
+                if let Some(path) = saved {
+                    self.prefs.push_recent(path);
+                    self.prefs.save();
+                }
                 self.dashboard.clear_window_stats();
                 self.page = Page::Packets;
             }

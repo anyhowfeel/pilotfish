@@ -13,6 +13,11 @@ use crate::process::{Proc, StderrTap, Tools, spawn};
 /// permission) fails the whole capture with dumpcap's message.
 pub fn start(tools: &Tools, o: &CaptureOptions) -> Result<Option<Proc>, CaptureError> {
     let base = Path::new(o.save_to.trim());
+    if o.ring.enabled && base.as_os_str().is_empty() && !o.remote.enabled {
+        return Err(CaptureError::Other(
+            "A ring buffer needs a save-to path.".into(),
+        ));
+    }
     let Some(args) = ring_args(o, base).filter(|_| !o.remote.enabled) else {
         return Ok(None);
     };

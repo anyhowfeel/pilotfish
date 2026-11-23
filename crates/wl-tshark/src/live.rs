@@ -91,6 +91,13 @@ pub fn start(tools: &Tools, a: &LiveArgs) -> Result<Session, CaptureError> {
     if let Some(f) = display {
         validate::display_filter(tools, a.empty_pcap, f)?;
     }
+    if let Some(dir) = a
+        .backing_file
+        .parent()
+        .filter(|d| !d.as_os_str().is_empty())
+    {
+        std::fs::create_dir_all(dir).map_err(|e| io_error("create the capture folder", &e))?;
+    }
     let file = File::create(a.backing_file).map_err(|e| io_error("create capture file", &e))?;
 
     let source = producer(tools, a.options)?;

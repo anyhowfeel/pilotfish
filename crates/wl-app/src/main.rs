@@ -10,6 +10,7 @@ mod app_paths;
 mod app_pump;
 mod app_settings;
 mod app_ui;
+mod autosave;
 mod bench;
 mod bench_script;
 mod bg;

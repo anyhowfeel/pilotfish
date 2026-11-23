@@ -49,7 +49,7 @@ pub fn capture_options(ui: &mut Ui, o: &mut CaptureOptions) -> bool {
             ui,
             true,
             "Save to",
-            "Keep the capture at this path. Empty = temporary file.",
+            "Keep the capture at this path. Empty = the saved captures folder of the settings, or a temporary file when automatic saving is off.",
             &mut o.save_to,
             "/home/me/captures/run.pcapng",
         );

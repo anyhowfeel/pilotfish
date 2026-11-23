@@ -9,6 +9,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - **Copying works with the system clipboard.** Ctrl+C on selected text and every Copy button only reached a
   clipboard inside pilotfish, because the build left out the clipboard support of the window library, so
   nothing could be pasted into another program. It is enabled again, on Wayland and X11.
+### Added
+- **Live captures are saved by default.** A capture is kept as `capture-<date>-<time>-<interface>.pcapng` in
+  `Documents/pilotfish/captures`, appears in Recent files, and never overwrites an existing file. Settings >
+  Capture > Saved captures sets the folder or turns it off, in which case the capture stays a temporary file
+  as before. A path typed in Output > Save to still wins, and a ring buffer always keeps its files.
 
 ## [0.6.0] - 2026-11-23
 
