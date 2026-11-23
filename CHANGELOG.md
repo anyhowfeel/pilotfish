@@ -18,6 +18,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
   and takes 3.3 s, where tshark peaks at 2059 MiB and takes 67 s.
 
 ### Fixed
+- **Wireshark is found on macOS and Windows when the app is not started from a shell.** The tools are also looked
+  for in the Wireshark app bundle, the Homebrew and MacPorts folders, the login shell's `PATH` (macOS) and
+  `Program Files\Wireshark`, or in a folder chosen in Settings > Capture or `PILOTFISH_WIRESHARK_DIR`. The
+  missing-Wireshark message says what to install and where it looked, and a macOS capture permission failure
+  lists the ChmodBPF steps.
 - **Insights no longer reports a clean capture when an analysis failed or has not run.** A failed expert info,
   protocol hierarchy, behavior or credential scan now shows "Analysis failed" with the reason and a way to
   retry, the summary reads "Analysis incomplete", and exported reports leave out the all-clear card unless

@@ -52,6 +52,8 @@ pub struct Settings {
     /// Defaults of Capture > Options (filter, promiscuous, snaplen, ring buffer, auto-stop ...).
     pub capture: CaptureOptions,
     pub temp_dir: String,
+    /// Folder holding tshark and dumpcap; empty searches PATH and the usual install folders.
+    pub wireshark_dir: String,
     // Display
     pub time_format: TimeFormat,
     /// Zone of the times in the file properties.
@@ -85,6 +87,7 @@ impl Default for Settings {
             default_interface: String::new(),
             capture: CaptureOptions::default(),
             temp_dir: String::new(),
+            wireshark_dir: String::new(),
             time_format: TimeFormat::Relative,
             clock_zone: ClockZone::Local,
             auto_scroll: true,
@@ -132,6 +135,12 @@ mod tests {
     fn empty_json_yields_defaults() {
         let s: Settings = serde_json::from_str("{}").expect("parse");
         assert_eq!(s, Settings::default());
+    }
+
+    #[test]
+    fn an_old_file_has_no_wireshark_folder() {
+        let s: Settings = serde_json::from_str(r#"{"theme":"Light"}"#).expect("parse");
+        assert_eq!(s.wireshark_dir, "");
     }
 
     #[test]

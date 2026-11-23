@@ -1,6 +1,7 @@
 //! Whether Wireshark's tools are installed. The app decides once; panels only read it.
 
 use crate::CaptureError;
+use crate::host_os::{HostOs, install_advice};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Wireshark {
@@ -30,14 +31,27 @@ pub fn needs_title(feature: &str) -> String {
 }
 
 /// What to do next, and what still works. Shared by every page and message.
-pub const NEEDS_HINT: &str =
-    "Install Wireshark and restart pilotfish. Opening a capture and browsing it works without it.";
+pub fn needs_hint() -> String {
+    needs_hint_on(HostOs::current())
+}
+
+fn needs_hint_on(os: HostOs) -> String {
+    format!(
+        "{} Then restart pilotfish. Opening a capture and browsing it works without it.",
+        install_advice(os)
+    )
+}
 
 /// One-line form for banners, toasts and tooltips.
 pub fn needs_message(feature: &str) -> String {
+    needs_message_on(HostOs::current(), feature)
+}
+
+fn needs_message_on(os: HostOs, feature: &str) -> String {
     format!(
-        "{}. Install Wireshark and restart pilotfish.",
-        needs_title(feature)
+        "{}. {} Then restart pilotfish.",
+        needs_title(feature),
+        install_advice(os)
     )
 }
 
@@ -58,17 +72,20 @@ mod tests {
     fn the_messages_name_the_feature() {
         assert_eq!(needs_title("Web analysis"), "Web analysis needs Wireshark");
         assert_eq!(
-            needs_message("Follow stream"),
-            "Follow stream needs Wireshark. Install Wireshark and restart pilotfish."
+            needs_message_on(HostOs::Mac, "Follow stream"),
+            "Follow stream needs Wireshark. Install Wireshark from wireshark.org or with \
+             `brew install --cask wireshark`, or choose its folder in Settings. \
+             Then restart pilotfish."
         );
+        assert!(needs_hint_on(HostOs::Linux).contains("package manager"));
     }
 
     #[test]
     fn a_missing_tool_reads_as_a_sentence() {
         let e = CaptureError::ToolMissing("tshark".into());
-        assert_eq!(
-            e.to_string(),
-            "tshark was not found. Install Wireshark to use this feature."
-        );
+        let text = e.to_string();
+        assert!(text.starts_with("tshark was not found. "), "{text}");
+        assert!(text.contains("choose its folder in Settings"), "{text}");
+        assert!(text.contains("Looked on PATH"), "{text}");
     }
 }

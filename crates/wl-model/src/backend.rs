@@ -40,7 +40,7 @@ impl CaptureSource {
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum CaptureError {
-    #[error("{0} was not found. Install Wireshark to use this feature.")]
+    #[error("{}", crate::host_os::missing_text(.0))]
     ToolMissing(String),
     #[error("permission denied: {0}")]
     Permission(String),

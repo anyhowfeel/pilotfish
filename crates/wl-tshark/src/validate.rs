@@ -97,6 +97,7 @@ mod tests {
             dumpcap: PathBuf::from("/nonexistent/dumpcap"),
             editcap: None,
             mergecap: None,
+            capinfos: None,
         }
     }
 

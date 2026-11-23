@@ -1,6 +1,7 @@
 //! The one handle to tshark. Nothing starts it until a feature that needs it asks, and the
 //! capture backend shares the same instance.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use wl_hybrid::{HybridBackend, Lazy};
@@ -9,8 +10,23 @@ use wl_tshark::TsharkBackend;
 
 pub type LazyTshark = Arc<Lazy<TsharkBackend>>;
 
-pub fn lazy_tshark() -> LazyTshark {
-    Arc::new(Lazy::new(|| TsharkBackend::new().map(Arc::new)))
+/// The user's Wireshark folder: the setting, else `PILOTFISH_WIRESHARK_DIR`, else none.
+pub fn wireshark_dir(setting: &str) -> Option<PathBuf> {
+    let setting = setting.trim();
+    if setting.is_empty() {
+        crate::app_paths::env_override("WIRESHARK_DIR")
+            .filter(|v| !v.is_empty())
+            .map(PathBuf::from)
+    } else {
+        Some(PathBuf::from(setting))
+    }
+}
+
+/// A failed lookup is kept for the session, so a changed folder applies at the next start.
+pub fn lazy_tshark(dir: Option<PathBuf>) -> LazyTshark {
+    Arc::new(Lazy::new(move || {
+        TsharkBackend::with_dir(dir.clone()).map(Arc::new)
+    }))
 }
 
 /// Native for what it can read, the shared tshark for the rest.
@@ -55,13 +71,19 @@ mod tests {
     }
 
     #[test]
+    fn the_setting_wins_over_nothing_and_blank_means_none() {
+        assert_eq!(wireshark_dir(" /w "), Some(PathBuf::from("/w")));
+        if crate::app_paths::env_override("WIRESHARK_DIR").is_none() {
+            assert_eq!(wireshark_dir("  "), None);
+        }
+    }
+
+    #[test]
     fn explain_rewrites_only_a_missing_tool() {
         let missing = CaptureError::ToolMissing("tshark".into());
         assert_eq!(
             explain(missing, "Follow stream"),
-            CaptureError::Other(
-                "Follow stream needs Wireshark. Install Wireshark and restart pilotfish.".into()
-            )
+            CaptureError::Other(needs_message("Follow stream"))
         );
         let other = CaptureError::BadFilter("x".into());
         assert_eq!(explain(other.clone(), "Follow stream"), other);

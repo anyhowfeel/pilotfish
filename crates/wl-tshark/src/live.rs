@@ -22,7 +22,7 @@ use crate::capture_args::stream_args;
 use crate::control::Control;
 use crate::error::{from_dumpcap, from_ssh, io_error};
 use crate::finish::{ProducerError, tshark_finish};
-use crate::process::{Proc, StderrTap, Tools, find_in_path, spawn};
+use crate::process::{Proc, StderrTap, Tools, spawn};
 use crate::remote_args::ssh_args;
 use crate::row_parser::field_args;
 use crate::{pump, ring, validate};
@@ -55,7 +55,8 @@ fn producer(tools: &Tools, o: &CaptureOptions) -> Result<Producer, CaptureError>
         return Err(CaptureError::Other(problem.into()));
     }
     Ok(Producer {
-        program: find_in_path("ssh").ok_or_else(|| CaptureError::ToolMissing("ssh".into()))?,
+        program: crate::find_tool(None, "ssh")
+            .ok_or_else(|| CaptureError::ToolMissing("ssh".into()))?,
         args: ssh_args(o),
         classify: from_ssh,
     })
@@ -221,6 +222,7 @@ mod tests {
             dumpcap: PathBuf::new(),
             editcap: None,
             mergecap: None,
+            capinfos: None,
         };
         let mut o = CaptureOptions::single("ignored", None);
         o.remote.enabled = true;

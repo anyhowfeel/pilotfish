@@ -95,6 +95,15 @@ macOS. These packages are built by CI and have not been tested on every platform
 - For live capture, permission to capture without root (on Linux, being in the `wireshark`
   group is usually enough).
 
+### macOS and Windows
+
+An app started from Finder, the Dock or the Start menu does not see the shell's `PATH`, so pilotfish also
+looks where the installers put the tools: `Wireshark.app/Contents/MacOS` (in `/Applications` or `~/Applications`),
+the Homebrew and MacPorts folders and the login shell's `PATH` on macOS, and `Program Files\Wireshark` on Windows.
+If Wireshark is elsewhere, set Settings > Capture > Wireshark folder or `PILOTFISH_WIRESHARK_DIR`, then restart.
+Live capture on macOS needs access to `/dev/bpf*`: run "Install ChmodBPF.pkg" from the Wireshark disk image,
+check that your user is in the `access_bpf` group, then log out and back in.
+
 Developed and tested on Linux only (Wayland and X11).
 
 ## Build and run

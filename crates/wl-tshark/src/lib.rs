@@ -41,6 +41,7 @@ mod json_ordered;
 pub mod keylog;
 mod keys_embed;
 mod live;
+mod login_path;
 mod msg_group;
 mod msg_preview;
 mod msg_rows;
@@ -66,6 +67,7 @@ mod tcp_scan;
 mod tls_merge;
 mod tls_names;
 mod tls_scan;
+mod tool_path;
 mod tsv_pass;
 mod validate;
 
@@ -83,6 +85,7 @@ use wl_model::{
 
 use process::Tools;
 pub use process::{kill_all_children, spawned as processes_spawned};
+pub use tool_path::find_tool;
 
 pub struct TsharkBackend {
     pub(crate) tools: Tools,

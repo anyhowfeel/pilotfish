@@ -85,6 +85,16 @@ pub fn capture(ui: &mut Ui, s: &mut Settings) {
             "e.g. port 53",
         );
     });
+    settings_card(ui, "Wireshark", |ui| {
+        text_row(
+            ui,
+            true,
+            "Wireshark folder",
+            "The folder that holds tshark and dumpcap. Restart pilotfish to apply it.",
+            &mut s.wireshark_dir,
+            "Automatic",
+        );
+    });
     crate::capture_form::capture_options(ui, &mut s.capture);
 }
 

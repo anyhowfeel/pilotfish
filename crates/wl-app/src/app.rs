@@ -92,9 +92,10 @@ impl App {
         }
         crate::app_settings::apply_visuals(&cc.egui_ctx, &visuals.clamped());
         let scale = scale::ui_scale(&cc.egui_ctx);
-        crate::tools_info::warm();
+        let tools_dir = wireshark::wireshark_dir(&prefs.settings.wireshark_dir);
+        crate::tools_info::warm(tools_dir.clone());
         send_min_size(&cc.egui_ctx, scale);
-        let tshark = wireshark::lazy_tshark();
+        let tshark = wireshark::lazy_tshark(tools_dir);
         let wireshark = wireshark::availability(&tshark);
         let backend: Arc<dyn CaptureBackend> = Arc::new(wireshark::hybrid(&tshark));
         let (itx, iface_rx) = unbounded();

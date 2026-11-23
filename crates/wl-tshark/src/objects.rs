@@ -171,6 +171,7 @@ mod tests {
             dumpcap: "dumpcap".into(),
             editcap: None,
             mergecap: None,
+            capinfos: None,
         };
         let r = Request {
             tools: &tools,

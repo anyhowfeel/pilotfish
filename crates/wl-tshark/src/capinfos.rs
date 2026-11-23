@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use wl_model::{CaptureError, CaptureProperties, ClockZone, InterfaceInfo};
 
 use crate::error::from_stderr;
-use crate::process::{self, Tools, find_in_path};
+use crate::process::{self, Tools};
 
 /// Everything except the file hashes (those read the whole file; see `sha256`).
 const INFO_FLAGS: &[&str] = &[
@@ -13,12 +13,11 @@ const INFO_FLAGS: &[&str] = &[
     "-x",
 ];
 
-fn capinfos_path(tools: &Tools) -> Result<PathBuf, CaptureError> {
-    let beside = tools.tshark.with_file_name("capinfos");
-    if beside.is_file() {
-        return Ok(beside);
-    }
-    find_in_path("capinfos").ok_or_else(|| CaptureError::ToolMissing("capinfos".into()))
+fn capinfos_path(tools: &Tools) -> Result<&PathBuf, CaptureError> {
+    tools
+        .capinfos
+        .as_ref()
+        .ok_or_else(|| CaptureError::ToolMissing("capinfos".into()))
 }
 
 fn capinfos(
@@ -29,7 +28,7 @@ fn capinfos(
 ) -> Result<String, CaptureError> {
     let mut args: Vec<String> = flags.iter().map(|f| (*f).to_owned()).collect();
     args.push(file.to_string_lossy().into_owned());
-    let out = process::run_with_env(&capinfos_path(tools)?, &args, envs)?;
+    let out = process::run_with_env(capinfos_path(tools)?, &args, envs)?;
     if !out.status.success() {
         return Err(from_stderr(&String::from_utf8_lossy(&out.stderr)));
     }
@@ -180,6 +179,7 @@ Interface #0 info:\n\
                 dumpcap: dir.join("dumpcap"),
                 editcap: None,
                 mergecap: None,
+                capinfos: Some(probe),
             }
         }
 

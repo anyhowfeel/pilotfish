@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use wl_hybrid::{HybridBackend, NativeBackend};
-use wl_model::{CaptureError, CaptureSource};
+use wl_model::{CaptureError, CaptureSource, needs_message};
 
 use super::Controller;
 
@@ -68,7 +68,7 @@ fn exporting_without_wireshark_is_a_notice_not_an_error() {
     }
     assert_eq!(
         c.notice(),
-        Some("Exporting packets needs Wireshark. Install Wireshark and restart pilotfish.")
+        Some(needs_message("Exporting packets").as_str())
     );
     assert!(c.error().is_none());
 }
@@ -81,10 +81,7 @@ fn a_filter_wireshark_must_evaluate_says_so() {
         Some("http.request.method == \"GET\"".into()),
     );
     let text = c.error().map(ToString::to_string).unwrap_or_default();
-    assert_eq!(
-        text,
-        "This display filter needs Wireshark. Install Wireshark and restart pilotfish."
-    );
+    assert_eq!(text, needs_message("This display filter"));
 }
 
 #[test]
