@@ -84,7 +84,7 @@ Each [release](https://github.com/anyhowfeel/pilotfish/releases) contains, next 
 
 Wireshark's command-line tools (`tshark`, `dumpcap`) must be installed separately on Windows and
 macOS. The Linux and Windows files are built in containers (see [docs/releasing.md](docs/releasing.md)) and
-the macOS images and the Windows installer by a workflow when a release is published. They have not been tested on every platform. On
+the macOS images, the Windows installer and the Linux arm64 files by a workflow when a release is published. They have not been tested on every platform. On
 macOS, pilotfish also looks for the tools in the Wireshark app and in the Homebrew folders, so it finds them
 when started from the Finder.
 
@@ -203,9 +203,9 @@ The country and network shown in the screenshots come from the DB-IP Lite databa
 
 A release has binaries for Linux (x86_64 and aarch64, plus a build made on Arch Linux), macOS (Apple
 silicon and Intel) and Windows (x86_64), with a `.deb` package for each Linux architecture, a Windows
-installer, macOS disk images and a `SHA256SUMS` file. The Linux and Windows files are built locally in
-containers with `tools/release.sh`; publishing the release starts a workflow that adds the macOS images and
-the installer. Those builds are not tested beyond compiling; `tshark` still has to be installed separately on
+installer, macOS disk images and a `SHA256SUMS` file. The Linux x86_64 and Windows files are built locally
+in containers with `tools/release.sh`; publishing the release starts a workflow that adds the macOS images,
+the installer and the Linux aarch64 files. Those builds are not tested beyond compiling; `tshark` still has to be installed separately on
 Windows and macOS.
 
 ## Layout of the repository

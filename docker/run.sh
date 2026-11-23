@@ -1,27 +1,21 @@
 #!/usr/bin/env bash
 # Container side of the release: image (build the release images), run (a command in one), build (all artifacts).
-# IMAGE=arch picks the Arch image, PLATFORM=linux/arm64 a foreign architecture (needs QEMU binfmt).
+# IMAGE=arch picks the Arch image. The Linux arm64 files are built by the release workflow on an arm runner.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-PLATFORM="${PLATFORM:-}"
 
 die() { echo "error: $*" >&2; exit 1; }
 version() { sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml; }
 
 # The tag is a hash of the Dockerfile, so an image is rebuilt only when it changes.
 image_ref() {
-  echo "ghcr.io/anyhowfeel/pilotfish-$1:$(sha256sum "docker/$1.Dockerfile" | cut -c1-12)${PLATFORM:+-${PLATFORM#*/}}"
+  echo "ghcr.io/anyhowfeel/pilotfish-$1:$(sha256sum "docker/$1.Dockerfile" | cut -c1-12)"
 }
 
 image() {
   local name="${1:?usage: docker/run.sh image builder|arch [--push]}" ref
   ref=$(image_ref "$name")
-  docker build ${PLATFORM:+--platform "$PLATFORM"} -f "docker/$name.Dockerfile" -t "$ref" docker
-  # The legacy builder (docker without the buildx plugin) ignores --platform and builds for the host.
-  if [[ -n "$PLATFORM" && "$(docker image inspect --format '{{.Architecture}}' "$ref")" != "${PLATFORM#*/}" ]]; then
-    docker rmi "$ref" >/dev/null 2>&1 || true
-    die "$ref was not built for $PLATFORM: install the Docker buildx plugin (Arch: docker-buildx)"
-  fi
+  docker build -f "docker/$name.Dockerfile" -t "$ref" docker
   echo "built $ref"
   [[ "${2:-}" == --push ]] && docker push "$ref"
   return 0
@@ -33,8 +27,8 @@ run() {
   ref=$(image_ref "${IMAGE:-builder}")
   docker image inspect "$ref" >/dev/null 2>&1 || docker pull -q "$ref" >/dev/null 2>&1 \
     || image "${IMAGE:-builder}" >&2
-  docker run --rm ${PLATFORM:+--platform "$PLATFORM"} --user "$(id -u):$(id -g)" -v "$PWD:/src" \
-    -v "pilotfish-${IMAGE:-builder}-${PLATFORM#*/}-$(pwd | sha256sum | cut -c1-8):/cache" "$ref" "$@"
+  docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/src" \
+    -v "pilotfish-${IMAGE:-builder}-$(pwd | sha256sum | cut -c1-8):/cache" "$ref" "$@"
 }
 
 # Stage a release folder with the binary and the docs, then archive it.
@@ -71,15 +65,11 @@ inside() {
 
 # Builds the working tree (including a version bump that is not committed yet) into dist/.
 build() {
-  local ref self="docker/run.sh" arches=("")
+  local ref self="docker/run.sh"
   ref=$(git stash create || true)
-  [[ "${1:-}" == --with-aarch64 ]] && arches+=(linux/arm64)
   rm -rf dist && mkdir -p dist/src
   git archive --prefix="pilotfish-$(version)/" -o "dist/src/pilotfish-$(version).tar.gz" "${ref:-HEAD}"
-  local p
-  for p in "${arches[@]}"; do
-    PLATFORM=$p run "$self" inside linux
-  done
+  run "$self" inside linux
   run "$self" inside windows
   IMAGE=arch run "$self" inside arch
   rm -rf dist/src
