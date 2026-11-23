@@ -210,6 +210,36 @@ Windows and macOS.
 
 ## Layout of the repository
 
+```mermaid
+flowchart TD
+    file[("pcap / pcapng file")]
+    tools[("Wireshark tools<br/>tshark, dumpcap")]
+
+    app["<b>wl-app</b><br/>window, state, background jobs"]
+    panels["<b>wl-panels</b><br/>the pages"]
+    kit["<b>wl-kit</b><br/>theme, widgets, charts"]
+    planar["<b>wl-planar</b><br/>planar map layout"]
+    stats["<b>wl-stats</b><br/>incremental statistics"]
+    hybrid["<b>wl-hybrid</b><br/>the CaptureBackend of the app"]
+    native["<b>wl-native</b><br/>pure-Rust reader and decoder"]
+    tshark["<b>wl-tshark</b><br/>drives tshark and dumpcap"]
+
+    app --> panels
+    app --> stats
+    app --> hybrid
+    panels --> kit
+    panels --> planar
+    panels --> stats
+    hybrid -->|"files, filters, graphs"| native
+    hybrid -->|"everything else, started on first use"| tshark
+    native --> file
+    tshark --> tools
+    tools --> file
+```
+
+Every other crate also depends on `wl-model`, which holds the plain data types and the `CaptureBackend`
+trait that `wl-tshark` and `wl-hybrid` implement. The arrows show the main flow, not every dependency.
+
 | Crate | Role |
 | --- | --- |
 | `wl-model` | Plain data types and the `CaptureBackend` trait. No I/O. |
@@ -217,6 +247,7 @@ Windows and macOS.
 | `wl-hybrid` | The `CaptureBackend` the app uses: answers from `wl-native` when it can and starts `wl-tshark` on first need. |
 | `wl-tshark` | `CaptureBackend` implementation on top of `tshark`, `dumpcap` and friends. |
 | `wl-stats` | Incremental statistics over the packet stream. |
+| `wl-planar` | Planarity test and straight-line planar drawing, used by the Planar layout of the map. No dependency on the other crates. |
 | `wl-kit` | Theme, widgets and charts shared by the UI. |
 | `wl-panels` | The pages (packets, overview, map, flows, web, settings, ...). |
 | `wl-app` | The `pilotfish` binary: window, state, background jobs. |
