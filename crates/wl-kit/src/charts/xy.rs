@@ -79,6 +79,19 @@ pub fn xy_chart(
     y_fmt: &dyn Fn(f64) -> String,
     height: f32,
 ) {
+    xy_chart_with_reset(ui, id, series, y_fmt, height, false);
+}
+
+/// Like `xy_chart`; `reset` brings the view back to the whole data for this frame (a zoomed chart
+/// would otherwise need a double click that not every pointer can make).
+pub fn xy_chart_with_reset(
+    ui: &mut Ui,
+    id: &str,
+    series: &[XySeries],
+    y_fmt: &dyn Fn(f64) -> String,
+    height: f32,
+    reset: bool,
+) {
     let tip = |h: &HoverPosition<'_>| match h {
         HoverPosition::NearDataPoint {
             plot_name,
@@ -91,7 +104,7 @@ pub fn xy_chart(
         )),
         HoverPosition::Elsewhere { .. } => None,
     };
-    Plot::new(id)
+    let mut plot = Plot::new(id)
         .height(height)
         .allow_drag(false)
         .allow_zoom(false)
@@ -106,26 +119,29 @@ pub fn xy_chart(
         .x_grid_spacer(time_ticks)
         .x_axis_formatter(|m, _| label(m))
         .label_formatter(tip)
-        .legend(Legend::default().position(Corner::LeftTop))
-        .show(ui, |pu| {
-            for s in series.iter().filter(|s| !s.is_empty()) {
-                let pts = PlotPoints::from(s.points.as_slice());
-                match s.style {
-                    SeriesStyle::Line => {
-                        // Never aggregated into a band: the points of a stream graph are few, and a
-                        // band fills the envelope between pixel columns, which turns two points at the
-                        // same time into a large filled polygon.
-                        let line = Line::new(&s.name, pts)
-                            .color(s.color)
-                            .width(1.8)
-                            .allow_band(false);
-                        pu.line(line);
-                    }
-                    SeriesStyle::Scatter(m) => {
-                        let p = Points::new(&s.name, pts).color(s.color);
-                        pu.points(p.shape(m.shape()).radius(m.radius()).filled(true));
-                    }
+        .legend(Legend::default().position(Corner::LeftTop));
+    if reset {
+        plot = plot.reset();
+    }
+    plot.show(ui, |pu| {
+        for s in series.iter().filter(|s| !s.is_empty()) {
+            let pts = PlotPoints::from(s.points.as_slice());
+            match s.style {
+                SeriesStyle::Line => {
+                    // Never aggregated into a band: the points of a stream graph are few, and a
+                    // band fills the envelope between pixel columns, which turns two points at the
+                    // same time into a large filled polygon.
+                    let line = Line::new(&s.name, pts)
+                        .color(s.color)
+                        .width(1.8)
+                        .allow_band(false);
+                    pu.line(line);
+                }
+                SeriesStyle::Scatter(m) => {
+                    let p = Points::new(&s.name, pts).color(s.color);
+                    pu.points(p.shape(m.shape()).radius(m.radius()).filled(true));
                 }
             }
-        });
+        }
+    });
 }

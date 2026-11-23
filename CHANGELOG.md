@@ -5,6 +5,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **A Reset zoom button on the TCP graphs.** A box dragged on a chart of Flows zooms in; the button next to the
+  chips brings the whole stream back, and a double click on the chart still does. Nothing said how to come back.
+
 ### Fixed
 - **Copying works with the system clipboard.** Ctrl+C on selected text and every Copy button only reached a
   clipboard inside pilotfish, because the build left out the clipboard support of the window library, so
