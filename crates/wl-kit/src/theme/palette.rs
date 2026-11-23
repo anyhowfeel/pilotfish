@@ -25,7 +25,7 @@ impl Theme {
 
     pub const fn label(self) -> &'static str {
         match self {
-            Theme::Slate => "Cool Slate",
+            Theme::Slate => "Cool slate",
         }
     }
 
@@ -121,9 +121,11 @@ impl Palette {
     pub fn row_alt() -> Color32 {
         Self::colors().row_alt
     }
-    /// Host scope colour shared by tables and the map: private = green, public = orange.
+    /// Host scope colour shared by tables and the map: private = blue, public = magenta.
+    /// Scope is a category, not a state, so it avoids the ok / warn colours; both come from the
+    /// chart series, which are checked for contrast and for colour-blind distinctness.
     pub fn scope(private: bool) -> Color32 {
-        if private { Self::ok() } else { Self::warn() }
+        Self::series(if private { 0 } else { 3 })
     }
 
     pub fn selection_bg() -> Color32 {
