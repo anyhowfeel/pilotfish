@@ -72,4 +72,4 @@ and every release build.
 5. When the CI is green, squash-merge it and update `main`.
 6. On `main`, run `tools/release.sh` to build and check the artifacts in containers (nothing leaves the
    machine), then `tools/release.sh --publish` to tag the commit, push the tag and create the release with the
-   notes taken from `CHANGELOG.md`. The macOS images and the Windows installer are added by a workflow. See `docs/releasing.md`.
+   notes taken from `CHANGELOG.md`. The macOS images, the Windows installer and the Linux arm64 files are added by a workflow. See `docs/releasing.md`.

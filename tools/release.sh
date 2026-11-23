@@ -1,17 +1,15 @@
 #!/usr/bin/env bash
 # Builds the release artifacts in containers and checks them. Nothing leaves the machine unless --publish is given.
 #   tools/release.sh                  dry run: checks, container build into dist/, release notes in dist/NOTES.md
-#   tools/release.sh --no-aarch64     skip the linux-aarch64 artifacts (they are built under QEMU and take long)
 #   tools/release.sh --publish        after the dry run, push the tag and create the GitHub release with gh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-publish=false build_args=(--with-aarch64)
+publish=false
 for arg in "$@"; do
   case "$arg" in
     --publish) publish=true ;;
-    --no-aarch64) build_args=() ;;
-    *) echo "usage: tools/release.sh [--no-aarch64] [--publish]" >&2; exit 1 ;;
+    *) echo "usage: tools/release.sh [--publish]" >&2; exit 1 ;;
   esac
 done
 
@@ -21,7 +19,7 @@ tag="v$version"
 [[ -z "$(git status --porcelain)" ]] || { echo "error: the working tree is not clean" >&2; exit 1; }
 tools/check-version.sh
 tools/check.sh
-docker/run.sh build "${build_args[@]}"
+docker/run.sh build
 
 # The notes are the CHANGELOG.md section of this version.
 awk -v v="$version" '$0 ~ "^## \\[" v "\\]" {on=1; next} /^## \[/ || /^\[[^]]+\]: / {on=0} on' CHANGELOG.md \

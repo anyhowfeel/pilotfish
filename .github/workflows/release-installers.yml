@@ -1,8 +1,9 @@
 name: Release installers
 
 # Linux and Windows files are built in containers (docker/run.sh) and published with tools/release.sh.
-# This workflow runs once the release is published and adds what needs a macOS or Windows machine:
-# the two macOS disk images and the Windows installer, then refreshes SHA256SUMS over every asset.
+# This workflow runs once the release is published and adds what needs another machine: the two macOS
+# disk images, the Windows installer and the Linux arm64 files (built on an arm runner, not emulated),
+# then refreshes SHA256SUMS over every asset.
 on:
   release:
     types: [published]
@@ -55,6 +56,38 @@ jobs:
       - name: Attach to the release
         run: gh release upload "$TAG" dist/*.dmg --clobber
 
+  linux-aarch64:
+    name: linux-aarch64
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pkg-config libxkbcommon-dev libwayland-dev \
+            libx11-dev libxcursor-dev libxrandr-dev libxi-dev libgl1-mesa-dev
+      - name: Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+      - uses: Swatinem/rust-cache@v2
+      - run: tools/check-version.sh
+        env:
+          GITHUB_REF_NAME: ${{ github.event.release.tag_name }}
+          GITHUB_REF_TYPE: tag
+      - run: cargo build --release --locked
+      - name: Archive and Debian package
+        run: |
+          name="pilotfish-$TAG-linux-aarch64"
+          mkdir -p dist "dist/$name"
+          cp target/release/pilotfish README.md LICENSE CHANGELOG.md "dist/$name/"
+          tar -C dist -czf "dist/$name.tar.gz" "$name"
+          rm -rf "dist/$name"
+          cargo install cargo-deb --version 3.8.0 --locked
+          cargo deb -p wl-app --no-build --output dist/
+      - name: Attach to the release
+        run: gh release upload "$TAG" dist/*.tar.gz dist/*.deb --clobber
+
   windows-installer:
     name: windows-installer
     runs-on: windows-latest
@@ -86,7 +119,7 @@ jobs:
 
   checksums:
     name: checksums
-    needs: [dmg, windows-installer]
+    needs: [dmg, linux-aarch64, windows-installer]
     runs-on: ubuntu-latest
     steps:
       - name: Recompute SHA256SUMS over every asset

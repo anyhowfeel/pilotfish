@@ -1,6 +1,6 @@
 # Releasing
 
-Linux and Windows artifacts are built locally in containers, so a release does not depend on CI minutes. GitHub Actions checks pull requests and, once a release is published, adds the macOS images and the Windows installer.
+The Linux x86_64 and Windows files and the Arch package are built locally in containers, so a release does not depend on CI minutes. GitHub Actions checks pull requests and, once a release is published, adds what needs another machine: the macOS images, the Windows installer and the Linux arm64 files.
 
 ## Prepare
 
@@ -12,16 +12,16 @@ Linux and Windows artifacts are built locally in containers, so a release does n
 
 `tools/release.sh` runs the version check, fmt, clippy and the tests, then builds in containers (`docker/run.sh build`) into `dist/`:
 
-- `pilotfish-vX.Y.Z-linux-x86_64.tar.gz` and `-linux-aarch64.tar.gz` and a `.deb` for each, from the Debian builder image (glibc 2.36)
+- `pilotfish-vX.Y.Z-linux-x86_64.tar.gz` and the `.deb`, from the Debian builder image (glibc 2.36)
 - `pilotfish-vX.Y.Z-windows-x86_64.zip`, cross-built with mingw
 - the Arch package, from the Arch image
 - `SHA256SUMS` and `NOTES.md` (the changelog section of this version)
 
-The arm64 files are built under QEMU and take much longer; `--no-aarch64` skips them. They need the QEMU handler registered on the host: `docker run --privileged --rm tonistiigi/binfmt --install arm64` (it lasts until a reboot). The builder images are tagged with a hash of their Dockerfile and live on `ghcr.io/anyhowfeel/pilotfish-<name>`; `docker/run.sh image builder` builds one, `docker/run.sh image builder --push` uploads it.
+The builder images are tagged with a hash of their Dockerfile and live on `ghcr.io/anyhowfeel/pilotfish-<name>`; `docker/run.sh image builder` builds one, `docker/run.sh image builder --push` uploads it.
 
 ## Publish
 
-`tools/release.sh --publish` pushes the tag `vX.Y.Z` and creates the GitHub release with `gh`. Publishing the release starts `release-installers.yml`, which builds the arm64 and x86_64 macOS disk images, wraps the executable of the Windows zip in the Inno Setup installer (`packaging/windows/pilotfish.iss`), attaches them to the release and refreshes `SHA256SUMS` over every asset.
+`tools/release.sh --publish` pushes the tag `vX.Y.Z` and creates the GitHub release with `gh`. Publishing the release starts `release-installers.yml`, which builds the arm64 and x86_64 macOS disk images and the Linux arm64 tarball and `.deb` (on an arm runner), wraps the executable of the Windows zip in the Inno Setup installer (`packaging/windows/pilotfish.iss`), attaches them to the release and refreshes `SHA256SUMS` over every asset.
 
 ## macOS and Wireshark
 

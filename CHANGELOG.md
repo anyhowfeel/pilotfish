@@ -35,7 +35,7 @@ and the project follows [Semantic Versioning](https://semver.org/).
   the Arch package in pinned containers (`docker/run.sh`) and prepares the notes from this changelog; it only
   publishes with `--publish`. The macOS disk images and the Windows installer (which wraps the same executable as
   the `.zip`) are built by a workflow when a release is published, and the CI only runs the version check, fmt,
-  clippy and the tests. The Linux build now covers aarch64 too, built under QEMU. See `docs/releasing.md`.
+  clippy and the tests. The Linux aarch64 files are built by the same workflow on an arm runner. See `docs/releasing.md`.
 - **The packages recommend Wireshark instead of requiring it**: the `.deb` recommends `tshark` and the Arch package
   lists `wireshark-cli` as optional, since capture files open without it.
 
