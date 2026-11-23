@@ -50,6 +50,8 @@ pub fn half_width(t: f32, zoom: f32) -> f32 {
 
 pub fn links(p: &Painter, s: &Scene, buf: &Buffers) {
     let mut flowing = 0;
+    // The arrows come after every stroke, or the next link would be drawn over the last one.
+    let mut arrows: Vec<(arrow::Link, Color32)> = Vec::new();
     let focus = s.sel != Resolved::None;
     for (i, l) in s.g.links.iter().enumerate() {
         let (a, b) = (buf.screen[l.a], buf.screen[l.b]);
@@ -74,18 +76,29 @@ pub fn links(p: &Painter, s: &Scene, buf: &Buffers) {
         let w = half_width(l.t, s.zoom) * 2.0 + if hot { 1.5 } else { 0.0 };
         p.line_segment([a, b], Stroke::new(w, color));
         if secure && k == 1.0 {
-            // Lock at the middle of the link, on a disc that keeps it readable over the line.
-            let m = a + (b - a) * 0.5;
+            // Lock on a disc that keeps it readable over the line, off the middle when the arrow is there.
+            let m = a + (b - a) * if s.directions { 0.3 } else { 0.5 };
             p.circle_filled(m, 8.5, Palette::panel());
             paint_lock(p, m, 11.0, color);
         }
         let (from, to, share) = dominant(s.g, i);
         let (pf, pt) = (buf.screen[from], buf.screen[to]);
-        if s.directions && share >= 0.62 && k == 1.0 {
+        if s.directions && k == 1.0 {
             let reach = (buf.discs[from].1, buf.discs[to].1);
-            if let Some(tri) = arrow::head(pf, pt, reach, w) {
-                arrow(p, tri, color);
-            }
+            // One way only when not a single byte went the other way.
+            let way = if l.a_to_b == 0 || l.a_to_b >= l.bytes {
+                arrow::Way::OneWay
+            } else {
+                arrow::Way::TwoWay(share)
+            };
+            let link = arrow::Link {
+                from: pf,
+                to: pt,
+                reach,
+                width: w,
+                way,
+            };
+            arrows.push((link, color));
         }
         if s.animate && flowing < MAX_FLOWING && l.t >= 0.35 && k == 1.0 {
             flowing += 1;
@@ -100,10 +113,16 @@ pub fn links(p: &Painter, s: &Scene, buf: &Buffers) {
             ));
         }
     }
+    let links: Vec<arrow::Link> = arrows.iter().map(|(l, _)| *l).collect();
+    for (placed, (_, color)) in arrow::place(&links).into_iter().zip(arrows) {
+        for head in placed.iter().flat_map(arrow::Arrow::heads) {
+            draw_head(p, head, color);
+        }
+    }
 }
 
-/// The head is opaque and outlined in the panel color so it stands out from the line it ends.
-fn arrow(p: &Painter, tri: [Pos2; 3], color: Color32) {
+/// A head is opaque and outlined in the panel color so it stands out from the line it sits on.
+fn draw_head(p: &Painter, tri: [Pos2; 3], color: Color32) {
     let solid = Color32::from_rgb(color.r(), color.g(), color.b());
     p.add(Shape::convex_polygon(
         tri.to_vec(),

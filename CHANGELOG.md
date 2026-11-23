@@ -18,6 +18,12 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - **A Reset view button on the map** (key `R`). It fits the graph, frees the hosts you moved so the layout starts
   afresh, and clears the selection, the search and the filters. The layout mode and the Labels, Directions and
   Encrypted switches stay as you set them.
+- **The arrows on the map say what the traffic did.** The arrow sits in the middle of its link: one head when
+  not a byte went the other way, two heads back to back with the line showing between them when the traffic went both
+  ways, as a TCP stream does, the head of the busier direction being the larger one. The heads are clearly wider than the line, stay clear of the ring around a busy host, are drawn after
+  every link so that none is painted over, and slide along their link when another arrow is in the way, the
+  widest links being served first. A link with no free place goes without an arrow. The lock of an encrypted
+  link moves aside while the arrows are on.
 
 ## [0.6.0] - 2026-11-23
 
