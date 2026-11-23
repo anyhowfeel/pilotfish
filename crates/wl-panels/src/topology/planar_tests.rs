@@ -252,3 +252,28 @@ fn the_map_renders_in_planar_mode_inside_its_area_in_both_themes() {
         }
     }
 }
+
+#[test]
+fn resetting_frees_a_moved_host_and_brings_the_planar_layout_back() {
+    let g = star_graph();
+    let mut l = planar_layout(&g, circle_solver);
+    settle(&mut l);
+    let solved: Vec<Vec2> = l.pos.clone();
+    l.drag(1, vec2(30.0, -20.0), &g);
+    settle(&mut l);
+    assert!(l.pinned[1] && (l.pos[1] - solved[1]).length() > 1.0);
+    l.forget();
+    l.sync(&g);
+    settle(&mut l);
+    assert!(l.pinned.iter().all(|p| !p), "no host stays pinned");
+    for (p, q) in l.pos.iter().zip(&solved) {
+        assert!(
+            (*p - *q).length() < 1.0,
+            "every host is back where the layout puts it"
+        );
+    }
+    assert_eq!(
+        l.readout().map(|r| r.crossings),
+        Some(actual_crossings(&g, &l.pos))
+    );
+}

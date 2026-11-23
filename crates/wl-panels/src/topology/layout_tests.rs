@@ -195,3 +195,49 @@ fn converged_view_requests_no_repaint() {
     }
     panic!("still repainting after 600 frames: {delay:?}");
 }
+
+#[test]
+fn forgetting_frees_every_pinned_host_and_lays_the_graph_out_afresh() {
+    let g = star_graph();
+    let mut l = force();
+    l.sync(&g);
+    settle(&mut l, 2_000);
+    l.drag(2, vec2(500.0, -300.0), &g);
+    settle(&mut l, 2_000);
+    assert!(l.pinned[2]);
+    l.forget();
+    l.sync(&g);
+    settle(&mut l, 2_000);
+    assert!(l.pinned.iter().all(|p| !p), "no host stays pinned");
+    assert!(
+        (l.pos[2] - vec2(500.0, -300.0)).length() > 1.0,
+        "the moved host is back in the layout"
+    );
+}
+
+#[test]
+fn reset_view_restores_the_starting_view_and_keeps_the_preferences() {
+    let mut v = TopologyView::default();
+    v.opts.labels = false;
+    v.opts.directions = true;
+    v.opts.mode = LayoutMode::Force;
+    v.opts.filters = Filters {
+        hide_private_pairs: true,
+        min_intensity: 0.4,
+    };
+    v.search = "10.0".into();
+    v.sel = super::state::Selection::Node("10.0.0.1".into());
+    v.auto_fit = false;
+    v.key = Some((1, 2, 3, 4, v.opts.filters));
+    v.reset_view();
+    assert_eq!(v.opts.filters, Filters::default());
+    assert!(v.search.is_empty() && v.sel == super::state::Selection::None);
+    assert!(
+        v.auto_fit && v.key.is_none(),
+        "the graph is rebuilt and fitted"
+    );
+    assert!(
+        !v.opts.labels && v.opts.directions && v.opts.mode == LayoutMode::Force,
+        "preferences stay"
+    );
+}

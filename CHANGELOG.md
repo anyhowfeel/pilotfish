@@ -14,6 +14,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   `Documents/pilotfish/captures`, appears in Recent files, and never overwrites an existing file. Settings >
   Capture > Saved captures sets the folder or turns it off, in which case the capture stays a temporary file
   as before. A path typed in Output > Save to still wins, and a ring buffer always keeps its files.
+### Added
+- **A Reset view button on the map** (key `R`). It fits the graph, frees the hosts you moved so the layout starts
+  afresh, and clears the selection, the search and the filters. The layout mode and the Labels, Directions and
+  Encrypted switches stay as you set them.
 
 ## [0.6.0] - 2026-11-23
 
