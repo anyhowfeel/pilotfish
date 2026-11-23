@@ -41,10 +41,15 @@ impl TopologyView {
                 _ => self.auto_fit = true,
             }
         } else if resp.clicked() {
+            // Shift+click on links builds a selection of several links; a click on the background
+            // with Shift held does not drop it.
+            let shift = ui.input(|i| i.modifiers.shift);
             self.sel = match hover {
+                Resolved::Link(l) if shift => self.sel.toggled_link(g, l),
                 Resolved::Node(i) => Selection::Node(g.nodes[i].addr.clone()),
                 Resolved::Link(l) => Selection::of_link(g, l),
-                Resolved::None => Selection::None,
+                Resolved::None | Resolved::Many if shift => self.sel.clone(),
+                Resolved::None | Resolved::Many => Selection::None,
             };
         }
         let (scroll, zoom) = ui.input(|i| (i.smooth_scroll_delta.y, i.zoom_delta()));

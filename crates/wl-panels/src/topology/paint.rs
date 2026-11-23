@@ -19,6 +19,8 @@ pub struct Scene<'a> {
     pub rect: Rect,
     pub zoom: f32,
     pub sel: Resolved,
+    /// Links of the selection when several are picked.
+    pub multi: &'a [usize],
     pub hover: Resolved,
     pub directions: bool,
     pub encrypted: bool,
@@ -58,8 +60,10 @@ pub fn links(p: &Painter, s: &Scene, buf: &Buffers) {
         if a == b || !s.rect.expand(40.0).intersects(Rect::from_two_pos(a, b)) {
             continue;
         }
-        let lit = s.sel.touches_link(s.g, i);
-        let hot = s.hover == Resolved::Link(i) || s.sel == Resolved::Link(i);
+        let lit = s.sel.touches_link(s.g, s.multi, i);
+        let hot = s.hover == Resolved::Link(i)
+            || s.sel == Resolved::Link(i)
+            || (s.sel == Resolved::Many && s.multi.contains(&i));
         let secure = s.encrypted && l.encrypted;
         // "Encrypted" mode: everything that is not encrypted fades out.
         let k = if (focus && !lit) || (s.encrypted && !secure) {
@@ -137,7 +141,7 @@ pub fn nodes(p: &Painter, s: &Scene, buf: &Buffers) {
         if !s.rect.expand(r + 8.0).contains(c) {
             continue;
         }
-        let k = if s.sel.touches_node(s.g, i) {
+        let k = if s.sel.touches_node(s.g, s.multi, i) {
             1.0
         } else {
             NODE_DIM
@@ -170,7 +174,7 @@ pub fn labels(p: &Painter, s: &Scene, buf: &Buffers) {
         let Some(g) = buf.galleys.get(*i).and_then(|g| g.as_ref()) else {
             continue;
         };
-        let dim = !s.sel.touches_node(s.g, *i);
+        let dim = !s.sel.touches_node(s.g, s.multi, *i);
         let pill = rect.expand2(vec2(3.0, 1.0));
         let bg = if dim { 60 } else { 205 };
         p.rect_filled(pill, CornerRadius::same(4), tint(Palette::panel(), bg));

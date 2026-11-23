@@ -169,7 +169,8 @@ Environment variables:
   country and network of public addresses when a local `.mmdb` database is present (see below).
 - **Graphs**: I/O graph with several display-filter series.
 - **Map**: graph of host-to-host traffic, link width by volume, optional highlight of encrypted
-  flows. The default Planar layout draws the graph without crossing links when that is possible
+  flows. Shift+click on links picks several of them, and the card then filters the packets of all of
+  them at once. The default Planar layout draws the graph without crossing links when that is possible
   and keeps the crossings to a minimum when it is not; Force is the free-moving alternative.
 - **Flows**: sequence diagram of a conversation, plus TCP time-sequence, throughput, RTT and
   window-size graphs.

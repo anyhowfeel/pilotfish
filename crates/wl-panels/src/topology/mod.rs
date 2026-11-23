@@ -153,11 +153,13 @@ impl TopologyView {
         }
         self.refresh(snap);
         let full = ui.available_rect_before_wrap();
-        let sel = self.sel.resolve(&self.graph);
+        let mut multi = std::mem::take(&mut self.buf.multi);
+        let sel = self.sel.resolve(&self.graph, &mut multi);
+        self.buf.multi = multi;
         let (canvas, card) = split(full, sel != Resolved::None);
         self.canvas(ui, canvas, sel, card.filter(|c| c.floating).map(|c| c.rect));
         if let Some(c) = card
-            && card::show(ui, c.rect, &self.graph, sel, &mut out)
+            && card::show(ui, c.rect, &self.graph, sel, &self.buf.multi, &mut out)
         {
             self.sel = Selection::None;
         }

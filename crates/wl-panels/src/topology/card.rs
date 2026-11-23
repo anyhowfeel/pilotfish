@@ -143,6 +143,55 @@ fn link_body(ui: &mut Ui, g: &Graph, i: usize, out: &mut Vec<OverviewAction>) {
     );
     filter_button(ui, &filters::pair(&a.addr, &b.addr), out);
     flow_button(ui, &[a.addr.clone(), b.addr.clone()], out);
+    ui.add_space(spacing::XS);
+    ui.label(
+        RichText::new("Shift+click another link to select several.")
+            .small()
+            .color(Palette::muted()),
+    );
+}
+
+/// How many of the selected links the card lists before it says "and N more".
+const MAX_LISTED: usize = 24;
+
+fn multi_body(ui: &mut Ui, g: &Graph, multi: &[usize], out: &mut Vec<OverviewAction>) {
+    let links = || multi.iter().map(|&i| &g.links[i]);
+    kv(ui, "Links", &format::count(multi.len() as u64));
+    kv(ui, "Bytes", &format::bytes(links().map(|l| l.bytes).sum()));
+    kv(
+        ui,
+        "Packets",
+        &format::count(links().map(|l| l.packets).sum()),
+    );
+    section_header(ui, "Selected links");
+    for l in links().take(MAX_LISTED) {
+        let name = format!("{} - {}", g.nodes[l.a].label(), g.nodes[l.b].label());
+        kv(ui, &name, &format::bytes(l.bytes));
+    }
+    if multi.len() > MAX_LISTED {
+        ui.label(
+            RichText::new(format!("and {} more", multi.len() - MAX_LISTED)).color(Palette::muted()),
+        );
+    }
+    let pairs: Vec<(std::sync::Arc<str>, std::sync::Arc<str>)> = links()
+        .map(|l| (g.nodes[l.a].addr.clone(), g.nodes[l.b].addr.clone()))
+        .collect();
+    filter_button(ui, &filters::any_pair(&pairs), out);
+    let mut hosts: Vec<std::sync::Arc<str>> = Vec::new();
+    for (a, b) in pairs {
+        for h in [a, b] {
+            if !hosts.contains(&h) {
+                hosts.push(h);
+            }
+        }
+    }
+    flow_button(ui, &hosts, out);
+    ui.add_space(spacing::XS);
+    ui.label(
+        RichText::new("Shift+click a link to add or remove it.")
+            .small()
+            .color(Palette::muted()),
+    );
 }
 
 /// Draws the card inside `rect`; returns true when the user closed it.
@@ -151,6 +200,7 @@ pub fn show(
     rect: Rect,
     g: &Graph,
     sel: Resolved,
+    multi: &[usize],
     out: &mut Vec<OverviewAction>,
 ) -> bool {
     let mut close = false;
@@ -189,6 +239,19 @@ pub fn show(
                 ScrollArea::vertical()
                     .auto_shrink([false, false])
                     .show(ui, |ui| link_body(ui, g, i, out));
+            }
+            Resolved::Many => {
+                close = title(
+                    ui,
+                    &format!("{} links", multi.len()),
+                    None,
+                    "Selection",
+                    Palette::accent(),
+                );
+                ui.add_space(spacing::XS);
+                ScrollArea::vertical()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| multi_body(ui, g, multi, out));
             }
             Resolved::None => {}
         }

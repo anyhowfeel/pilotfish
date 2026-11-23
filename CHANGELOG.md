@@ -24,6 +24,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
   every link so that none is painted over, and slide along their link when another arrow is in the way, the
   widest links being served first. A link with no free place goes without an arrow. The lock of an encrypted
   link moves aside while the arrows are on.
+### Added
+- **Several links can be selected on the map.** Shift+click on a link adds it to the selection or takes it out
+  again. The card then shows the totals and the list of the links, and Filter packets keeps the packets of any
+  of them (each pair of hosts, joined with OR), which makes it quick to compare a few conversations.
 
 ## [0.6.0] - 2026-11-23
 
