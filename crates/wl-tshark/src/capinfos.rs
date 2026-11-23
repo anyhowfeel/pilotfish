@@ -2,10 +2,10 @@
 
 use std::path::{Path, PathBuf};
 
-use wl_model::{CaptureError, CaptureProperties, InterfaceInfo};
+use wl_model::{CaptureError, CaptureProperties, ClockZone, InterfaceInfo};
 
 use crate::error::from_stderr;
-use crate::process::{self, Tools, find_in_path};
+use crate::process::{self, Tools};
 
 /// Everything except the file hashes (those read the whole file; see `sha256`).
 const INFO_FLAGS: &[&str] = &[
@@ -13,31 +13,52 @@ const INFO_FLAGS: &[&str] = &[
     "-x",
 ];
 
-fn capinfos_path(tools: &Tools) -> Result<PathBuf, CaptureError> {
-    let beside = tools.tshark.with_file_name("capinfos");
-    if beside.is_file() {
-        return Ok(beside);
-    }
-    find_in_path("capinfos").ok_or_else(|| CaptureError::ToolMissing("capinfos".into()))
+fn capinfos_path(tools: &Tools) -> Result<&PathBuf, CaptureError> {
+    tools
+        .capinfos
+        .as_ref()
+        .ok_or_else(|| CaptureError::ToolMissing("capinfos".into()))
 }
 
-fn capinfos(tools: &Tools, flags: &[&str], file: &Path) -> Result<String, CaptureError> {
+fn capinfos(
+    tools: &Tools,
+    flags: &[&str],
+    file: &Path,
+    envs: &[(&str, &str)],
+) -> Result<String, CaptureError> {
     let mut args: Vec<String> = flags.iter().map(|f| (*f).to_owned()).collect();
     args.push(file.to_string_lossy().into_owned());
-    let out = process::run(&capinfos_path(tools)?, &args)?;
+    let out = process::run_with_env(capinfos_path(tools)?, &args, envs)?;
     if !out.status.success() {
         return Err(from_stderr(&String::from_utf8_lossy(&out.stderr)));
     }
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
-pub fn properties(tools: &Tools, file: &Path) -> Result<CaptureProperties, CaptureError> {
-    Ok(parse_properties(&capinfos(tools, INFO_FLAGS, file)?))
+/// `capinfos` prints times in the zone of its environment: the machine's unless `zone` is UTC.
+pub fn properties(
+    tools: &Tools,
+    file: &Path,
+    zone: ClockZone,
+) -> Result<CaptureProperties, CaptureError> {
+    Ok(parse_properties(&capinfos(
+        tools,
+        INFO_FLAGS,
+        file,
+        zone_env(zone),
+    )?))
+}
+
+fn zone_env(zone: ClockZone) -> &'static [(&'static str, &'static str)] {
+    match zone {
+        ClockZone::Local => &[],
+        ClockZone::Utc => &[("TZ", "UTC")],
+    }
 }
 
 /// SHA256 as lowercase hex (`capinfos -M -H`).
 pub fn sha256(tools: &Tools, file: &Path) -> Result<String, CaptureError> {
-    let text = capinfos(tools, &["-M", "-H"], file)?;
+    let text = capinfos(tools, &["-M", "-H"], file, &[])?;
     text.lines()
         .find_map(|l| l.strip_prefix("SHA256:"))
         .map(|h| h.trim().to_owned())
@@ -139,5 +160,72 @@ Interface #0 info:\n\
         let p = parse_properties("Capture duration:    n/a\n");
         assert_eq!(p.duration, 0.0);
         assert!(p.interfaces.is_empty());
+    }
+
+    #[cfg(unix)]
+    mod zone {
+        use std::os::unix::fs::PermissionsExt;
+
+        use super::*;
+
+        /// A `capinfos` that reports the `TZ` it was started with.
+        fn tools_with_tz_probe(dir: &Path) -> Tools {
+            let probe = dir.join("capinfos");
+            std::fs::write(&probe, "#!/bin/sh\necho \"TZ=${TZ-unset}\"\n").expect("write");
+            std::fs::set_permissions(&probe, std::fs::Permissions::from_mode(0o755))
+                .expect("chmod");
+            Tools {
+                tshark: dir.join("tshark"),
+                dumpcap: dir.join("dumpcap"),
+                editcap: None,
+                mergecap: None,
+                capinfos: Some(probe),
+            }
+        }
+
+        /// A script written a moment ago is "busy" while another test thread's fork still holds
+        /// its descriptor, so the first run can fail with ETXTBSY. Retry briefly.
+        fn run_probe(tools: &Tools, flags: &[&str], envs: &[(&str, &str)]) -> String {
+            for _ in 0..200 {
+                match capinfos(tools, flags, Path::new("x.pcap"), envs) {
+                    Err(CaptureError::Other(m)) if m.contains("Text file busy") => {
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                    }
+                    other => return other.expect("run").trim().to_owned(),
+                }
+            }
+            panic!("the probe stayed busy");
+        }
+
+        fn reported_tz(envs: &[(&str, &str)]) -> String {
+            let dir = tempfile::tempdir().expect("dir");
+            let tools = tools_with_tz_probe(dir.path());
+            run_probe(&tools, &["-M"], envs)
+        }
+
+        #[test]
+        fn utc_runs_capinfos_with_tz_utc() {
+            assert_eq!(reported_tz(&[("TZ", "UTC")]), "TZ=UTC");
+        }
+
+        #[test]
+        fn local_leaves_the_environment_of_the_child_alone() {
+            let inherited = std::env::var("TZ").unwrap_or_else(|_| "unset".into());
+            assert_eq!(reported_tz(&[]), format!("TZ={inherited}"));
+        }
+
+        #[test]
+        fn utc_asks_for_tz_utc_and_local_for_nothing() {
+            assert_eq!(zone_env(ClockZone::Utc), [("TZ", "UTC")]);
+            assert!(zone_env(ClockZone::Local).is_empty());
+        }
+
+        #[test]
+        fn properties_in_utc_reach_capinfos_as_tz_utc() {
+            let dir = tempfile::tempdir().expect("dir");
+            let tools = tools_with_tz_probe(dir.path());
+            let text = run_probe(&tools, INFO_FLAGS, zone_env(ClockZone::Utc));
+            assert_eq!(text, "TZ=UTC");
+        }
     }
 }

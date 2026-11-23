@@ -40,6 +40,7 @@ use wl_kit::egui::{Key, Ui};
 use wl_kit::theme::spacing;
 use wl_kit::widgets::{empty_state, segmented_w};
 
+use crate::needs::needs_wireshark;
 use crate::overview::SortState;
 use detail::Shown;
 /// Page heights below this hide the KPI strip while a row is selected.
@@ -140,6 +141,11 @@ impl WebPanel {
     }
 
     pub fn ui(&mut self, ui: &mut Ui, d: &WebData) -> Vec<WebAction> {
+        // Exchanges, streams, files and key logs are all read by tshark.
+        if d.wireshark.is_missing() {
+            needs_wireshark(ui, "Web analysis");
+            return Vec::new();
+        }
         let tabs = [
             (Tab::Exchanges, "Exchanges"),
             (Tab::Streams, "Streams"),

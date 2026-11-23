@@ -1,12 +1,13 @@
 # Maintainer: anyhowfeel <346877873+anyhowfeel@users.noreply.github.com>
 pkgname=pilotfish
-pkgver=0.5.0
+pkgver=0.6.0
 pkgrel=1
 pkgdesc="Prototype desktop packet viewer on top of tshark, written in Rust with egui"
 arch=('x86_64' 'aarch64')
 url="https://github.com/anyhowfeel/pilotfish"
 license=('GPL-3.0-or-later')
-depends=('wireshark-cli' 'libxkbcommon' 'wayland' 'libx11' 'libxcursor' 'libxrandr' 'libxi' 'mesa')
+depends=('libxkbcommon' 'wayland' 'libx11' 'libxcursor' 'libxrandr' 'libxi' 'mesa')
+optdepends=('wireshark-cli: packet dissection, streams and live capture')
 makedepends=('cargo')
 options=('!lto' '!debug')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")

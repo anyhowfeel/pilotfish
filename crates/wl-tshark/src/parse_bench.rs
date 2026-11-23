@@ -3,8 +3,8 @@
 use std::io::{BufRead, BufReader};
 use std::time::Instant;
 
-use crate::interner::Interner;
 use crate::row_parser::parse_line;
+use wl_model::Interner;
 
 #[test]
 #[ignore]

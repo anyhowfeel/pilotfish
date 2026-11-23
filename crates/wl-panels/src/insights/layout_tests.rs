@@ -2,10 +2,11 @@
 use wl_kit::egui::{self, Context, Rect, pos2, vec2};
 use wl_kit::theme::Mode;
 use wl_model::{
-    ExpertEntry, ExpertReport, ExpertSeverity, HostStat, ProtocolHierarchy, StatsSnapshot,
+    Analyses, Analysis, BehaviorData, ExpertEntry, ExpertReport, ExpertSeverity, HostStat,
+    ProtocolHierarchy, SecurityData, StatsSnapshot,
 };
 
-use super::InsightsPanel;
+use super::{InsightsPanel, Tab};
 use crate::test_util::plain;
 
 fn report() -> ExpertReport {
@@ -29,6 +30,16 @@ fn report() -> ExpertReport {
                 "Type indicates an error",
             ),
         ],
+    }
+}
+
+/// Every analysis finished, with `expert` as the expert report.
+fn finished(expert: ExpertReport) -> Analyses {
+    Analyses {
+        expert: Analysis::Ready(expert),
+        hierarchy: Analysis::Ready(ProtocolHierarchy::default()),
+        behavior: Analysis::Ready(BehaviorData::default()),
+        security: Analysis::Ready(SecurityData::default()),
     }
 }
 
@@ -65,15 +76,14 @@ fn run(width: f32, height: f32, scale: f32, mode: Mode, f: impl FnMut(&mut egui:
 
 #[test]
 fn page_stays_inside_its_area_at_all_widths_and_scales() {
-    let (rep, st) = (report(), stats());
-    let phs: Option<ProtocolHierarchy> = None;
+    let (analyses, st) = (finished(report()), stats());
     let mut panel = InsightsPanel::default();
     for mode in [Mode::Dark, Mode::Light] {
         for width in [700.0_f32, 1000.0, 1600.0] {
             for scale in [1.0_f32, 1.5] {
                 run(width, 700.0, scale, mode, |ui| {
                     let area = ui.max_rect();
-                    panel.ui(ui, &st, Some(&rep), phs.as_ref(), None, &plain());
+                    panel.ui(ui, &st, &analyses, &plain());
                     assert!(
                         area.expand(1.0).contains_rect(ui.min_rect()),
                         "{mode:?} {width}@{scale}: {:?} outside {area:?}",
@@ -89,13 +99,91 @@ fn page_stays_inside_its_area_at_all_widths_and_scales() {
 fn empty_and_healthy_states_render() {
     let mut panel = InsightsPanel::default();
     run(1000.0, 640.0, 1.0, Mode::Dark, |ui| {
-        panel.ui(ui, &StatsSnapshot::default(), None, None, None, &plain());
         panel.ui(
             ui,
-            &stats(),
-            Some(&ExpertReport::default()),
-            None,
-            None,
+            &StatsSnapshot::default(),
+            &Analyses::default(),
+            &plain(),
+        );
+        panel.ui(ui, &stats(), &finished(ExpertReport::default()), &plain());
+    });
+}
+
+#[test]
+fn no_wireshark_renders_the_needs_state_and_no_actions() {
+    let mut panel = InsightsPanel::default();
+    let cx = crate::features::InsightContext {
+        wireshark: wl_model::Wireshark::Missing,
+        ..plain()
+    };
+    run(1000.0, 640.0, 1.0, Mode::Dark, |ui| {
+        let acts = panel.ui(ui, &stats(), &Analyses::default(), &cx);
+        assert!(acts.is_empty());
+    });
+}
+
+fn failed<T>(reason: &str) -> Analysis<T> {
+    Analysis::Failed(reason.into())
+}
+
+fn states() -> Vec<(&'static str, Analyses)> {
+    let mut running = Analyses::default();
+    running.start();
+    let mut half_done = finished(report());
+    half_done.behavior = Analysis::Pending;
+    let mut expert_failed = finished(ExpertReport::default());
+    expert_failed.expert = failed("tshark exited with status 2");
+    let all_failed = Analyses {
+        expert: failed("tshark exited with status 2"),
+        hierarchy: failed("tshark exited with status 2"),
+        behavior: failed("no such file"),
+        security: failed("no such file"),
+    };
+    let mut failed_beside_findings = finished(report());
+    failed_beside_findings.security = failed("no such file");
+    vec![
+        ("not run", Analyses::default()),
+        ("running", running),
+        ("partly done", half_done),
+        ("expert failed", expert_failed),
+        ("all failed", all_failed),
+        ("failed beside findings", failed_beside_findings),
+        ("finished", finished(report())),
+    ]
+}
+
+#[test]
+fn every_tab_stays_inside_its_area_in_every_analysis_state() {
+    let st = stats();
+    for (name, analyses) in states() {
+        for tab in [Tab::Findings, Tab::Expert, Tab::Hierarchy] {
+            for mode in [Mode::Dark, Mode::Light] {
+                let mut panel = InsightsPanel {
+                    tab,
+                    ..Default::default()
+                };
+                run(900.0, 600.0, 1.0, mode, |ui| {
+                    let area = ui.max_rect();
+                    panel.ui(ui, &st, &analyses, &plain());
+                    assert!(
+                        area.expand(1.0).contains_rect(ui.min_rect()),
+                        "{name} {tab:?} {mode:?}: {:?} outside {area:?}",
+                        ui.min_rect()
+                    );
+                });
+            }
+        }
+    }
+}
+
+#[test]
+fn an_empty_capture_shows_no_summary_strip_and_no_health_claim() {
+    let mut panel = InsightsPanel::default();
+    run(900.0, 600.0, 1.0, Mode::Dark, |ui| {
+        panel.ui(
+            ui,
+            &StatsSnapshot::default(),
+            &finished(ExpertReport::default()),
             &plain(),
         );
     });

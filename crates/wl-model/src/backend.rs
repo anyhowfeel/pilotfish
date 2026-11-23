@@ -4,8 +4,8 @@ use crossbeam_channel::Receiver;
 use thiserror::Error;
 
 use crate::{
-    CaptureOptions, CaptureProperties, Channel, Credential, DecodeAs, DnsQuery, FlowEvents,
-    FrameDetail, HttpDetail, HttpExchange, IoGraph, IoSpec, MessageStream, ObjectSet,
+    CaptureOptions, CaptureProperties, Channel, ClockZone, Credential, DecodeAs, DnsQuery,
+    FlowEvents, FrameDetail, HttpDetail, HttpExchange, IoGraph, IoSpec, MessageStream, ObjectSet,
     PacketBookmark, PacketRow, SysInfo, TcpSamples, TlsSession,
 };
 
@@ -40,7 +40,7 @@ impl CaptureSource {
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum CaptureError {
-    #[error("tshark not found: {0}")]
+    #[error("{}", crate::host_os::missing_text(.0))]
     ToolMissing(String),
     #[error("permission denied: {0}")]
     Permission(String),
@@ -48,6 +48,12 @@ pub enum CaptureError {
     BadFilter(String),
     #[error("{0}")]
     Other(String),
+}
+
+impl CaptureError {
+    pub fn is_tool_missing(&self) -> bool {
+        matches!(self, CaptureError::ToolMissing(_))
+    }
 }
 
 /// Messages flowing from the capture thread to the UI. Rows are batched for performance.
@@ -161,6 +167,8 @@ pub trait CaptureBackend: Send + Sync {
     /// Replaces the "Decode As" rules (`-d tcp.port==8080,http`) used by every later dissection
     /// and drops cached dissections. The caller re-reads the current file afterwards.
     fn set_decode_as(&self, _rules: Vec<DecodeAs>) {}
+    /// Zone of the times in `capture_properties`. The caller reads the properties again.
+    fn set_clock_zone(&self, _zone: ClockZone) {}
     /// Short names of the protocols that can be bound to `field` (e.g. `tcp.port`).
     fn decode_protocols(&self, _field: &str) -> Result<Vec<String>, CaptureError> {
         Ok(Vec::new())

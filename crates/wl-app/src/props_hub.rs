@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use eframe::egui;
-use wl_model::{CaptureBackend, CaptureProperties};
+use wl_model::{CaptureBackend, CaptureProperties, ClockZone};
 use wl_panels::properties::{PropertiesAction, PropertiesDialog};
 
 /// Files up to this size get their hash computed right away (it reads the whole file).
@@ -21,6 +21,7 @@ pub struct PropsHub {
     ctx: egui::Context,
     pub dialog: PropertiesDialog,
     file: Option<PathBuf>,
+    zone: ClockZone,
     tx: Sender<Msg>,
     rx: Receiver<Msg>,
 }
@@ -33,8 +34,21 @@ impl PropsHub {
             ctx,
             dialog: PropertiesDialog::default(),
             file: None,
+            zone: ClockZone::default(),
             tx,
             rx,
+        }
+    }
+
+    /// Sets the zone of the times. An open dialog reads its file again to show them.
+    pub fn set_clock_zone(&mut self, zone: ClockZone) {
+        if zone == self.zone {
+            return;
+        }
+        self.zone = zone;
+        self.backend.set_clock_zone(zone);
+        if let Some(file) = self.file.clone().filter(|_| self.dialog.is_open()) {
+            self.open(file);
         }
     }
 
@@ -96,3 +110,7 @@ impl PropsHub {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "props_hub_tests.rs"]
+mod tests;

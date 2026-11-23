@@ -1,18 +1,11 @@
 //! Detected tshark / dumpcap location + version for the About page (probed once, off-thread).
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 static INFO: OnceLock<(String, String)> = OnceLock::new();
 
-fn find(name: &str) -> Option<PathBuf> {
-    let paths = std::env::var_os("PATH")?;
-    std::env::split_paths(&paths)
-        .map(|d| d.join(name))
-        .find(|p| p.is_file())
-}
-
-fn describe(name: &str) -> String {
-    let Some(path) = find(name) else {
+fn describe(dir: Option<&Path>, name: &str) -> String {
+    let Some(path) = wl_tshark::find_tool(dir, name) else {
         return "not found".into();
     };
     let ver = std::process::Command::new(&path)
@@ -26,9 +19,10 @@ fn describe(name: &str) -> String {
 }
 
 /// Starts the probe in the background (idempotent).
-pub fn warm() {
-    std::thread::spawn(|| {
-        let _ = INFO.set((describe("tshark"), describe("dumpcap")));
+pub fn warm(dir: Option<PathBuf>) {
+    std::thread::spawn(move || {
+        let dir = dir.as_deref();
+        let _ = INFO.set((describe(dir, "tshark"), describe(dir, "dumpcap")));
     });
 }
 
@@ -44,7 +38,7 @@ mod tests {
     #[test]
     fn missing_tool_is_reported() {
         assert_eq!(
-            super::describe("definitely-not-a-real-tool-xyz"),
+            super::describe(None, "definitely-not-a-real-tool-xyz"),
             "not found"
         );
     }

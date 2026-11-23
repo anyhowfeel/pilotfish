@@ -6,7 +6,7 @@ use eframe::egui::{self, RichText, Ui};
 use serde::{Deserialize, Serialize};
 use wl_kit::theme::Palette;
 use wl_kit::widgets::badge;
-use wl_model::PacketBookmark;
+use wl_model::{PacketBookmark, Wireshark, needs_message};
 
 use crate::features::bookmarks_json;
 
@@ -129,6 +129,7 @@ pub fn bookmark_toolbar_ui(
     store: &mut BookmarkStore,
     selected_frame: Option<u64>,
     comment_buf: &mut String,
+    wireshark: Wireshark,
 ) -> Option<BookmarkBarAction> {
     let mut action = None;
     // Right-side data is computed up front so the two sides never borrow `store` together.
@@ -178,15 +179,18 @@ pub fn bookmark_toolbar_ui(
             {
                 action = Some(BookmarkBarAction::JumpTo(n));
             }
-            if ui
-                .small_button("Save to .pcapng")
+            let save = ui
+                .add_enabled(
+                    !wireshark.is_missing(),
+                    egui::Button::new("Save to .pcapng").small(),
+                )
                 .on_hover_text(
                     "Write the comments into a copy of the capture. editcap rewrites the file: \
 interface statistics blocks and the capture filter option are not kept, and a packet \
 keeps a single comment.",
                 )
-                .clicked()
-            {
+                .on_disabled_hover_text(needs_message("Saving comments"));
+            if save.clicked() {
                 action = Some(BookmarkBarAction::SaveComments);
             }
             if let Some(flt) = filter

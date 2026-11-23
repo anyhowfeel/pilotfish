@@ -89,10 +89,6 @@ impl WindowScope {
     }
 }
 
-fn muted_note(ui: &mut Ui, text: &str) {
-    ui.label(RichText::new(text).color(Palette::muted()));
-}
-
 /// Bucket width of the throughput chart: the native (finest) one, or a coarser one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RateStep {
@@ -153,11 +149,7 @@ fn selection_actions(
             .color(Palette::on_accent()),
     )
     .fill(Palette::accent());
-    if ui
-        .add(show)
-        .on_hover_text("Open these packets in the Packets page")
-        .clicked()
-    {
+    if ui.add(show).clicked() {
         actions.push(OverviewAction::ApplyFilter(sel.filter_expr()));
     }
     let opts = [(Scope::All, "All"), (Scope::Window, "Window")];
@@ -177,9 +169,8 @@ pub fn window_row(
         vec2(ui.available_width(), WINDOW_ROW_H),
         Layout::left_to_right(Align::Center),
         |ui| {
-            match *selection {
-                Some(sel) => selection_summary(ui, &sel, rate),
-                None => muted_note(ui, "Drag on the chart to select a time window"),
+            if let Some(sel) = *selection {
+                selection_summary(ui, &sel, rate);
             }
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 segmented_w(ui, step, &RateStep::OPTIONS, STEP_W);

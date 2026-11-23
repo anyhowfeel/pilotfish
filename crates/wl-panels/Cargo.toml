@@ -9,6 +9,7 @@ serde.workspace = true
 eframe.workspace = true
 egui_extras.workspace = true
 wl-stats.workspace = true
+wl-planar.workspace = true
 rayon.workspace = true
 fjadra = "0.2.1"
 serde_json = { workspace = true, features = ["preserve_order"] }

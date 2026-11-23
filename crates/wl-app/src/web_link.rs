@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use eframe::egui;
-use wl_model::{HttpDetail, HttpExchange, MessageStream, ThreatIntel, TlsSession};
+use wl_model::{HttpDetail, HttpExchange, MessageStream, ThreatIntel, TlsSession, Wireshark};
 use wl_panels::web::{
     KeysInfo, WebAction, WebData, WebStatus, demo_data, demo_detail, demo_streams,
 };
@@ -74,7 +74,7 @@ impl WebLink {
         self.rev += 1;
     }
 
-    pub fn data<'a>(&'a self, keys: &'a KeysInfo) -> WebData<'a> {
+    pub fn data<'a>(&'a self, keys: &'a KeysInfo, wireshark: Wireshark) -> WebData<'a> {
         let status = if self.unavailable {
             WebStatus::Error("Web analysis is not available in this build.")
         } else if self.loading && self.exchanges.is_empty() && self.tls.is_empty() {
@@ -90,6 +90,7 @@ impl WebLink {
             detail: self.detail.as_ref(),
             status,
             keys,
+            wireshark,
         }
     }
 

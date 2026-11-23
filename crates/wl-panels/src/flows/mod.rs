@@ -28,6 +28,7 @@ use wl_kit::theme::{Palette, RADIUS, spacing};
 use wl_kit::widgets::{empty_state, segmented_w};
 use wl_model::{FlowEvents, FlowSel, TcpSamples};
 
+use crate::needs::needs_wireshark;
 use crate::overview::NameResolver;
 use graph::FlowGraph;
 use header::Header;
@@ -144,6 +145,11 @@ impl FlowsPanel {
     }
 
     fn detail(&mut self, ui: &mut Ui, d: &FlowsData, out: &mut Vec<FlowsAction>) {
+        // The list on the left comes from the rows; both graphs are tshark passes.
+        if d.wireshark.is_missing() {
+            needs_wireshark(ui, "Flow analysis");
+            return;
+        }
         let Some(sel) = self.sel.clone() else {
             empty_state(
                 ui,

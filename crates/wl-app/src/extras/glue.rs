@@ -1,7 +1,7 @@
 //! `App` side of the extras: panel actions in, background results out.
 
 use eframe::egui;
-use wl_model::DecodeAs;
+use wl_model::{DecodeAs, needs_message};
 use wl_panels::decode_as::DecodeAsAction;
 use wl_panels::dns::DnsState;
 use wl_panels::features::InsightsAction;
@@ -103,8 +103,20 @@ impl App {
         }
     }
 
+    /// Decode As lists protocols and re-dissects with tshark; without it the dialog is no use.
+    fn decode_as_possible(&mut self) -> bool {
+        let missing = self.wireshark.is_missing();
+        if missing {
+            self.hub.notice = Some(needs_message("Decode As"));
+        }
+        !missing
+    }
+
     /// Opens Decode As, pre-filled from the selected packet when it has a TCP/UDP port.
     pub(crate) fn open_decode_as(&mut self) {
+        if !self.decode_as_possible() {
+            return;
+        }
         let state = &self.packets.table.state;
         let target = state
             .selected_pos()
@@ -117,6 +129,9 @@ impl App {
     }
 
     pub(crate) fn open_decode_as_for(&mut self, field: &str, port: u16) {
+        if !self.decode_as_possible() {
+            return;
+        }
         self.extras.decode.open_for(field, port);
     }
 

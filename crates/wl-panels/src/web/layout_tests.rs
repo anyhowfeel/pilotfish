@@ -1,6 +1,7 @@
 //! Headless layout checks at several widths and scales, in both themes, in every page state.
 use wl_kit::egui::{self, Context, Rect, pos2, vec2};
 use wl_kit::theme::Mode;
+use wl_model::Wireshark;
 
 use super::model::Sel;
 use super::{
@@ -51,6 +52,7 @@ fn page_stays_inside_its_area_at_all_widths_and_scales() {
                             detail: Some(&detail),
                             status: WebStatus::Ready,
                             keys: &KeysInfo::default(),
+                            wireshark: Wireshark::Available,
                         };
                         panel.ui(ui, &d);
                         assert!(
@@ -82,6 +84,7 @@ fn empty_loading_and_error_states_render() {
                 detail: None,
                 status,
                 keys: &KeysInfo::default(),
+                wireshark: Wireshark::Available,
             };
             assert!(panel.ui(ui, &d).is_empty());
         }
@@ -106,6 +109,7 @@ fn selecting_a_row_requests_its_detail_once() {
             detail: None,
             status: WebStatus::Ready,
             keys: &KeysInfo::default(),
+            wireshark: Wireshark::Available,
         };
         loads += panel
             .ui(ui, &d)
@@ -138,6 +142,7 @@ fn streams_tab_fits_with_and_without_a_selection() {
                         detail: None,
                         status: WebStatus::Ready,
                         keys: &KeysInfo::default(),
+                        wireshark: Wireshark::Available,
                     };
                     panel.ui(ui, &d);
                     assert!(
@@ -170,6 +175,7 @@ fn keys_bar_fits_with_a_key_log_loaded() {
                 detail: None,
                 status: WebStatus::Ready,
                 keys: &keys,
+                wireshark: Wireshark::Available,
             };
             panel.ui(ui, &d);
             assert!(
@@ -179,4 +185,49 @@ fn keys_bar_fits_with_a_key_log_loaded() {
             );
         });
     }
+}
+
+#[test]
+fn no_wireshark_shows_one_state_on_every_tab_and_asks_for_nothing() {
+    let (ex, tls) = demo_data();
+    let streams = demo_streams();
+    for spec in ["http:1", "stream:0", "files:0"] {
+        let mut panel = WebPanel::default();
+        panel.preselect(spec);
+        run(1000.0, 640.0, 1.0, Mode::Dark, |ui| {
+            let d = WebData {
+                rev: 1,
+                exchanges: &ex,
+                tls: &tls,
+                streams: &streams,
+                detail: None,
+                status: WebStatus::Ready,
+                keys: &KeysInfo::default(),
+                wireshark: Wireshark::Missing,
+            };
+            assert!(panel.ui(ui, &d).is_empty(), "{spec}");
+        });
+    }
+}
+
+#[test]
+fn the_files_tab_asks_for_its_list_when_wireshark_is_there() {
+    let (ex, tls) = demo_data();
+    let mut panel = WebPanel::default();
+    panel.preselect("files:0");
+    let mut asked = 0;
+    run(1000.0, 640.0, 1.0, Mode::Dark, |ui| {
+        let d = WebData {
+            rev: 1,
+            exchanges: &ex,
+            tls: &tls,
+            streams: &[],
+            detail: None,
+            status: WebStatus::Ready,
+            keys: &KeysInfo::default(),
+            wireshark: Wireshark::Available,
+        };
+        asked += panel.ui(ui, &d).len();
+    });
+    assert!(asked > 0);
 }

@@ -11,6 +11,7 @@ use crate::bg::BgJobs;
 use crate::metrics::Metrics;
 use crate::state::{RunState, StatusInfo, describe_source};
 use crate::web_jobs::WebState;
+use crate::wireshark::explain;
 
 /// Rows handed to the UI per `poll` call at most (keeps frames short while a big file streams in).
 pub const MAX_ROWS_PER_POLL: usize = 30_000;
@@ -114,7 +115,7 @@ impl Controller {
                 self.source = Some(source);
                 self.display_filter = filter;
             }
-            Err(e) => self.fail(e),
+            Err(e) => self.fail(explain(e, start_feature(&source))),
         }
     }
 
@@ -199,6 +200,10 @@ impl Controller {
             out.changed = true;
         }
         if let Some(e) = failed {
+            let e = match &self.source {
+                Some(source) => explain(e, start_feature(source)),
+                None => e,
+            };
             self.fail(e);
             out.changed = true;
         }
@@ -219,6 +224,14 @@ impl Controller {
     }
 }
 
+/// What a capture that could not start needed Wireshark for.
+fn start_feature(source: &CaptureSource) -> &'static str {
+    match source {
+        CaptureSource::File(_) => "This display filter",
+        _ => "Live capture",
+    }
+}
+
 impl Drop for Controller {
     fn drop(&mut self) {
         self.stop();
@@ -234,3 +247,7 @@ mod jobs;
 #[cfg(test)]
 #[path = "worker_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "worker_missing_tests.rs"]
+mod missing_tests;

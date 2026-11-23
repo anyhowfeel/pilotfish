@@ -1,6 +1,6 @@
 //! Panel input (`WebData`) and output (`WebAction`).
 
-use wl_model::{HttpDetail, HttpExchange, MessageStream, TlsSession};
+use wl_model::{HttpDetail, HttpExchange, MessageStream, TlsSession, Wireshark};
 
 /// What the panel asks the app to do.
 #[derive(Debug, Clone, PartialEq)]
@@ -47,4 +47,5 @@ pub struct WebData<'a> {
     pub detail: Option<&'a HttpDetail>,
     pub status: WebStatus<'a>,
     pub keys: &'a KeysInfo,
+    pub wireshark: Wireshark,
 }

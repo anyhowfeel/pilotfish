@@ -8,7 +8,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 
 use crossbeam_channel::{Receiver, Sender, bounded};
-use wl_model::{CaptureBackend, CaptureError, FrameDetail};
+use wl_model::{CaptureBackend, CaptureError, FrameDetail, needs_message};
 
 /// Result of one background job.
 pub enum BgEvent {
@@ -192,7 +192,8 @@ impl BgJobs {
                     changed = true;
                 }
                 BgEvent::Detail(seq, no, Err(e)) if self.detail_wanted == Some((seq, no)) => {
-                    error = Some(e);
+                    // Without Wireshark the pane keeps the native summary: nothing to report.
+                    error = Some(e).filter(|e| !e.is_tool_missing());
                     changed = true;
                 }
                 BgEvent::Detail(..) => {}
@@ -203,6 +204,10 @@ impl BgJobs {
                 BgEvent::Filter(..) => {}
                 BgEvent::Export(Ok(p)) => {
                     notice = Some(format!("Saved {}", p.display()));
+                    changed = true;
+                }
+                BgEvent::Export(Err(e)) if e.is_tool_missing() => {
+                    notice = Some(needs_message("Exporting packets"));
                     changed = true;
                 }
                 BgEvent::Export(Err(e)) => {

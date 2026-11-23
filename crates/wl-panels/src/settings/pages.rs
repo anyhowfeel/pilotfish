@@ -1,6 +1,7 @@
 //! Appearance, Capture and Display category bodies (pure form code over `Settings`).
 use wl_kit::egui::Ui;
 use wl_kit::widgets::{choice_row, number_row, settings_card, slider_row, text_row, toggle_row};
+use wl_model::ClockZone;
 
 use super::model::{Density, PillLook, Settings, ThemeChoice};
 
@@ -10,7 +11,7 @@ pub fn appearance(ui: &mut Ui, s: &mut Settings) {
             ui,
             true,
             "Theme",
-            "Dark, light, or follow the operating system.",
+            "",
             &mut s.theme,
             &[
                 (ThemeChoice::Dark, "Dark"),
@@ -84,6 +85,16 @@ pub fn capture(ui: &mut Ui, s: &mut Settings) {
             "e.g. port 53",
         );
     });
+    settings_card(ui, "Wireshark", |ui| {
+        text_row(
+            ui,
+            true,
+            "Wireshark folder",
+            "The folder that holds tshark and dumpcap. Restart pilotfish to apply it.",
+            &mut s.wireshark_dir,
+            "Automatic",
+        );
+    });
     crate::capture_form::capture_options(ui, &mut s.capture);
 }
 
@@ -104,6 +115,16 @@ pub fn display(ui: &mut Ui, s: &mut Settings) {
             &mut s.max_rows,
             10_000..=20_000_000,
             "",
+        );
+    });
+    settings_card(ui, "Capture file", |ui| {
+        choice_row(
+            ui,
+            true,
+            "Time zone",
+            "Times in the file properties.",
+            &mut s.clock_zone,
+            &[(ClockZone::Local, "Local"), (ClockZone::Utc, "UTC")],
         );
     });
 }

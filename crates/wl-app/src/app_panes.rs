@@ -16,7 +16,7 @@ impl App {
             let id = egui::ViewportId::from_hash_of(("wl_detached", page.label()));
             let mut builder = egui::ViewportBuilder::default()
                 .with_app_id("pilotfish")
-                .with_title(format!("pilotfish \u{2013} {}", page.label()))
+                .with_title(format!("pilotfish: {}", page.label()))
                 .with_inner_size([980.0, 660.0])
                 .with_min_inner_size([520.0, 360.0]);
             if let Some(icon) = crate::app_icon::window_icon() {

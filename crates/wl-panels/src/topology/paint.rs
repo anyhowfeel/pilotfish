@@ -4,6 +4,7 @@ use wl_kit::egui::{Color32, CornerRadius, Painter, Pos2, Rect, Shape, Stroke, po
 use wl_kit::theme::{Palette, protocol_color, tint};
 use wl_kit::widgets::paint_lock;
 
+use super::arrow;
 use super::model::Graph;
 use super::scale::{edge_alpha, edge_width};
 use super::state::{Buffers, Resolved};
@@ -81,7 +82,10 @@ pub fn links(p: &Painter, s: &Scene, buf: &Buffers) {
         let (from, to, share) = dominant(s.g, i);
         let (pf, pt) = (buf.screen[from], buf.screen[to]);
         if s.directions && share >= 0.62 && k == 1.0 {
-            arrow(p, pf, pt, w, color);
+            let reach = (buf.discs[from].1, buf.discs[to].1);
+            if let Some(tri) = arrow::head(pf, pt, reach, w) {
+                arrow(p, tri, color);
+            }
         }
         if s.animate && flowing < MAX_FLOWING && l.t >= 0.35 && k == 1.0 {
             flowing += 1;
@@ -98,20 +102,14 @@ pub fn links(p: &Painter, s: &Scene, buf: &Buffers) {
     }
 }
 
-fn arrow(p: &Painter, from: Pos2, to: Pos2, w: f32, color: Color32) {
-    let d = (to - from).normalized();
-    if !d.x.is_finite() {
-        return;
-    }
-    let n = vec2(-d.y, d.x);
-    let m = from + (to - from) * 0.58;
-    let sz = 4.5 + w;
-    let pts = vec![
-        m + d * sz,
-        m - d * sz * 0.6 + n * sz * 0.6,
-        m - d * sz * 0.6 - n * sz * 0.6,
-    ];
-    p.add(Shape::convex_polygon(pts, color, Stroke::NONE));
+/// The head is opaque and outlined in the panel color so it stands out from the line it ends.
+fn arrow(p: &Painter, tri: [Pos2; 3], color: Color32) {
+    let solid = Color32::from_rgb(color.r(), color.g(), color.b());
+    p.add(Shape::convex_polygon(
+        tri.to_vec(),
+        solid,
+        Stroke::new(1.5, Palette::panel()),
+    ));
 }
 
 pub fn nodes(p: &Painter, s: &Scene, buf: &Buffers) {

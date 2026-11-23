@@ -93,7 +93,7 @@ impl CommandPalette {
             self.close();
             return None;
         }
-        Window::new("Command Palette")
+        Window::new("Command palette")
             .id(egui::Id::NULL.with("wl_command_palette"))
             .title_bar(false)
             .collapsible(false)

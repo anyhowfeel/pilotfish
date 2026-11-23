@@ -6,9 +6,10 @@ use eframe::egui::{
 use wl_kit::format;
 use wl_kit::theme::{Palette, RADIUS, mono, protocol_color, row_h, spacing};
 use wl_kit::widgets::{badge, empty_state, section_header};
-use wl_model::{ExpertReport, ExpertSeverity, ProtocolHierarchy};
+use wl_model::{Analysis, ExpertReport, ExpertSeverity, ProtocolHierarchy};
 
 use super::actions::InsightsAction;
+use super::state::ready_or_explain;
 
 pub fn severity_color(sev: ExpertSeverity) -> Color32 {
     match sev {
@@ -22,16 +23,10 @@ pub fn severity_color(sev: ExpertSeverity) -> Color32 {
 pub fn expert_view(
     ui: &mut Ui,
     severity_filter: &mut Option<ExpertSeverity>,
-    expert: Option<&ExpertReport>,
+    expert: &Analysis<ExpertReport>,
     actions: &mut Vec<InsightsAction>,
 ) {
-    let Some(rep) = expert else {
-        empty_state(
-            ui,
-            "!",
-            "Expert Info not loaded",
-            "Click Refresh to run tshark Expert Info analysis.",
-        );
+    let Some(rep) = ready_or_explain(ui, "Expert info", expert) else {
         return;
     };
     ui.horizontal_wrapped(|ui| {
@@ -91,14 +86,8 @@ pub fn expert_view(
     }
 }
 
-pub fn phs_view(ui: &mut Ui, phs: Option<&ProtocolHierarchy>, actions: &mut Vec<InsightsAction>) {
-    let Some(tree) = phs else {
-        empty_state(
-            ui,
-            "%",
-            "Protocol Hierarchy not loaded",
-            "Click Refresh to compute tshark io,phs statistics.",
-        );
+pub fn phs_view(ui: &mut Ui, phs: &Analysis<ProtocolHierarchy>, actions: &mut Vec<InsightsAction>) {
+    let Some(tree) = ready_or_explain(ui, "Protocol hierarchy", phs) else {
         return;
     };
     if tree.nodes.is_empty() {
@@ -113,7 +102,7 @@ pub fn phs_view(ui: &mut Ui, phs: Option<&ProtocolHierarchy>, actions: &mut Vec<
     section_header(
         ui,
         &format!(
-            "Protocol Hierarchy — {} frames • {}",
+            "Protocol hierarchy: {} frames, {}",
             format::count(tree.total_frames),
             format::bytes(tree.total_bytes)
         ),

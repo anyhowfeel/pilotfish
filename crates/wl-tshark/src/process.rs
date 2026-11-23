@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 use wl_model::CaptureError;
 
 use crate::error::spawn_error;
+use crate::tool_path::find_tool;
 
 #[derive(Debug, Clone)]
 pub struct Tools {
@@ -19,23 +20,25 @@ pub struct Tools {
     pub dumpcap: PathBuf,
     pub editcap: Option<PathBuf>,
     pub mergecap: Option<PathBuf>,
-}
-
-pub(crate) fn find_in_path(name: &str) -> Option<PathBuf> {
-    let paths = std::env::var_os("PATH")?;
-    std::env::split_paths(&paths)
-        .map(|d| d.join(name))
-        .find(|p| p.is_file())
+    pub capinfos: Option<PathBuf>,
 }
 
 impl Tools {
-    pub fn locate() -> Result<Tools, CaptureError> {
-        let need = |n: &str| find_in_path(n).ok_or_else(|| CaptureError::ToolMissing(n.into()));
+    /// Finds tshark and dumpcap (`dir` is the user's Wireshark folder); the other tools are
+    /// taken from the folder tshark was found in first, so one install is never mixed with another.
+    pub fn locate(dir: Option<&Path>) -> Result<Tools, CaptureError> {
+        let need = |n: &str, dir: Option<&Path>| {
+            find_tool(dir, n).ok_or_else(|| CaptureError::ToolMissing(n.into()))
+        };
+        let tshark = need("tshark", dir)?;
+        let home = tshark.parent().map(Path::to_path_buf);
+        let near = home.as_deref().or(dir);
         Ok(Tools {
-            tshark: need("tshark")?,
-            dumpcap: need("dumpcap")?,
-            editcap: find_in_path("editcap"),
-            mergecap: find_in_path("mergecap"),
+            dumpcap: need("dumpcap", near)?,
+            editcap: find_tool(near, "editcap"),
+            mergecap: find_tool(near, "mergecap"),
+            capinfos: find_tool(near, "capinfos"),
+            tshark,
         })
     }
 }
@@ -53,9 +56,23 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
+    run_with_env(tool, args, &[])
+}
+
+/// `run` with extra environment variables for the child.
+pub fn run_with_env<I, S>(
+    tool: &Path,
+    args: I,
+    envs: &[(&str, &str)],
+) -> Result<Output, CaptureError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
     SPAWNED.fetch_add(1, Ordering::Relaxed);
     Command::new(tool)
         .args(args)
+        .envs(envs.iter().copied())
         .stdin(Stdio::null())
         .output()
         .map_err(|e| spawn_error(&tool.to_string_lossy(), &e))

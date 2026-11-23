@@ -29,6 +29,7 @@ pub fn plain() -> crate::features::InsightContext<'static> {
         security: None,
         intel: &NO_EXTRAS.0,
         rules: &NO_EXTRAS.1,
+        wireshark: wl_model::Wireshark::Available,
     }
 }
 

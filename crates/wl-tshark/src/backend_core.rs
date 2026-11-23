@@ -2,9 +2,14 @@
 use super::*;
 
 impl TsharkBackend {
-    /// Locates tshark and dumpcap on `PATH`; `ToolMissing` otherwise.
+    /// Locates tshark and dumpcap on `PATH` and the usual install folders; `ToolMissing` otherwise.
     pub fn new() -> Result<Self, CaptureError> {
-        let tools = Tools::locate()?;
+        Self::with_dir(None)
+    }
+
+    /// Like `new`, looking in the user's Wireshark folder first.
+    pub fn with_dir(dir: Option<PathBuf>) -> Result<Self, CaptureError> {
+        let tools = Tools::locate(dir.as_deref())?;
         let scratch = tempfile::Builder::new()
             .prefix("pilotfish-")
             .tempdir()
@@ -21,6 +26,7 @@ impl TsharkBackend {
             http_cache: http_detail::DetailCache::default(),
             keylog: Mutex::new(keylog::from_env()),
             decode_as: Mutex::new(Vec::new()),
+            clock_zone: Mutex::new(ClockZone::default()),
             scans: Scans::default(),
         })
     }

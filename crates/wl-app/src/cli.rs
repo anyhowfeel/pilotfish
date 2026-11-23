@@ -63,7 +63,7 @@ pub struct Cli {
     /// Select this host on the Map page (screenshots).
     #[arg(hide = true, long, value_name = "ADDR")]
     pub map_select: Option<String>,
-    /// Map view options for screenshots: radial,directions,nolabels.
+    /// Map view options for screenshots: force,directions,encrypted,nolabels.
     #[arg(hide = true, long, value_name = "LIST")]
     pub map_view: Option<String>,
     /// Feed the Web page synthetic HTTP/TLS traffic (no tshark), for screenshots.

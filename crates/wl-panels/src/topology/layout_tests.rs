@@ -19,6 +19,13 @@ fn settle(l: &mut Layout, max_frames: usize) -> usize {
     max_frames
 }
 
+/// The classic physics, which the tests below are about (the default layout is planar).
+fn force() -> Layout {
+    let mut l = Layout::default();
+    l.set_mode(LayoutMode::Force, &Graph::default());
+    l
+}
+
 fn star_graph() -> Graph {
     Graph::build(&star(), &Filters::default(), &|_| None)
 }
@@ -26,8 +33,8 @@ fn star_graph() -> Graph {
 #[test]
 fn force_layout_converges_without_overlap() {
     let g = star_graph();
-    let mut l = Layout::default();
-    l.sync(&g, None);
+    let mut l = force();
+    l.sync(&g);
     let frames = settle(&mut l, 2_000);
     assert!(frames < 2_000, "did not settle");
     assert!(!l.is_moving());
@@ -46,8 +53,8 @@ fn force_layout_converges_without_overlap() {
 fn layout_is_deterministic() {
     let g = star_graph();
     let run = || {
-        let mut l = Layout::default();
-        l.sync(&g, None);
+        let mut l = force();
+        l.sync(&g);
         settle(&mut l, 2_000);
         l.pos
     };
@@ -57,9 +64,9 @@ fn layout_is_deterministic() {
 #[test]
 fn positions_persist_and_new_nodes_spawn_near_neighbours() {
     let mut s = star();
-    let mut l = Layout::default();
+    let mut l = force();
     let g = Graph::build(&s, &Filters::default(), &|_| None);
-    l.sync(&g, None);
+    l.sync(&g);
     settle(&mut l, 2_000);
     let before: Vec<_> = g
         .nodes
@@ -73,7 +80,7 @@ fn positions_persist_and_new_nodes_spawn_near_neighbours() {
         "UDP",
     ));
     let g2 = Graph::build(&s, &Filters::default(), &|_| None);
-    l.sync(&g2, None);
+    l.sync(&g2);
     let anchor = l.pos[g2.find("192.168.74.7").unwrap()];
     let newcomer = l.pos[g2.find("9.9.9.9").unwrap()];
     assert!(
@@ -90,8 +97,8 @@ fn positions_persist_and_new_nodes_spawn_near_neighbours() {
 #[test]
 fn dragged_node_stays_pinned_until_unpinned() {
     let g = star_graph();
-    let mut l = Layout::default();
-    l.sync(&g, None);
+    let mut l = force();
+    l.sync(&g);
     settle(&mut l, 2_000);
     let target = vec2(500.0, -300.0);
     l.drag(2, target, &g);
@@ -100,16 +107,6 @@ fn dragged_node_stays_pinned_until_unpinned() {
     l.unpin(2, &g);
     settle(&mut l, 2_000);
     assert!((l.pos[2] - target).length() > 1.0 && !l.pinned[2]);
-}
-
-#[test]
-fn radial_layout_reaches_its_targets_and_stops() {
-    let g = star_graph();
-    let mut l = Layout::default();
-    l.sync(&g, None);
-    l.set_mode(LayoutMode::Radial, &g, g.find("192.168.74.1"));
-    assert!(settle(&mut l, 500) < 500);
-    assert!(l.pos[g.find("192.168.74.1").unwrap()].length() < 1.0);
 }
 
 fn run_frames(

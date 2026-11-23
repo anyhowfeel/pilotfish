@@ -46,12 +46,14 @@ impl Controller {
     }
 
     /// Drains finished web jobs and starts a due refresh. Web errors of a live capture (file still
-    /// empty or being written) are expected and ignored.
+    /// empty or being written) are expected and ignored, and so is a missing Wireshark: the page
+    /// says so itself.
     pub(super) fn poll_web_jobs(&mut self) {
         let (live, backing) = (self.live_running(), self.backing());
         self.web.tick(backing, live, Instant::now());
         if let Some(e) = self.web.jobs.drain()
             && !live
+            && !e.is_tool_missing()
         {
             self.error = Some(e);
         }

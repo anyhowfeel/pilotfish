@@ -50,7 +50,7 @@ pub fn build_html_report(
     let safe_title = html_escape(title);
     let _ = write!(
         h,
-        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>{safe_title} — pilotfish report</title><style>{REPORT_CSS}</style></head><body>\
+        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>{safe_title}, pilotfish report</title><style>{REPORT_CSS}</style></head><body>\
 <h1>pilotfish Report: {safe_title}</h1>\
 <div class=\"grid\">\
 <div class=\"card\"><div class=\"mut\">Packets</div><div class=\"kpi\">{}</div></div>\

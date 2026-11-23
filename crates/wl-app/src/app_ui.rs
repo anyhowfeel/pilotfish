@@ -31,6 +31,7 @@ impl App {
                     filter_status: self.setup_io.status(),
                     running: self.ctrl.is_live() && (self.ctrl.is_busy() || self.ctrl.is_paused()),
                     paused: self.ctrl.is_paused(),
+                    wireshark: self.wireshark,
                 };
                 ov = self.setup.ui(ui, &data);
                 drop(activity);
@@ -55,14 +56,16 @@ impl App {
             }
             Page::Conversations => ov = self.convs.ui(ui, &stats),
             Page::Flows => {
-                let acts = self.flows.ui(ui, &self.flows_link.data(&stats));
+                let acts = self
+                    .flows
+                    .ui(ui, &self.flows_link.data(&stats, self.wireshark));
                 for a in acts {
                     self.flows_action(a, &mut cmds);
                 }
             }
             Page::Web => {
                 let keys = self.keys.info();
-                let data = self.web_link.data(&keys);
+                let data = self.web_link.data(&keys, self.wireshark);
                 let acts = self.web.ui(ui, &data);
                 let ctx = ui.ctx().clone();
                 for a in acts {
@@ -74,7 +77,7 @@ impl App {
                     .ctrl
                     .backing()
                     .map(|f| (f, self.ctrl.status().source.clone()));
-                self.diff.ui(ui, base);
+                self.diff.ui(ui, base, self.wireshark);
             }
             Page::Insights => {
                 for act in self.hub.insights_ui(ui, &stats) {
@@ -118,6 +121,7 @@ impl App {
                         &mut self.hub.bookmarks,
                         sel,
                         &mut self.hub.bookmark_comment,
+                        self.wireshark,
                     )
                 {
                     match bm {

@@ -43,15 +43,20 @@ fn requests_on_activation_and_loads_reply() {
     link.tick(&mut fake, true);
     assert_eq!((fake.requests, fake.active.clone()), (1, vec![true]));
     assert!(matches!(
-        link.data(&KeysInfo::default()).status,
+        link.data(&KeysInfo::default(), Wireshark::Available).status,
         WebStatus::Loading
     ));
     let (ex, tls) = demo_data();
     fake.reply = Some((ex, tls, Vec::new()));
     assert!(link.tick(&mut fake, true));
-    assert_eq!(link.data(&KeysInfo::default()).exchanges.len(), 40);
+    assert_eq!(
+        link.data(&KeysInfo::default(), Wireshark::Available)
+            .exchanges
+            .len(),
+        40
+    );
     assert!(matches!(
-        link.data(&KeysInfo::default()).status,
+        link.data(&KeysInfo::default(), Wireshark::Available).status,
         WebStatus::Ready
     ));
 }
@@ -59,5 +64,10 @@ fn requests_on_activation_and_loads_reply() {
 #[test]
 fn demo_feeds_without_backend() {
     let link = WebLink::new(true);
-    assert_eq!(link.data(&KeysInfo::default()).tls.len(), 10);
+    assert_eq!(
+        link.data(&KeysInfo::default(), Wireshark::Available)
+            .tls
+            .len(),
+        10
+    );
 }

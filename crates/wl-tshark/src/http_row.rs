@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use crate::interner::Interner;
 use crate::tsv_pass::{columns, opt};
+use wl_model::Interner;
 
 /// Column order is part of the contract with `parse`. HTTP/2 columns are best effort.
 pub const FIELDS: [&str; 22] = [

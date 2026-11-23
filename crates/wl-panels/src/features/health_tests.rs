@@ -95,6 +95,7 @@ fn muted_findings_are_counted_and_never_reported_as_healthy() {
             security: None,
             intel: &intel,
             rules,
+            wireshark: Default::default(),
         };
         synthesize_insights(Some(&rep), None, None, &stats, &cx)
             .into_iter()

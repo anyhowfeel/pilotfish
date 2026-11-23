@@ -61,7 +61,7 @@ with full sentences.
 
 The version lives in `Cargo.toml`, `Cargo.lock`, `packaging/arch/PKGBUILD` and the latest released section of
 `CHANGELOG.md`. `tools/check-version.sh` fails when they disagree, and the CI runs it on every pull request
-and every tag.
+and every release build.
 
 ## Releasing
 
@@ -69,6 +69,7 @@ and every tag.
 2. `tools/bump-version.sh X.Y.Z` sets the version in `Cargo.toml`, `Cargo.lock` and the PKGBUILD.
 3. In `CHANGELOG.md`, move the `Unreleased` notes under `## [X.Y.Z] - YYYY-MM-DD` and fix the compare links.
 4. `tools/check-version.sh`, then open a pull request titled `chore(release): X.Y.Z`.
-5. When the CI is green, squash-merge it, then tag the merge commit and push the tag:
-   `git tag -a vX.Y.Z -m "pilotfish X.Y.Z" && git push origin vX.Y.Z`.
-   The CI builds the packages and publishes the release, with the notes taken from `CHANGELOG.md`.
+5. When the CI is green, squash-merge it and update `main`.
+6. On `main`, run `tools/release.sh` to build and check the artifacts in containers (nothing leaves the
+   machine), then `tools/release.sh --publish` to tag the commit, push the tag and create the release with the
+   notes taken from `CHANGELOG.md`. The macOS images and the Windows installer are added by a workflow. See `docs/releasing.md`.

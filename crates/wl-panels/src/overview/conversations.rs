@@ -73,7 +73,7 @@ impl ConversationsPanel {
                 ui,
                 "=",
                 "No conversations yet",
-                "Flows between two endpoints will be listed here.",
+                "Start a capture or open a file to see conversations.",
             );
             return out;
         }

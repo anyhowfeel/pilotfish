@@ -1,6 +1,10 @@
-; Inno Setup script. Build with: ISCC /DAppVersion=0.1.0 packaging\windows\pilotfish.iss
+; Inno Setup script. Build with: ISCC /DAppVersion=0.1.0 /DExePath=C:\path\to\pilotfish.exe packaging\windows\pilotfish.iss
 #ifndef AppVersion
   #define AppVersion "0.0.0"
+#endif
+
+#ifndef ExePath
+  #define ExePath "..\..\target\x86_64-pc-windows-msvc\release\pilotfish.exe"
 #endif
 
 [Setup]
@@ -30,7 +34,7 @@ UninstallDisplayName=pilotfish
 Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 
 [Files]
-Source: "..\..\target\x86_64-pc-windows-msvc\release\pilotfish.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#ExePath}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\CHANGELOG.md"; DestDir: "{app}"; Flags: ignoreversion
 

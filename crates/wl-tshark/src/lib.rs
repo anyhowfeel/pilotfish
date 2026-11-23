@@ -34,13 +34,14 @@ mod http_pair;
 mod http_row;
 mod http_scan;
 mod interfaces;
-mod interner;
+
 mod io_stat;
 mod io_stat_parse;
 mod json_ordered;
 pub mod keylog;
 mod keys_embed;
 mod live;
+mod login_path;
 mod msg_group;
 mod msg_preview;
 mod msg_rows;
@@ -66,6 +67,7 @@ mod tcp_scan;
 mod tls_merge;
 mod tls_names;
 mod tls_scan;
+mod tool_path;
 mod tsv_pass;
 mod validate;
 
@@ -76,13 +78,14 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use tempfile::TempDir;
 use wl_model::{
     CaptureBackend, CaptureError, CaptureOptions, CaptureProperties, CaptureSource, Channel,
-    Credential, DecodeAs, DnsQuery, FlowEvents, FrameDetail, FrameFields, HttpDetail, HttpExchange,
-    Interface, IoGraph, IoSpec, MessageStream, ObjectSet, PacketBookmark, Session, TcpSamples,
-    TlsSession,
+    ClockZone, Credential, DecodeAs, DnsQuery, FlowEvents, FrameDetail, FrameFields, HttpDetail,
+    HttpExchange, Interface, IoGraph, IoSpec, MessageStream, ObjectSet, PacketBookmark, Session,
+    TcpSamples, TlsSession,
 };
 
 use process::Tools;
 pub use process::{kill_all_children, spawned as processes_spawned};
+pub use tool_path::find_tool;
 
 pub struct TsharkBackend {
     pub(crate) tools: Tools,
@@ -94,6 +97,7 @@ pub struct TsharkBackend {
     http_cache: http_detail::DetailCache,
     keylog: Mutex<Option<PathBuf>>,
     decode_as: Mutex<Vec<DecodeAs>>,
+    clock_zone: Mutex<ClockZone>,
     scans: Scans,
 }
 
@@ -231,12 +235,17 @@ impl CaptureBackend for TsharkBackend {
     }
 
     fn capture_properties(&self, file: &Path) -> Result<CaptureProperties, CaptureError> {
-        capinfos::properties(&self.tools, file)
+        let zone = *self.clock_zone.lock().unwrap_or_else(|e| e.into_inner());
+        capinfos::properties(&self.tools, file, zone)
     }
 
     fn file_sha256(&self, file: &Path) -> Result<String, CaptureError> {
         capinfos::sha256(&self.tools, file)
     }
+    fn set_clock_zone(&self, zone: ClockZone) {
+        *self.clock_zone.lock().unwrap_or_else(|e| e.into_inner()) = zone;
+    }
+
     fn set_decode_as(&self, rules: Vec<DecodeAs>) {
         *self.decode_as.lock().unwrap_or_else(|e| e.into_inner()) = rules;
         self.frame_cache.clear();

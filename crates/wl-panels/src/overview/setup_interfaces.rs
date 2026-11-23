@@ -7,7 +7,7 @@ use wl_kit::egui::{
 };
 use wl_kit::theme::{Palette, spacing};
 use wl_kit::widgets::{centered_row, empty_state, paint_elided, text_field};
-use wl_model::Interface;
+use wl_model::{Interface, Wireshark};
 
 use super::activity::ActivityMap;
 use super::iface_class::{Group, classify, grouped};
@@ -37,17 +37,14 @@ impl InterfacePicker {
         ui: &mut Ui,
         interfaces: &[Interface],
         activity: &ActivityMap,
+        wireshark: Wireshark,
         selected: &mut Vec<String>,
     ) {
         self.refresh_order(ui, interfaces, activity);
         self.header(ui, interfaces.len(), selected.len());
         if interfaces.is_empty() {
-            empty_state(
-                ui,
-                "!",
-                "No interfaces found",
-                "Check that dumpcap is installed and you may capture.",
-            );
+            let (title, hint) = no_interfaces(wireshark);
+            empty_state(ui, "!", title, hint);
             return;
         }
         let rate = |n: &str| self.frozen.get(n).copied().unwrap_or(0.0);
@@ -108,6 +105,22 @@ impl InterfacePicker {
         let (line, _) = ui.allocate_exact_size(vec2(ui.available_width(), 1.0), Sense::hover());
         ui.painter().rect_filled(line, 0.0, Palette::border());
         ui.add_space(spacing::SM);
+    }
+}
+
+/// Without Wireshark there is no dumpcap to list interfaces, which is not the same as a machine
+/// with none.
+fn no_interfaces(wireshark: Wireshark) -> (&'static str, &'static str) {
+    if wireshark.is_missing() {
+        (
+            "Live capture needs Wireshark",
+            "Opening a capture file works without it.",
+        )
+    } else {
+        (
+            "No interfaces found",
+            "Check that dumpcap is installed and you may capture.",
+        )
     }
 }
 
@@ -215,5 +228,23 @@ mod tests {
         assert_eq!(s, ["c"]);
         apply_event(&mut s, "c", CardEvent::Toggle, false);
         assert!(s.is_empty());
+    }
+
+    #[test]
+    fn no_wireshark_is_not_reported_as_no_interfaces() {
+        let (title, hint) = no_interfaces(Wireshark::Missing);
+        assert_eq!(title, "Live capture needs Wireshark");
+        assert!(hint.contains("without it"));
+    }
+
+    #[test]
+    fn an_empty_list_with_wireshark_keeps_the_dumpcap_hint() {
+        assert_eq!(
+            no_interfaces(Wireshark::Available),
+            (
+                "No interfaces found",
+                "Check that dumpcap is installed and you may capture."
+            )
+        );
     }
 }

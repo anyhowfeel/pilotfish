@@ -3,7 +3,7 @@
 use wl_kit::egui::{self, Color32, Frame, Key, Margin, Stroke, Ui};
 use wl_kit::theme::{Palette, RADIUS, spacing};
 use wl_kit::widgets::{centered_row, pill_toggle, text_field};
-use wl_model::CaptureOptions;
+use wl_model::{CaptureOptions, Wireshark};
 
 use super::actions::OverviewAction;
 use super::setup_actions::action_row;
@@ -31,6 +31,7 @@ pub struct BarData<'a> {
     pub running: bool,
     pub paused: bool,
     pub status: Option<&'a FilterStatus>,
+    pub wireshark: Wireshark,
 }
 
 /// Draws the bar and returns its outer height.

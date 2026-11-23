@@ -66,7 +66,7 @@ mod tests {
 
     #[test]
     fn finds_frames_in_sample_capture() {
-        let Some(tools) = Tools::locate().ok() else {
+        let Some(tools) = Tools::locate(None).ok() else {
             return;
         };
         let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/sample.pcapng");

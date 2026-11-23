@@ -5,9 +5,51 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-23
+
+### Added
+- **Capture files open without Wireshark.** A pure-Rust reader and decoder (`wl-native`) read pcap and pcapng
+  files and feed the Overview, Hosts, Map, Packets, Graphs and Properties pages, a layer summary in the packet
+  detail pane, a subset of the display filter language, I/O graphs and file properties. `wl-hybrid` sends
+  every other request (HTTP and TLS details, streams, objects, Decode As, export, live capture) to tshark, which
+  now starts on first use instead of at launch. The missing-Wireshark banner is gone; a feature that needs
+  Wireshark says so when it is used. The native rows, filters, series, properties and frame layers are checked
+  against tshark on every fixture capture. On a synthetic 3 million packet capture the native read peaks at 15 MiB
+  and takes 3.3 s, where tshark peaks at 2059 MiB and takes 67 s.
+- **A Planar layout for the map.** The default layout draws the graph without crossing links when that is
+  possible and keeps the crossings to a minimum when it is not. The map shows the number of crossings, or "No
+  crossings". Force stays as the free-moving layout.
+- **A time zone setting for the file properties.** Times show in local time by default and in UTC when
+  chosen in Settings, on both the native and the tshark path.
+
 ### Changed
-- **The README screenshots show pilotfish 0.5.0**, in both themes, with three new views: the Capture Diff page, the
-  Streams tab and the masked credentials of Insights. They are taken on invented captures only.
+- **The Radial map layout is gone**, replaced by Planar.
+- **Link arrows on the map end at the destination host.** The tip touches the host, the head is outlined and its
+  size no longer grows with the width of the link.
+- **The map colors private and public hosts with chart colors** (blue and magenta). Green and orange are the ok and
+  warning colors, so every public host used to read as a warning.
+- **Less interface copy.** The Network health page lost its subtitle, the hints that explained how to drag a chart
+  selection or zoom were removed (the README describes the gestures), tooltips that repeated a button label are
+  gone and the command palette uses sentence case.
+- **Releases are built in containers.** `tools/release.sh` checks the tree, builds the Linux and Windows files and
+  the Arch package in pinned containers (`docker/run.sh`) and prepares the notes from this changelog; it only
+  publishes with `--publish`. The macOS disk images and the Windows installer (which wraps the same executable as
+  the `.zip`) are built by a workflow when a release is published, and the CI only runs the version check, fmt,
+  clippy and the tests. The Linux build now covers aarch64 too, built under QEMU. See `docs/releasing.md`.
+- **The packages recommend Wireshark instead of requiring it**: the `.deb` recommends `tshark` and the Arch package
+  lists `wireshark-cli` as optional, since capture files open without it.
+
+### Fixed
+- **Wireshark is found on macOS and Windows when the app is not started from a shell.** The tools are looked for
+  in the folder chosen in Settings > Capture (or `PILOTFISH_WIRESHARK_DIR`), on `PATH`, in the Wireshark app
+  bundle, the Homebrew and MacPorts folders, `Program Files\Wireshark` and, on macOS, the `PATH` of the login
+  shell. The missing-Wireshark message says what to install and where it looked, and a macOS capture permission
+  failure lists the ChmodBPF steps.
+- **Insights no longer reports a clean capture when an analysis failed or has not run.** A failed expert info,
+  protocol hierarchy, behavior or credential scan now shows "Analysis failed" with the reason and a way to
+  retry, the summary reads "Analysis incomplete", and exported reports leave out the all-clear card unless
+  every analysis finished. Before, the failure was dropped and the page said "Nothing looks wrong".
+- **A Python cache file is no longer tracked** in `tests/fixtures`, and Python caches are ignored.
 
 ## [0.5.0] - 2026-11-22
 
@@ -192,7 +234,8 @@ First public prototype of wirelens, a desktop packet viewer written in Rust with
 - **Release binaries** built by the CI for Linux (`x86_64`, `aarch64`, Arch Linux), macOS (`arm64`, `x86_64`) and
   Windows (`x86_64`).
 
-[Unreleased]: https://github.com/anyhowfeel/pilotfish/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/anyhowfeel/pilotfish/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/anyhowfeel/pilotfish/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/anyhowfeel/pilotfish/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/anyhowfeel/pilotfish/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/anyhowfeel/pilotfish/compare/v0.2.0...v0.3.0

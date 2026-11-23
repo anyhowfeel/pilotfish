@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use wl_model::{PacketRow, Transport};
 
-use crate::interner::Interner;
+use wl_model::Interner;
 
 /// Maximum characters kept for `_ws.col.Info` so pathological packets cannot blow up memory or UI.
 pub const MAX_INFO_CHARS: usize = 2048;

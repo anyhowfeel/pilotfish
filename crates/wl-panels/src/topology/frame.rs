@@ -35,6 +35,8 @@ const FIT_PAD: f32 = 44.0;
 const LABEL_MAX_W: f32 = 150.0;
 /// Canvases shorter than this (or with a floating inspector) fold the option rows away.
 const COMPACT_H: f32 = 480.0;
+/// Narrower canvases do not fit the three-way layout switch beside the search field.
+const COMPACT_W: f32 = 440.0;
 const MAX_CANDIDATES: usize = 120;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,7 +106,8 @@ impl TopologyView {
             Stroke::new(1.0, Palette::border()),
             StrokeKind::Inside,
         );
-        let compact = floating_card.is_some() || rect.height() < COMPACT_H;
+        let compact =
+            floating_card.is_some() || rect.height() < COMPACT_H || rect.width() < COMPACT_W;
         let cmd = controls::controls(
             &ctx,
             rect,
@@ -126,7 +129,7 @@ impl TopologyView {
         if let Some(card) = floating_card {
             bottom = bottom.max(rect.bottom() - card.top());
         } else {
-            let counts = controls::counts(&ctx, rect, &self.graph);
+            let counts = controls::counts(&ctx, rect, &self.graph, self.layout.readout());
             bottom = bottom.max(rect.bottom() - counts.top());
         }
         self.insets = (cmd.rect.map_or(0.0, |r| r.bottom() - rect.top()), bottom);

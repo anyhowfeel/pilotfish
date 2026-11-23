@@ -2,7 +2,7 @@
 
 use std::io;
 
-use wl_model::CaptureError;
+use wl_model::{CaptureError, HostOs, MAC_CAPTURE_STEPS};
 
 /// Error for a failed process spawn; a missing binary is `ToolMissing`.
 pub fn spawn_error(tool: &str, e: &io::Error) -> CaptureError {
@@ -74,10 +74,19 @@ pub fn from_display_filter_failure(stderr: &str, code: Option<i32>) -> CaptureEr
 
 /// Failure of dumpcap (capture filter errors, permissions, unknown device ...).
 pub fn from_dumpcap(stderr: &str) -> CaptureError {
+    from_dumpcap_on(HostOs::current(), stderr)
+}
+
+/// "bpf" only ever appears on macOS and the BSDs; the generic permission texts are OS neutral,
+/// so for those the host decides.
+fn from_dumpcap_on(os: HostOs, stderr: &str) -> CaptureError {
     let msg = clean_stderr(stderr);
     let lower = msg.to_lowercase();
+    let denied = lower.contains("bpf") || (os == HostOs::Mac && is_permission(&lower));
     if lower.contains("invalid capture filter") || lower.contains("syntax error") {
         CaptureError::BadFilter(msg)
+    } else if denied && !lower.contains("monitor mode") {
+        CaptureError::Permission(format!("{MAC_CAPTURE_STEPS}\n{msg}"))
     } else if lower.contains("monitor mode") || lower.contains("rfmon") {
         CaptureError::Permission(format!(
             "Monitor mode is not available on this interface. It needs a Wi-Fi adapter that \
@@ -156,6 +165,49 @@ mod tests {
             "dumpcap: You don't have permission to capture on that device (socket: Operation not permitted)",
         );
         assert!(matches!(e, CaptureError::Permission(_)));
+    }
+
+    #[test]
+    fn macos_bpf_failures_give_the_chmodbpf_steps() {
+        let cases = [
+            "dumpcap: There are no interfaces on which a capture can be done\n\
+             (cannot open BPF device) /dev/bpf0: Permission denied",
+            "dumpcap: You don't have permission to capture on that device (socket: Operation not permitted)",
+            "dumpcap: The capture session could not be initiated on interface 'en0' (Operation not permitted)",
+        ];
+        for stderr in cases {
+            match from_dumpcap_on(HostOs::Mac, stderr) {
+                CaptureError::Permission(m) => {
+                    assert!(m.starts_with("Install ChmodBPF"), "{m}");
+                    assert!(m.contains("access_bpf") && m.contains("Log out"), "{m}");
+                    assert!(m.lines().count() >= 4, "steps then the original text: {m}");
+                }
+                other => panic!("{other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn a_bpf_failure_is_a_macos_failure_on_any_host() {
+        let e = from_dumpcap_on(
+            HostOs::Linux,
+            "(cannot open BPF device) /dev/bpf0: Permission denied",
+        );
+        assert!(matches!(e, CaptureError::Permission(m) if m.contains("ChmodBPF")));
+    }
+
+    #[test]
+    fn linux_permission_text_is_left_as_it_was() {
+        let e = from_dumpcap_on(
+            HostOs::Linux,
+            "dumpcap: You don't have permission to capture on that device (socket: Operation not permitted)",
+        );
+        assert_eq!(
+            e,
+            CaptureError::Permission(
+                "You don't have permission to capture on that device (socket: Operation not permitted)".into()
+            )
+        );
     }
 
     #[test]

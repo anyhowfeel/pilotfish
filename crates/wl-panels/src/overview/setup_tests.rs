@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use wl_kit::theme::Mode;
-use wl_model::{Interface, SysInfo};
+use wl_model::{Interface, SysInfo, Wireshark};
 
 use super::activity::{Activity, ActivityMap};
 use super::harness::run_extent;
@@ -119,6 +119,7 @@ fn setup_page_fits_every_size_and_selects_the_default_route() {
                         filter_status: None,
                         running: false,
                         paused: false,
+                        wireshark: Wireshark::Available,
                     };
                     setup.ui(ui, &data);
                 });

@@ -11,6 +11,7 @@ path = "src/main.rs"
 [dependencies]
 wl-model.workspace = true
 wl-tshark.workspace = true
+wl-hybrid.workspace = true
 wl-stats.workspace = true
 wl-kit.workspace = true
 wl-panels.workspace = true
@@ -31,7 +32,7 @@ ureq = "3"
 flate2 = "1.1.11"
 chrono = "0.4.45"
 
-[target.'cfg(windows)'.build-dependencies]
+[build-dependencies]
 winresource = "0.1"
 
 [dev-dependencies]
@@ -47,8 +48,9 @@ copyright = "pilotfish contributors"
 license-file = ["../../LICENSE", "0"]
 section = "net"
 priority = "optional"
-depends = "$auto, tshark"
-extended-description = "Prototype desktop packet viewer written in Rust with egui. Captures are read and filtered by tshark and dumpcap; pilotfish shows them as tables, charts and a host graph."
+depends = "$auto"
+recommends = "tshark"
+extended-description = "Prototype desktop packet viewer written in Rust with egui. It opens pcap and pcapng files itself; tshark adds packet dissection, streams and live capture."
 assets = [
     ["target/release/pilotfish", "usr/bin/", "755"],
     ["../../packaging/linux/pilotfish.desktop", "usr/share/applications/", "644"],

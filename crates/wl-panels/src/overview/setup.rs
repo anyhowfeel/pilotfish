@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use wl_kit::egui::{Align, CursorIcon, FontId, Rect, ScrollArea, Sense, Ui, pos2, vec2};
 use wl_kit::theme::{Palette, spacing};
 use wl_kit::widgets::paint_elided;
-use wl_model::{CaptureOptions, Interface};
+use wl_model::{CaptureOptions, Interface, Wireshark};
 
 use super::actions::OverviewAction;
 use super::activity::ActivityMap;
@@ -26,6 +26,7 @@ pub struct SetupData<'a> {
     pub filter_status: Option<&'a FilterStatus>,
     pub running: bool,
     pub paused: bool,
+    pub wireshark: Wireshark,
 }
 
 /// Widest the options form grows; wider pages leave the rest empty instead of stretching rows.
@@ -103,6 +104,7 @@ impl CaptureSetup {
                     ui,
                     data.interfaces,
                     data.activity,
+                    data.wireshark,
                     &mut self.options.interfaces,
                 );
                 ui.add_space(spacing::MD);
@@ -117,6 +119,7 @@ impl CaptureSetup {
             running: data.running,
             paused: data.paused,
             status: data.filter_status,
+            wireshark: data.wireshark,
         };
         let measured = sticky_bar(ui, &mut self.bar, &mut self.options, &bar, &mut out);
         if (measured - self.sticky_h).abs() > 1.0 && measured > 60.0 {

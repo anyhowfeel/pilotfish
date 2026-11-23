@@ -7,7 +7,7 @@ use std::thread;
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use wl_kit::egui;
-use wl_model::{CaptureBackend, CaptureError, FlowEvents, FlowSel, TcpSamples};
+use wl_model::{CaptureBackend, CaptureError, FlowEvents, FlowSel, TcpSamples, Wireshark};
 use wl_panels::flows::{FlowsAction, FlowsData};
 
 use crate::app::App;
@@ -138,7 +138,11 @@ impl FlowsLink {
         changed
     }
 
-    pub fn data<'a>(&'a self, stats: &'a wl_model::StatsSnapshot) -> FlowsData<'a> {
+    pub fn data<'a>(
+        &'a self,
+        stats: &'a wl_model::StatsSnapshot,
+        wireshark: Wireshark,
+    ) -> FlowsData<'a> {
         FlowsData {
             stats,
             flow: self.flow.as_ref().map(|(s, e)| (s, e)),
@@ -146,6 +150,7 @@ impl FlowsLink {
             rev: self.rev,
             flow_error: self.flow_err.as_deref(),
             tcp_error: self.tcp_err.as_deref(),
+            wireshark,
         }
     }
 }

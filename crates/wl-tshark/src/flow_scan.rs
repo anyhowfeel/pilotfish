@@ -6,9 +6,9 @@ use std::path::Path;
 use wl_model::{CaptureError, FlowEvent, FlowEvents, MAX_FLOW_EVENTS};
 
 use crate::flow_flags::{analysis_flags, drop_numbers, port, strip_ports, tcp_flags};
-use crate::interner::Interner;
 use crate::process::Tools;
 use crate::tsv_pass::{Pass, opt, run_pass};
+use wl_model::Interner;
 
 /// Info is last so a stray tab inside it cannot shift the other columns (`splitn`).
 const FIELDS: [&str; 14] = [

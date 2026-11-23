@@ -31,7 +31,7 @@ pub fn performance(ui: &mut Ui, s: &mut Settings) {
             ui,
             true,
             "Statistics refresh",
-            "Dashboard updates per second.",
+            "",
             &mut s.stats_hz,
             1..=30,
             " Hz",

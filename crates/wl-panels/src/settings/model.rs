@@ -1,7 +1,7 @@
 //! `Settings`: every user preference edited by the dialog. Pure data, serde defaults so old
 //! files keep loading; `clamped()` makes any value safe to apply.
 use serde::{Deserialize, Serialize};
-use wl_model::CaptureOptions;
+use wl_model::{CaptureOptions, ClockZone};
 
 use crate::insights::InsightRules;
 
@@ -52,8 +52,12 @@ pub struct Settings {
     /// Defaults of Capture > Options (filter, promiscuous, snaplen, ring buffer, auto-stop ...).
     pub capture: CaptureOptions,
     pub temp_dir: String,
+    /// Folder holding tshark and dumpcap; empty searches PATH and the usual install folders.
+    pub wireshark_dir: String,
     // Display
     pub time_format: TimeFormat,
+    /// Zone of the times in the file properties.
+    pub clock_zone: ClockZone,
     pub auto_scroll: bool,
     pub color_rules: bool,
     pub max_rows: u32,
@@ -83,7 +87,9 @@ impl Default for Settings {
             default_interface: String::new(),
             capture: CaptureOptions::default(),
             temp_dir: String::new(),
+            wireshark_dir: String::new(),
             time_format: TimeFormat::Relative,
+            clock_zone: ClockZone::Local,
             auto_scroll: true,
             color_rules: true,
             max_rows: 2_000_000,
@@ -129,6 +135,29 @@ mod tests {
     fn empty_json_yields_defaults() {
         let s: Settings = serde_json::from_str("{}").expect("parse");
         assert_eq!(s, Settings::default());
+    }
+
+    #[test]
+    fn an_old_file_has_no_wireshark_folder() {
+        let s: Settings = serde_json::from_str(r#"{"theme":"Light"}"#).expect("parse");
+        assert_eq!(s.wireshark_dir, "");
+    }
+
+    #[test]
+    fn an_old_file_without_a_zone_shows_local_time() {
+        let s: Settings = serde_json::from_str(r#"{"theme":"Light"}"#).expect("parse");
+        assert_eq!(s.clock_zone, ClockZone::Local);
+    }
+
+    #[test]
+    fn the_zone_survives_a_save_and_load() {
+        let s = Settings {
+            clock_zone: ClockZone::Utc,
+            ..Settings::default()
+        };
+        let back: Settings =
+            serde_json::from_str(&serde_json::to_string(&s).expect("save")).expect("load");
+        assert_eq!(back.clock_zone, ClockZone::Utc);
     }
 
     #[test]

@@ -159,18 +159,10 @@ impl TcpView {
             empty_state(ui, "~", "Nothing to plot", hint);
             return;
         }
-        let hint_h = ui.text_style_height(&wl_kit::egui::TextStyle::Small);
-        let reserve = spacing::XS + hint_h + 2.0 * ui.spacing().item_spacing.y;
         let used = ui.cursor().min.y - top;
-        let h = (page_h - used - reserve).max(MIN_CHART_H);
+        let h = (page_h - used).max(MIN_CHART_H);
         let plot_id = format!("{id}-{tab:?}-{d}");
         xy_chart(ui, &plot_id, plot, &y_formatter(tab), h);
-        ui.add_space(spacing::XS);
-        ui.label(
-            RichText::new("Drag a box to zoom, double-click to reset.")
-                .small()
-                .color(Palette::muted()),
-        );
     }
 }
 
