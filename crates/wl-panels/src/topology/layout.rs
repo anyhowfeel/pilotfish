@@ -1,5 +1,5 @@
-//! Stable incremental layout: force-directed (fjadra, a d3-force port with Barnes-Hut
-//! many-body) or radial around a focus host. Positions persist across graph updates.
+//! Stable incremental layout: planar (fewest crossings, solved off-thread) or force-directed
+//! (fjadra, a d3-force port with Barnes-Hut many-body). Positions persist across graph updates.
 
 use std::collections::HashMap;
 use std::f32::consts::TAU;
@@ -10,13 +10,13 @@ use fjadra::{Collide, Link, ManyBody, Node, PositionX, PositionY, Simulation, Si
 use wl_kit::egui::{Vec2, vec2};
 
 use super::model::Graph;
-use super::radial::radial_targets;
+use super::planar::{PlanarState, Readout};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Mode {
     #[default]
+    Planar,
     Force,
-    Radial,
 }
 
 /// Ticks per frame are bounded so a frame never spends more than the caller's budget.
@@ -32,6 +32,7 @@ pub struct Layout {
     sim: Option<Simulation>,
     stored: HashMap<Arc<str>, (Vec2, bool)>,
     targets: Vec<Vec2>,
+    planar: PlanarState,
     moving: bool,
 }
 
@@ -52,13 +53,16 @@ impl Layout {
         self.mode
     }
 
-    pub fn set_mode(&mut self, m: Mode, g: &Graph, focus: Option<usize>) {
+    pub fn set_mode(&mut self, m: Mode, g: &Graph) {
+        if m != self.mode {
+            self.planar.reset();
+        }
         self.mode = m;
-        self.sync(g, focus);
+        self.sync(g);
     }
 
-    /// Call when the graph (or the radial focus) changed: re-seeds positions and restarts relaxation.
-    pub fn sync(&mut self, g: &Graph, focus: Option<usize>) {
+    /// Call when the graph changed: re-seeds positions and restarts relaxation.
+    pub fn sync(&mut self, g: &Graph) {
         self.remember();
         let mut placed: Vec<Option<Vec2>> = vec![None; g.nodes.len()];
         let mut fresh = false;
@@ -80,12 +84,24 @@ impl Layout {
             .collect();
         match self.mode {
             Mode::Force => self.rebuild(g, if fresh { 1.0 } else { ALPHA_REHEAT }),
-            Mode::Radial => {
+            Mode::Planar => {
                 self.sim = None;
-                self.targets = radial_targets(g, focus);
+                if self.planar.request(g) {
+                    self.targets = self.pos.clone();
+                }
             }
         }
         self.moving = !g.nodes.is_empty();
+    }
+
+    /// Crossing count of the planar layout, once it is known.
+    pub fn readout(&self) -> Option<Readout> {
+        self.planar.readout().filter(|_| self.mode == Mode::Planar)
+    }
+
+    #[cfg(test)]
+    pub fn use_solver(&mut self, solver: super::planner::Solver, min_gap: Duration) {
+        self.planar = PlanarState::with_solver(solver, min_gap);
     }
 
     fn remember(&mut self) {
@@ -136,9 +152,12 @@ impl Layout {
         }
         self.pos[i] = p;
         self.pinned[i] = true;
-        if self.mode == Mode::Force {
-            self.rebuild(g, ALPHA_REHEAT);
-            self.moving = true;
+        match self.mode {
+            Mode::Force => {
+                self.rebuild(g, ALPHA_REHEAT);
+                self.moving = true;
+            }
+            Mode::Planar => self.planar.refresh(&self.pos, true),
         }
     }
 
@@ -147,9 +166,23 @@ impl Layout {
             *p = false;
             if self.mode == Mode::Force {
                 self.rebuild(g, ALPHA_REHEAT);
-                self.moving = true;
             }
+            self.moving = true;
         }
+    }
+
+    /// Moves every free node a fraction of the way to its target; the largest distance left.
+    fn glide(&mut self) -> f32 {
+        let mut worst = 0.0_f32;
+        for (i, p) in self.pos.iter_mut().enumerate() {
+            if self.pinned[i] {
+                continue;
+            }
+            let d = self.targets[i] - *p;
+            worst = worst.max(d.length());
+            *p += d * 0.22;
+        }
+        worst
     }
 
     /// Relaxes for at most `budget`; returns whether the layout is still moving.
@@ -171,17 +204,14 @@ impl Layout {
                 }
                 self.moving = !sim.is_finished();
             }
-            (Mode::Radial, _) => {
-                let mut worst = 0.0_f32;
-                for (i, p) in self.pos.iter_mut().enumerate() {
-                    if self.pinned[i] {
-                        continue;
-                    }
-                    let d = self.targets[i] - *p;
-                    worst = worst.max(d.length());
-                    *p += d * 0.22;
+            (Mode::Planar, _) => {
+                if let Some(t) = self.planar.poll() {
+                    self.targets = t;
                 }
-                self.moving = worst > 0.4;
+                self.moving = self.glide() > 0.4 || self.planar.busy();
+                if !self.moving {
+                    self.planar.refresh(&self.pos, self.pinned.contains(&true));
+                }
             }
             _ => self.moving = false,
         }

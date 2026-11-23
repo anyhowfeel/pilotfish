@@ -26,7 +26,7 @@ use eframe::egui::{
 
 use crate::theme::{Palette, RADIUS, mono, spacing};
 
-pub use chip::{chip, chip_copy, chip_dot};
+pub use chip::{chip, chip_copy, chip_dot, chip_tip};
 pub use http_pill::{
     METHOD_PILL_W, STATUS_PILL_W, class_of, method_color, method_pill, method_pill_at,
     status_color, status_pill, status_pill_at,

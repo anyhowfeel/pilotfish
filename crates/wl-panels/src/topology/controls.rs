@@ -6,10 +6,11 @@ use wl_kit::egui::{
 };
 use wl_kit::format;
 use wl_kit::theme::{Palette, RADIUS, mono, protocol_color, spacing, tint};
-use wl_kit::widgets::{Glyph, chip, icon_button, pill_toggle, segmented_w};
+use wl_kit::widgets::{Glyph, chip, chip_tip, icon_button, pill_toggle, segmented_w};
 
 use super::layout::Mode;
 use super::model::Graph;
+use super::planar::Readout;
 use super::scale::{edge_alpha, edge_width};
 use super::state::Options;
 
@@ -17,9 +18,9 @@ pub const CLUSTER_MIN_W: f32 = 308.0;
 const CLUSTER_MAX_W: f32 = 520.0;
 /// From this cluster width the intensity slider shares the row of the toggle chips.
 const WIDE_W: f32 = 500.0;
-const SEG_W: f32 = 132.0;
+const SEG_W: f32 = 184.0;
 const OPTIONS_W: f32 = 76.0;
-const MODES: [(Mode, &str); 2] = [(Mode::Force, "Force"), (Mode::Radial, "Radial")];
+const MODES: [(Mode, &str); 2] = [(Mode::Planar, "Planar"), (Mode::Force, "Force")];
 pub const ZOOM_STEP: f32 = 1.25;
 
 #[derive(Default)]
@@ -214,7 +215,7 @@ pub fn legend(ctx: &egui::Context, canvas: Rect, g: &Graph, kind: LegendKind) ->
     })
 }
 
-pub fn counts(ctx: &egui::Context, canvas: Rect, g: &Graph) -> Rect {
+pub fn counts(ctx: &egui::Context, canvas: Rect, g: &Graph, crossings: Option<Readout>) -> Rect {
     overlay(ctx, "counts", Align2::RIGHT_BOTTOM, canvas, |ui| {
         // The overlay starts unconstrained: give it room or the chip text is elided ("6 lin...").
         ui.set_max_width((canvas.width() * 0.5).clamp(200.0, 380.0));
@@ -224,6 +225,9 @@ pub fn counts(ctx: &egui::Context, canvas: Rect, g: &Graph) -> Rect {
             chip(ui, &text, true);
             if g.hidden > 0 {
                 chip(ui, &format!("+{} more hidden", g.hidden), true);
+            }
+            if let Some(r) = crossings {
+                chip_tip(ui, &r.text(), true, r.tooltip());
             }
         });
     })

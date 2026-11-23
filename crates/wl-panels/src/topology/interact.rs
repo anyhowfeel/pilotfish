@@ -102,13 +102,9 @@ impl TopologyView {
             self.vp.zoom = self.vp.zoom.max(1.0);
             self.auto_fit = false;
         }
-        let focus = self.focus();
-        if self.opts.mode != self.layout.mode()
-            || (self.opts.mode == super::layout::Mode::Radial && focus != self.last_focus)
-        {
-            self.layout.set_mode(self.opts.mode, &self.graph, focus);
+        if self.opts.mode != self.layout.mode() {
+            self.layout.set_mode(self.opts.mode, &self.graph);
             self.auto_fit = true;
         }
-        self.last_focus = focus;
     }
 }

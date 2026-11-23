@@ -1,6 +1,7 @@
 //! Network topology map: hosts as nodes, host pairs as links whose width/opacity follow the bytes.
 //! Layout by `fjadra` (d3-force port, Barnes-Hut); all painting is done here with the egui painter.
 
+mod arrow;
 mod card;
 mod controls;
 mod declutter;
@@ -12,7 +13,8 @@ mod interact;
 mod layout;
 mod model;
 mod paint;
-mod radial;
+mod planar;
+mod planner;
 mod scale;
 mod search;
 mod state;
@@ -23,6 +25,8 @@ mod viewport;
 mod interaction_tests;
 #[cfg(test)]
 mod layout_tests;
+#[cfg(test)]
+mod planar_tests;
 
 use wl_kit::egui::{Rect, Ui, pos2, vec2};
 use wl_kit::theme::spacing;
@@ -50,7 +54,6 @@ pub struct TopologyView {
     live: bool,
     drag: Option<frame::Drag>,
     buf: Buffers,
-    last_focus: Option<usize>,
     /// Heights covered by the overlays at the top / bottom of the canvas (measured last frame).
     insets: (f32, f32),
     opts_open: bool,
@@ -71,7 +74,6 @@ impl Default for TopologyView {
             live: false,
             drag: None,
             buf: Buffers::default(),
-            last_focus: None,
             insets: (0.0, 0.0),
             opts_open: false,
         }
@@ -94,11 +96,12 @@ impl TopologyView {
         self.sel = Selection::Node(addr.into());
     }
 
-    /// Screenshot helper: comma list of `radial`, `directions`, `nolabels`.
+    /// Screenshot helper: comma list of `force`, `directions`, `encrypted`, `nolabels`.
     pub fn apply_spec(&mut self, spec: &str) {
         for w in spec.split(',').map(str::trim) {
             match w {
-                "radial" => self.opts.mode = layout::Mode::Radial,
+                "force" => self.opts.mode = layout::Mode::Force,
+                "planar" => self.opts.mode = layout::Mode::Planar,
                 "directions" => self.opts.directions = true,
                 "encrypted" => self.opts.encrypted = true,
                 "nolabels" => self.opts.labels = false,
@@ -128,16 +131,7 @@ impl TopologyView {
         self.graph = Graph::build(s, &self.opts.filters, &|a| r.name(a));
         self.buf.galleys.clear();
         self.buf.galleys.resize(self.graph.nodes.len(), None);
-        let focus = self.focus();
-        self.layout.set_mode(self.opts.mode, &self.graph, focus);
-        self.last_focus = focus;
-    }
-
-    fn focus(&self) -> Option<usize> {
-        match self.sel.resolve(&self.graph) {
-            Resolved::Node(i) => Some(i),
-            _ => None,
-        }
+        self.layout.set_mode(self.opts.mode, &self.graph);
     }
 
     pub fn ui(&mut self, ui: &mut Ui, snap: &StatsSnapshot) -> Vec<OverviewAction> {

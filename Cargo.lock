@@ -3964,8 +3964,13 @@ dependencies = [
  "serde_json",
  "wl-kit",
  "wl-model",
+ "wl-planar",
  "wl-stats",
 ]
+
+[[package]]
+name = "wl-planar"
+version = "0.5.0"
 
 [[package]]
 name = "wl-stats"

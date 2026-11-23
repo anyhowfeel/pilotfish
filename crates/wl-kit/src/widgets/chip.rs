@@ -23,6 +23,11 @@ pub fn chip_dot(ui: &mut Ui, label: &str, mono: bool, dot: Option<Color32>) -> R
     paint(ui, label, mono, dot, Sense::hover()).on_hover_text(label)
 }
 
+/// Chip whose hover text is `tip` instead of its own text.
+pub fn chip_tip(ui: &mut Ui, text: &str, mono: bool, tip: &str) -> Response {
+    paint(ui, text, mono, None, Sense::hover()).on_hover_text(tip)
+}
+
 /// Monospace chip that copies its text when clicked (caller handles `.clicked()`): pointing-hand
 /// cursor and a "Click to copy" tooltip make the affordance explicit.
 pub fn chip_copy(ui: &mut Ui, label: &str) -> Response {
