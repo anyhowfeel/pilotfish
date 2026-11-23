@@ -36,6 +36,13 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - **The TCP graphs no longer fill a large area on a short exchange.** On a stream that lasts a few milliseconds
   the ACK line of the time-sequence graph, which has two points at the same time, was drawn as a filled
   polygon instead of a line. Lines are drawn as lines whatever the zoom.
+- **The TCP graphs say what the connection did.** The ACK line of the time-sequence graph and the advertised
+  window are drawn as steps, since a value holds until the next packet, instead of slanted lines between
+  packets. A stream that lasts a few milliseconds has a throughput curve, drawn as flat stretches over their
+  bucket, instead of a lone point (the narrowest bucket goes from 10 ms to 0.1 ms).
+- **The I/O graph no longer draws needles under the zero line.** On a long capture with many short buckets, the
+  needles went far below the baseline. The line is now reduced to about two points per pixel column, keeping the
+  highest and the lowest value of each, so no spike is lost.
 
 ## [0.6.0] - 2026-11-23
 

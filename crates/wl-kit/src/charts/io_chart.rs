@@ -65,24 +65,64 @@ fn log_marks(input: GridInput) -> Vec<GridMark> {
         .collect()
 }
 
-fn add_series(pu: &mut egui_plot::PlotUi<'_>, s: &PlotSeries<'_>, cfg: &ChartConfig) {
+/// At most about `max_points` points: the lowest and the highest value of each stretch, in time order,
+/// so that no spike is lost and the line stays cheap to draw however many buckets there are.
+fn decimate(points: Vec<[f64; 2]>, max_points: usize) -> Vec<[f64; 2]> {
+    if points.len() <= max_points || max_points < 4 {
+        return points;
+    }
+    let stretch = points.len().div_ceil(max_points / 2);
+    let mut out = Vec::with_capacity(max_points + 2);
+    for part in points.chunks(stretch) {
+        let (mut lo, mut hi) = (part[0], part[0]);
+        for p in part {
+            if p[1] < lo[1] {
+                lo = *p;
+            }
+            if p[1] > hi[1] {
+                hi = *p;
+            }
+        }
+        match (lo == hi, lo[0] <= hi[0]) {
+            (true, _) => out.push(lo),
+            (false, true) => out.extend([lo, hi]),
+            (false, false) => out.extend([hi, lo]),
+        }
+    }
+    out
+}
+
+fn add_series(
+    pu: &mut egui_plot::PlotUi<'_>,
+    s: &PlotSeries<'_>,
+    cfg: &ChartConfig,
+    max_points: usize,
+) {
     for (start, run) in runs(s.values) {
-        let pts = || -> PlotPoints<'_> {
-            run.iter()
-                .enumerate()
-                .map(|(k, v)| {
-                    let x = ((start + k) as f64 + 0.5) * cfg.interval;
-                    [x, to_plot(*v, cfg.log_y)]
-                })
-                .collect()
-        };
-        let mut line = Line::new(s.name, pts()).color(s.color).width(2.0);
+        let points: Vec<[f64; 2]> = run
+            .iter()
+            .enumerate()
+            .map(|(k, v)| {
+                let x = ((start + k) as f64 + 0.5) * cfg.interval;
+                [x, to_plot(*v, cfg.log_y)]
+            })
+            .collect();
+        let lone = (run.len() == 1).then(|| points.clone());
+        // Never folded into egui_plot's band: its sharp corners draw needles far below the baseline.
+        let mut line = Line::new(s.name, PlotPoints::from(decimate(points, max_points)))
+            .color(s.color)
+            .width(2.0)
+            .allow_band(false);
         if cfg.mode == DrawMode::Area {
             line = line.fill(0.0).fill_alpha(0.14);
         }
         pu.line(line);
-        if run.len() == 1 {
-            pu.points(Points::new(s.name, pts()).color(s.color).radius(3.0));
+        if let Some(p) = lone {
+            pu.points(
+                Points::new(s.name, PlotPoints::from(p))
+                    .color(s.color)
+                    .radius(3.0),
+            );
         }
     }
 }
@@ -125,6 +165,8 @@ pub fn io_chart(
         return None;
     }
     let unit = shared_unit(series);
+    // About two points per pixel column are all the eye can tell apart.
+    let max_points = (ui.available_width().max(100.0) * 2.0) as usize;
     let top = to_plot(y_max(series), cfg.log_y).max(1.0) * 1.08;
     let log = cfg.log_y;
     let mut plot = Plot::new("wl_io_chart")
@@ -153,7 +195,9 @@ pub fn io_chart(
         if cfg.mode == DrawMode::Bars {
             add_bars(pu, series, cfg);
         } else {
-            series.iter().for_each(|s| add_series(pu, s, cfg));
+            series
+                .iter()
+                .for_each(|s| add_series(pu, s, cfg, max_points));
         }
     });
     handle_drag(ui, &out, selection);
@@ -215,6 +259,50 @@ fn clock_ms(t: f64, interval: f64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn spiky(n: usize) -> Vec<[f64; 2]> {
+        (0..n)
+            .map(|i| {
+                [
+                    i as f64,
+                    if i % 97 == 0 {
+                        1000.0 + i as f64
+                    } else {
+                        (i % 7) as f64
+                    },
+                ]
+            })
+            .collect()
+    }
+
+    #[test]
+    fn decimating_keeps_every_spike_and_the_time_order_within_the_budget() {
+        let pts = spiky(50_000);
+        let max = pts.iter().map(|p| p[1]).fold(f64::MIN, f64::max);
+        let min = pts.iter().map(|p| p[1]).fold(f64::MAX, f64::min);
+        let out = decimate(pts.clone(), 2600);
+        assert!(out.len() <= 2600 + 2, "{} points", out.len());
+        assert!(
+            out.windows(2).all(|w| w[0][0] <= w[1][0]),
+            "time never goes back"
+        );
+        assert_eq!(out.iter().map(|p| p[1]).fold(f64::MIN, f64::max), max);
+        assert_eq!(out.iter().map(|p| p[1]).fold(f64::MAX, f64::min), min);
+        // Every spike of the signal is still there.
+        let spikes = |v: &[[f64; 2]]| v.iter().filter(|p| p[1] >= 1000.0).count();
+        assert_eq!(spikes(&out), spikes(&pts));
+    }
+
+    #[test]
+    fn a_short_series_is_left_alone() {
+        let pts = spiky(300);
+        assert_eq!(decimate(pts.clone(), 2600), pts);
+        assert_eq!(
+            decimate(spiky(5000), 3).len(),
+            5000,
+            "no budget worth the name"
+        );
+    }
 
     #[test]
     fn sub_second_clock_has_a_tenth() {
