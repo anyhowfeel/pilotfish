@@ -62,8 +62,8 @@ impl Embedding {
         if self.rotation.len() != g.vertex_count() {
             return false;
         }
-        for v in 0..g.vertex_count() {
-            let mut have = self.rotation[v].clone();
+        for (v, rotation) in self.rotation.iter().enumerate() {
+            let mut have = rotation.clone();
             have.sort_unstable();
             if have != g.neighbors(v) {
                 return false;

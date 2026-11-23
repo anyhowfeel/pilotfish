@@ -42,9 +42,9 @@ fn children_are_removed_before_their_parents() {
     let g = Graph::new(7, &[(0, 1), (1, 2), (2, 3), (2, 4), (4, 5), (4, 6)]);
     let p = peel(&g);
     let at = |v: usize| p.order.iter().position(|&x| x == v).unwrap();
-    for v in 0..7 {
-        if let Some(u) = p.parent[v] {
-            assert!(at(v) < at(u));
+    for (v, parent) in p.parent.iter().enumerate() {
+        if let Some(u) = parent {
+            assert!(at(v) < at(*u));
         }
     }
 }
