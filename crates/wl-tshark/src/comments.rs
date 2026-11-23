@@ -31,6 +31,7 @@ pub fn read(
     let mut all = opts.to_vec();
     all.extend(["-E".into(), format!("aggregator={SEP}")]);
     let pass = Pass {
+        scope: None,
         file,
         filter: "frame.comment",
         fields: &FIELDS,

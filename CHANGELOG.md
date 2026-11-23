@@ -28,6 +28,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
 - **Several links can be selected on the map.** Shift+click on a link adds it to the selection or takes it out
   again. The card then shows the totals and the list of the links, and Filter packets keeps the packets of any
   of them (each pair of hosts, joined with OR), which makes it quick to compare a few conversations.
+- **The Web page follows the display filter.** Exchanges, HTTPS sessions and Streams were always those of the
+  whole capture, even with a filter applied on the Packets page or from the map. They now keep only what the
+  filter lets through, the frame numbers staying those of the whole capture. An exchange is kept when its
+  frames pass the filter, so a filter on a field that only the request has (`http.host`) can drop the
+  response. The Files tab still lists every object.
 
 ## [0.6.0] - 2026-11-23
 

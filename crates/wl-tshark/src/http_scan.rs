@@ -15,8 +15,10 @@ pub fn http_exchanges(
     tools: &Tools,
     file: &Path,
     opts: &[String],
+    scope: Option<&str>,
 ) -> Result<Vec<HttpExchange>, CaptureError> {
     let pass = Pass {
+        scope,
         file,
         filter: "http || http2",
         fields: &FIELDS,

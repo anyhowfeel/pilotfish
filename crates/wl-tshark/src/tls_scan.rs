@@ -16,10 +16,16 @@ use crate::tsv_pass::{Pass, columns, run_pass};
 const HANDSHAKE_FILTER: &str =
     "tls.handshake.type==1 || tls.handshake.type==2 || tls.handshake.type==11";
 
-fn handshakes(tools: &Tools, file: &Path, opts: &[String]) -> Result<Merger, CaptureError> {
+fn handshakes(
+    tools: &Tools,
+    file: &Path,
+    opts: &[String],
+    scope: Option<&str>,
+) -> Result<Merger, CaptureError> {
     let mut fields = FIELDS.to_vec();
     fields.push(CERT_FIELD);
     let pass = Pass {
+        scope,
         file,
         filter: HANDSHAKE_FILTER,
         fields: &fields,
@@ -39,10 +45,12 @@ fn flow_bytes(
     tools: &Tools,
     file: &Path,
     opts: &[String],
+    scope: Option<&str>,
 ) -> Result<HashMap<StreamKey, u64>, CaptureError> {
     let mut all = opts.to_vec();
     all.extend(["-o".into(), "tcp.desegment_tcp_streams:FALSE".into()]);
     let pass = Pass {
+        scope,
         file,
         filter: "tcp.len>0 || quic",
         fields: &["tcp.stream", "udp.stream", "frame.len"],
@@ -64,14 +72,16 @@ pub fn tls_sessions(
     cache: &CertCache,
     file: &Path,
     opts: &[String],
+    scope: Option<&str>,
 ) -> Result<Vec<TlsSession>, CaptureError> {
     // A first scan runs the chain pass beside the others; a rescan of a growing file only
     // runs it when more streams carried a certificate.
-    let cold = !cache.knows(file);
+    // A scan narrowed by a filter sees only some of the certificates: it neither reads nor feeds the cache.
+    let cold = scope.is_some() || !cache.knows(file);
     let (hs, bytes, certs) = thread::scope(|s| {
-        let b = s.spawn(|| flow_bytes(tools, file, opts));
-        let c = cold.then(|| s.spawn(|| cert_scan::chains(tools, file, opts)));
-        let h = handshakes(tools, file, opts);
+        let b = s.spawn(|| flow_bytes(tools, file, opts, scope));
+        let c = cold.then(|| s.spawn(|| cert_scan::chains(tools, file, opts, scope)));
+        let h = handshakes(tools, file, opts, scope);
         let panicked = || CaptureError::Other("scan thread panicked".into());
         (
             h,
@@ -85,10 +95,12 @@ pub fn tls_sessions(
         Some(done) => done,
         None => match cache.get(file, streams) {
             Some(known) => Ok(known),
-            None => cert_scan::chains(tools, file, opts),
+            None => cert_scan::chains(tools, file, opts, scope),
         },
     };
-    if let Ok(c) = &certs {
+    if scope.is_none()
+        && let Ok(c) = &certs
+    {
         cache.put(file, streams, c);
     }
     // Byte totals and chains are decoration: a failed extra pass must not hide the sessions.

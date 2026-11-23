@@ -61,6 +61,7 @@ pub fn flow_events(
     opts: &[String],
 ) -> Result<FlowEvents, CaptureError> {
     let pass = Pass {
+        scope: None,
         file,
         filter,
         fields: &FIELDS,

@@ -99,9 +99,30 @@ pub trait CaptureBackend: Send + Sync {
     fn http_exchanges(&self, _file: &Path) -> Result<Vec<HttpExchange>, CaptureError> {
         Ok(Vec::new())
     }
+
+    /// `http_exchanges` restricted to the frames the display filter `scope` keeps (`None`: all of
+    /// them). A backend that cannot filter returns every exchange.
+    fn http_exchanges_scoped(
+        &self,
+        file: &Path,
+        scope: Option<&str>,
+    ) -> Result<Vec<HttpExchange>, CaptureError> {
+        let _ = scope;
+        self.http_exchanges(file)
+    }
     /// TLS sessions (SNI, version, cipher, ALPN, cert subject) found in a backing file.
     fn tls_sessions(&self, _file: &Path) -> Result<Vec<TlsSession>, CaptureError> {
         Ok(Vec::new())
+    }
+
+    /// `tls_sessions` restricted to the frames the display filter `scope` keeps.
+    fn tls_sessions_scoped(
+        &self,
+        file: &Path,
+        scope: Option<&str>,
+    ) -> Result<Vec<TlsSession>, CaptureError> {
+        let _ = scope;
+        self.tls_sessions(file)
     }
     /// Comments stored in the capture file itself (pcapng `opt_comment` of packets).
     fn packet_comments(&self, _file: &Path) -> Result<Vec<PacketBookmark>, CaptureError> {
@@ -121,6 +142,16 @@ pub trait CaptureBackend: Send + Sync {
     /// WebSocket, Server-Sent Events and gRPC streams with their messages.
     fn message_streams(&self, _file: &Path) -> Result<Vec<MessageStream>, CaptureError> {
         Ok(Vec::new())
+    }
+
+    /// `message_streams` restricted to the frames the display filter `scope` keeps.
+    fn message_streams_scoped(
+        &self,
+        file: &Path,
+        scope: Option<&str>,
+    ) -> Result<Vec<MessageStream>, CaptureError> {
+        let _ = scope;
+        self.message_streams(file)
     }
     /// Start line, headers and body preview of one exchange.
     fn http_detail(&self, _file: &Path, _ex: &HttpExchange) -> Result<HttpDetail, CaptureError> {

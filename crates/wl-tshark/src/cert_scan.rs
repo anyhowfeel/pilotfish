@@ -58,8 +58,10 @@ pub fn chains(
     tools: &Tools,
     file: &Path,
     opts: &[String],
+    scope: Option<&str>,
 ) -> Result<HashMap<u32, Vec<CertInfo>>, CaptureError> {
     let pass = Pass {
+        scope,
         file,
         filter: "tls.handshake.type==11",
         fields: &FIELDS,

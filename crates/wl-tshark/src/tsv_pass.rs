@@ -14,10 +14,24 @@ use crate::process::{Proc, StderrTap, Tools, spawn};
 /// Description of a field-extraction pass.
 pub struct Pass<'a> {
     pub file: &'a Path,
+    /// Display filter of the user: only the frames that match it are looked at (`None` = all).
+    pub scope: Option<&'a str>,
     pub filter: &'a str,
     pub fields: &'a [&'a str],
     /// Extra `-o` style options (TLS keylog, reassembly switches ...).
     pub opts: &'a [String],
+}
+
+/// The display filter of a pass narrowed to the frames the user's filter keeps.
+pub fn scoped(scope: Option<&str>, filter: &str) -> String {
+    match (
+        scope.map(str::trim).filter(|s| !s.is_empty()),
+        filter.is_empty(),
+    ) {
+        (None, _) => filter.to_owned(),
+        (Some(scope), true) => scope.to_owned(),
+        (Some(scope), false) => format!("({scope}) && ({filter})"),
+    }
 }
 
 impl Pass<'_> {
@@ -28,8 +42,9 @@ impl Pass<'_> {
         for s in ["-T", "fields", "-E", "separator=/t"] {
             a.push(s.into());
         }
-        if !self.filter.is_empty() {
-            a.extend(["-Y".into(), self.filter.into()]);
+        let filter = scoped(self.scope, self.filter);
+        if !filter.is_empty() {
+            a.extend(["-Y".into(), filter]);
         }
         a.extend(["-E".into(), format!("occurrence={occurrence}")]);
         for f in self.fields {
@@ -126,8 +141,33 @@ mod tests {
     }
 
     #[test]
+    fn the_scope_narrows_the_filter_of_a_pass() {
+        assert_eq!(scoped(None, "http"), "http");
+        assert_eq!(scoped(Some("  "), "http"), "http");
+        assert_eq!(scoped(Some("ip.addr == 1.1.1.1"), ""), "ip.addr == 1.1.1.1");
+        assert_eq!(
+            scoped(
+                Some("ip.addr == 1.1.1.1 || ip.addr == 2.2.2.2"),
+                "http || http2"
+            ),
+            "(ip.addr == 1.1.1.1 || ip.addr == 2.2.2.2) && (http || http2)"
+        );
+        let a = Pass {
+            scope: Some("tcp.port == 80"),
+            file: Path::new("a.pcap"),
+            filter: "http",
+            fields: &["frame.number"],
+            opts: &[],
+        }
+        .args("f");
+        let y = a.iter().position(|s| s == "-Y").expect("a -Y");
+        assert_eq!(a[y + 1], "(tcp.port == 80) && (http)");
+    }
+
+    #[test]
     fn pass_args_emits_filter_at_most_once() {
         let with_filter = Pass {
+            scope: None,
             file: Path::new("a.pcap"),
             filter: "http || http2",
             fields: &["frame.number"],
@@ -137,6 +177,7 @@ mod tests {
         assert_eq!(with_filter.iter().filter(|s| s.as_str() == "-Y").count(), 1);
 
         let no_filter = Pass {
+            scope: None,
             file: Path::new("a.pcap"),
             filter: "",
             fields: &["frame.number"],

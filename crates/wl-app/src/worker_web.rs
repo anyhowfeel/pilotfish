@@ -11,8 +11,8 @@ impl Controller {
     /// Scans the current backing file for HTTP exchanges and TLS sessions on helper threads.
     /// Automatic refreshes (new capture, live ticks) only run while `set_web_active(true)`.
     pub fn request_web(&mut self) {
-        let backing = self.backing();
-        self.web.request_now(backing, Instant::now());
+        let (backing, scope) = (self.backing(), self.display_filter().map(str::to_owned));
+        self.web.request_now(backing, scope, Instant::now());
     }
 
     /// Finished scan, once per result: `(exchanges, tls sessions)`.
@@ -50,7 +50,8 @@ impl Controller {
     /// says so itself.
     pub(super) fn poll_web_jobs(&mut self) {
         let (live, backing) = (self.live_running(), self.backing());
-        self.web.tick(backing, live, Instant::now());
+        let scope = self.display_filter().map(str::to_owned);
+        self.web.tick(backing, scope, live, Instant::now());
         if let Some(e) = self.web.jobs.drain()
             && !live
             && !e.is_tool_missing()

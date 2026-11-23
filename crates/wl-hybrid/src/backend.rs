@@ -65,8 +65,24 @@ impl<F: FastPath> CaptureBackend for HybridBackend<F> {
         self.deep()?.http_exchanges(file)
     }
 
+    fn http_exchanges_scoped(
+        &self,
+        file: &Path,
+        scope: Option<&str>,
+    ) -> Result<Vec<HttpExchange>, CaptureError> {
+        self.deep()?.http_exchanges_scoped(file, scope)
+    }
+
     fn tls_sessions(&self, file: &Path) -> Result<Vec<TlsSession>, CaptureError> {
         self.deep()?.tls_sessions(file)
+    }
+
+    fn tls_sessions_scoped(
+        &self,
+        file: &Path,
+        scope: Option<&str>,
+    ) -> Result<Vec<TlsSession>, CaptureError> {
+        self.deep()?.tls_sessions_scoped(file, scope)
     }
 
     fn packet_comments(&self, file: &Path) -> Result<Vec<PacketBookmark>, CaptureError> {
@@ -84,6 +100,14 @@ impl<F: FastPath> CaptureBackend for HybridBackend<F> {
 
     fn message_streams(&self, file: &Path) -> Result<Vec<MessageStream>, CaptureError> {
         self.deep()?.message_streams(file)
+    }
+
+    fn message_streams_scoped(
+        &self,
+        file: &Path,
+        scope: Option<&str>,
+    ) -> Result<Vec<MessageStream>, CaptureError> {
+        self.deep()?.message_streams_scoped(file, scope)
     }
 
     fn http_detail(&self, file: &Path, ex: &HttpExchange) -> Result<HttpDetail, CaptureError> {

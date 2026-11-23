@@ -27,6 +27,7 @@ pub(crate) fn same_file(a: &Path, b: &Path) -> bool {
 
 fn session_ids(tools: &Tools, file: &Path) -> Result<SessionIds, CaptureError> {
     let pass = Pass {
+        scope: None,
         file,
         filter: "tls.handshake.type==1 || tls.handshake.type==16",
         fields: &["tls.handshake.random", "tls.handshake.epms"],

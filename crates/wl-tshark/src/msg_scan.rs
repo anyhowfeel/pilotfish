@@ -35,9 +35,11 @@ fn group(
     tools: &crate::process::Tools,
     file: &Path,
     opts: &[String],
+    scope: Option<&str>,
 ) -> Result<Grouper, CaptureError> {
     let all = separator_opts(opts);
     let pass = Pass {
+        scope,
         file,
         filter: FILTER,
         fields: &msg_rows::FIELDS,
@@ -97,6 +99,7 @@ fn sse_events(
     file: &Path,
     targets: &[&SseTarget],
     opts: &[String],
+    scope: Option<&str>,
 ) -> Result<HashMap<u32, Decoded>, CaptureError> {
     let mut all = opts.to_vec();
     all.extend(["-o".into(), "tcp.desegment_tcp_streams:FALSE".into()]);
@@ -105,6 +108,7 @@ fn sse_events(
     for part in targets.chunks(STREAMS_PER_PASS) {
         let filter = pass_filter(part);
         let pass = Pass {
+            scope,
             file,
             filter: &filter,
             fields: &PAYLOAD_FIELDS,
@@ -178,13 +182,14 @@ pub fn message_streams(
     tools: &crate::process::Tools,
     file: &Path,
     opts: &[String],
+    scope: Option<&str>,
 ) -> Result<Vec<MessageStream>, CaptureError> {
-    let (mut streams, targets) = group(tools, file, opts)?.finish();
+    let (mut streams, targets) = group(tools, file, opts, scope)?.finish();
     let cleartext: Vec<&SseTarget> = targets.iter().filter(|t| !t.tls).collect();
     let mut decoded = if cleartext.is_empty() {
         HashMap::new()
     } else {
-        sse_events(tools, file, &cleartext, opts)?
+        sse_events(tools, file, &cleartext, opts, scope)?
     };
     streams.extend(
         targets

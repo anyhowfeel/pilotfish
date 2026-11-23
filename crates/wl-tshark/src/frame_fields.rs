@@ -21,6 +21,7 @@ pub fn frame_fields(
     let mut names: Vec<&str> = vec!["frame.number"];
     names.extend(fields.iter().map(String::as_str));
     let pass = Pass {
+        scope: None,
         file,
         filter: filter.trim(),
         fields: &names,

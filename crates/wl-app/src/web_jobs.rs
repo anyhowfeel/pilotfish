@@ -88,7 +88,7 @@ impl<T> Drop for Lane<T> {
 
 pub struct WebJobs {
     rx: Receiver<Event>,
-    scan: Lane<PathBuf>,
+    scan: Lane<(PathBuf, Option<String>)>,
     detail: Lane<(PathBuf, HttpExchange)>,
     scan_result: Mutex<Option<WebData>>,
     detail_result: Mutex<Option<HttpDetail>>,
@@ -98,22 +98,27 @@ impl WebJobs {
     pub fn new(backend: Arc<dyn CaptureBackend>) -> Self {
         let (tx, rx) = unbounded();
         let b = backend.clone();
-        let scan = Lane::spawn(tx.clone(), move |seq, file: PathBuf| {
-            // The scans are independent tshark passes: run them side by side.
-            let (h, t, m) = thread::scope(|s| {
-                let h = s.spawn(|| b.http_exchanges(&file));
-                let m = s.spawn(|| b.message_streams(&file));
-                let t = b.tls_sessions(&file);
-                (
-                    h.join().unwrap_or_else(|_| Err(panic_err())),
-                    t,
-                    m.join().unwrap_or_else(|_| Err(panic_err())),
-                )
-            });
-            // Message streams are an extra tab: their failure must not hide the exchanges.
-            let m = m.unwrap_or_default();
-            Event::Web(seq, h.and_then(|h| t.map(|t| (h, t, m))))
-        });
+        let scan = Lane::spawn(
+            tx.clone(),
+            move |seq, (file, scope): (PathBuf, Option<String>)| {
+                // The scans are independent tshark passes: run them side by side. They keep only what the
+                // display filter of the application lets through.
+                let scope = scope.as_deref();
+                let (h, t, m) = thread::scope(|s| {
+                    let h = s.spawn(|| b.http_exchanges_scoped(&file, scope));
+                    let m = s.spawn(|| b.message_streams_scoped(&file, scope));
+                    let t = b.tls_sessions_scoped(&file, scope);
+                    (
+                        h.join().unwrap_or_else(|_| Err(panic_err())),
+                        t,
+                        m.join().unwrap_or_else(|_| Err(panic_err())),
+                    )
+                });
+                // Message streams are an extra tab: their failure must not hide the exchanges.
+                let m = m.unwrap_or_default();
+                Event::Web(seq, h.and_then(|h| t.map(|t| (h, t, m))))
+            },
+        );
         let detail = Lane::spawn(tx, move |seq, (file, ex): (PathBuf, HttpExchange)| {
             Event::Detail(seq, backend.http_detail(&file, &ex))
         });
@@ -126,8 +131,8 @@ impl WebJobs {
         }
     }
 
-    pub fn request(&self, file: PathBuf) {
-        self.scan.submit(file);
+    pub fn request(&self, file: PathBuf, scope: Option<String>) {
+        self.scan.submit((file, scope));
     }
 
     pub fn request_detail(&self, file: PathBuf, ex: HttpExchange) {
@@ -221,16 +226,22 @@ impl WebState {
         self.dirty |= was_live;
     }
 
-    pub fn request_now(&mut self, backing: Option<PathBuf>, now: Instant) {
+    pub fn request_now(&mut self, backing: Option<PathBuf>, scope: Option<String>, now: Instant) {
         if let Some(file) = backing {
-            self.jobs.request(file);
+            self.jobs.request(file, scope);
             self.dirty = false;
             self.last = Some(now);
         }
     }
 
     /// Called every poll: starts a scan when one is due. Cheap when nothing is.
-    pub fn tick(&mut self, backing: Option<PathBuf>, live: bool, now: Instant) {
+    pub fn tick(
+        &mut self,
+        backing: Option<PathBuf>,
+        scope: Option<String>,
+        live: bool,
+        now: Instant,
+    ) {
         if !self.active || self.jobs.in_flight() || backing.is_none() {
             return;
         }
@@ -239,7 +250,7 @@ impl WebState {
                 .last
                 .is_none_or(|t| now.duration_since(t) >= LIVE_REFRESH);
         if self.dirty || stale {
-            self.request_now(backing, now);
+            self.request_now(backing, scope, now);
         }
     }
 }

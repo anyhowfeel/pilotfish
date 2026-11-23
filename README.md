@@ -176,7 +176,7 @@ Environment variables:
   window-size graphs.
 - **Web**: HTTP requests paired with responses (headers, pretty or raw JSON, readable HTML,
   image preview, `curl` export) and TLS sessions (SNI, version, cipher, ALPN, JA3 / JA4 fingerprints) for HTTPS;
-  extracted objects.
+  extracted objects. Exchanges, sessions and streams follow the display filter that is applied.
 - **Insights**: plain-language findings (including port scans, sweeps, beaconing and odd DNS
   names), expert info, protocol hierarchy, DNS log.
 - **Diff**: compares the open capture with a second one (`--diff FILE` or the Choose capture
