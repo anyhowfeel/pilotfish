@@ -112,7 +112,14 @@ pub fn xy_chart(
                 let pts = PlotPoints::from(s.points.as_slice());
                 match s.style {
                     SeriesStyle::Line => {
-                        pu.line(Line::new(&s.name, pts).color(s.color).width(1.8));
+                        // Never aggregated into a band: the points of a stream graph are few, and a
+                        // band fills the envelope between pixel columns, which turns two points at the
+                        // same time into a large filled polygon.
+                        let line = Line::new(&s.name, pts)
+                            .color(s.color)
+                            .width(1.8)
+                            .allow_band(false);
+                        pu.line(line);
                     }
                     SeriesStyle::Scatter(m) => {
                         let p = Points::new(&s.name, pts).color(s.color);

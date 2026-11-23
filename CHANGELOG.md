@@ -33,6 +33,9 @@ and the project follows [Semantic Versioning](https://semver.org/).
   filter lets through, the frame numbers staying those of the whole capture. An exchange is kept when its
   frames pass the filter, so a filter on a field that only the request has (`http.host`) can drop the
   response. The Files tab still lists every object.
+- **The TCP graphs no longer fill a large area on a short exchange.** On a stream that lasts a few milliseconds
+  the ACK line of the time-sequence graph, which has two points at the same time, was drawn as a filled
+  polygon instead of a line. Lines are drawn as lines whatever the zoom.
 
 ## [0.6.0] - 2026-11-23
 
