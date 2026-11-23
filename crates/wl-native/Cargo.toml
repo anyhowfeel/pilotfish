@@ -1,0 +1,50 @@
+[package]
+name = "wl-native"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+wl-model.workspace = true
+crossbeam-channel.workspace = true
+pcap-parser = "0.17"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+etherparse = "0.21"
+sha2 = "0.10"
+
+[features]
+test-util = []
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true
+
+[[test]]
+name = "decode_vs_tshark"
+required-features = ["test-util"]
+
+[[test]]
+name = "session_vs_tshark"
+required-features = ["test-util"]
+
+[[test]]
+name = "properties_vs_capinfos"
+required-features = ["test-util"]
+
+[[test]]
+name = "io_series_vs_tshark"
+required-features = ["test-util"]
+
+[[test]]
+name = "filter_vs_tshark"
+required-features = ["test-util"]
+
+[[test]]
+name = "detail_vs_tshark"
+required-features = ["test-util"]
+
+[[test]]
+name = "memory_flat"
+required-features = ["test-util"]

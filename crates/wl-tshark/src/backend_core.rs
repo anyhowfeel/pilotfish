@@ -21,6 +21,7 @@ impl TsharkBackend {
             http_cache: http_detail::DetailCache::default(),
             keylog: Mutex::new(keylog::from_env()),
             decode_as: Mutex::new(Vec::new()),
+            clock_zone: Mutex::new(ClockZone::default()),
             scans: Scans::default(),
         })
     }

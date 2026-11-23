@@ -7,6 +7,7 @@ use crate::app::App;
 use crate::dispatch::Command;
 use crate::page::Page;
 use crate::state::RunState;
+use crate::wireshark::explain;
 
 impl App {
     /// True when `p` is on screen, as the main page or in its own window.
@@ -89,7 +90,7 @@ impl App {
         let remote = self.ctrl.source().is_some_and(CaptureSource::is_remote);
         let local_live = self.ctrl.is_live() && !remote;
         self.resolver.procs().set_active(running && local_live);
-        let web_shown = self.shows(Page::Web);
+        let web_shown = self.shows(Page::Web) && !self.wireshark.is_missing();
         if self.web_link.tick(&mut self.ctrl, web_shown) {
             ctx.request_repaint();
         }
@@ -126,8 +127,9 @@ impl App {
         if let Some((f, r)) = self.ctrl.take_filter_result()
             && f == self.packets.filter_bar.text()
         {
-            self.packets
-                .set_filter_status(r.map_err(|e: CaptureError| e.to_string()));
+            self.packets.set_filter_status(
+                r.map_err(|e: CaptureError| explain(e, "This filter").to_string()),
+            );
         }
         if let Some(p) = ctx.input(|i| i.raw.dropped_files.first().map(|f| f.path().to_path_buf()))
         {

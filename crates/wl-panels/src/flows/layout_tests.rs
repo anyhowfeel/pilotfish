@@ -155,6 +155,21 @@ fn data_is_requested_once_per_view() {
 }
 
 #[test]
+fn no_wireshark_asks_for_no_graph_pass() {
+    let stats = StatsSnapshot::default();
+    let mut panel = FlowsPanel::default();
+    panel.open(conv());
+    for tab in [Tab::Flow, Tab::Rtt] {
+        panel.set_tab(tab);
+        run(1000.0, 640.0, 1.0, Mode::Dark, |ui| {
+            let mut d = FlowsData::empty(&stats);
+            d.wireshark = wl_model::Wireshark::Missing;
+            assert!(panel.ui(ui, &d).is_empty(), "{tab:?}");
+        });
+    }
+}
+
+#[test]
 fn stale_results_of_another_selection_are_ignored() {
     let stats = StatsSnapshot::default();
     let (ev, other) = (synth(10, 2), FlowSel::Stream(9));

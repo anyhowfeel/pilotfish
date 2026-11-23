@@ -11,9 +11,10 @@
 ![Tested on Linux](https://img.shields.io/badge/tested%20on-Linux-informational)
 
 A small desktop packet viewer written in Rust with [egui](https://github.com/emilk/egui).
-It does no dissection of its own: captures are read and filtered by `tshark` / `dumpcap`
-(Wireshark's command-line tools), and pilotfish turns the output into tables, charts and a
-host graph.
+Capture files open without Wireshark: a built-in reader and decoder feed the Overview, Hosts, Map,
+Packets, Graphs and Properties pages. Deep dissection (HTTP and TLS details, streams, objects,
+Decode As, exports) and live capture go through `tshark` / `dumpcap` (Wireshark's command-line
+tools), which pilotfish starts only when a request needs them.
 
 This is a prototype built to explore what a Wireshark front end could look like. It is not
 meant to replace Wireshark or Sniffnet, and it covers only a small part of what they do.
@@ -87,8 +88,10 @@ macOS. These packages are built by CI and have not been tested on every platform
 ## Requirements
 
 - A recent stable Rust toolchain (edition 2024).
-- Wireshark's command-line tools on `PATH`: `tshark`, `dumpcap`, and optionally `editcap`,
-  `mergecap` and `capinfos` (export, large selections and file properties use them).
+- Wireshark's command-line tools on `PATH` for everything beyond reading a file: `tshark`,
+  `dumpcap`, and optionally `editcap`, `mergecap` and `capinfos` (live capture, packet dissection,
+  export and large selections use them). Without them a capture file still opens and the pages
+  listed above work; a feature that needs Wireshark says so.
 - For live capture, permission to capture without root (on Linux, being in the `wireshark`
   group is usually enough).
 
@@ -193,6 +196,8 @@ installed separately on Windows and macOS.
 | Crate | Role |
 | --- | --- |
 | `wl-model` | Plain data types and the `CaptureBackend` trait. No I/O. |
+| `wl-native` | Pure-Rust capture file reader, packet decoder, display-filter subset, I/O series and file properties. |
+| `wl-hybrid` | The `CaptureBackend` the app uses: answers from `wl-native` when it can and starts `wl-tshark` on first need. |
 | `wl-tshark` | `CaptureBackend` implementation on top of `tshark`, `dumpcap` and friends. |
 | `wl-stats` | Incremental statistics over the packet stream. |
 | `wl-kit` | Theme, widgets and charts shared by the UI. |
@@ -209,13 +214,59 @@ exports, and the GitHub social preview image).
 cargo test --workspace
 ```
 
-Tests that need `tshark` or loopback capture rights skip themselves when those are missing.
+Tests that need `tshark` or loopback capture rights skip themselves when those are missing. The
+native reader, decoder, filters, rows, I/O series, file properties and frame detail are each
+compared with tshark on every fixture capture; see [docs/native-backend.md](docs/native-backend.md).
+
+## Benchmark
+
+The native reader against tshark on the same file, measured by a small program in this repository.
+It generates a deterministic synthetic capture (TCP, UDP, DNS and ICMP over 50 000 conversations
+and 5 000 hosts), reads it through each backend the way the app does, drops the rows as they
+arrive, and reports time, rows per second and peak resident memory. Linux only (it reads
+`/proc`); `tshark` has to be installed for the second command.
+
+```sh
+cargo build --release -p wl-hybrid --features test-util --example measure
+M=target/release/examples/measure
+
+$M gen /tmp/big.pcap 3000000     # 1257 MiB, written in about 2 s
+$M native /tmp/big.pcap
+$M tshark /tmp/big.pcap
+$M native /tmp/big.pcap --keep   # also keeps every row, as the packet table does
+$M tshark /tmp/big.pcap --keep
+```
+
+Use `1000000` instead of `3000000` for a run of about a minute. Results on one machine, release
+build, tshark 4.7.4, one run each:
+
+| Packets | Backend | Seconds | Rows per second | Peak memory |
+| ---: | --- | ---: | ---: | ---: |
+| 3 000 000 | native | 3.3 | 915 000 | 15 MiB |
+| 3 000 000 | tshark | 66.8 | 45 000 | 2059 MiB |
+| 1 000 000 | native | 3.3 | 300 000 | 15 MiB |
+| 1 000 000 | tshark | 22.0 | 45 000 | 889 MiB |
+
+Memory is the process's own peak for native and the `tshark` child's peak for tshark. Absolute
+times depend on the disk, the CPU and what else is running; the shape does not: native memory
+stays flat while tshark's grows with the file. With `--keep`, both paths cost about 235 to 246
+bytes per row in the app, because the rows are the same type, so the native path saves tshark's
+share and not the packet table's. The numbers are for a synthetic capture; real traffic with
+other protocol mixes can differ. `crates/wl-native/tests/memory_flat.rs` keeps the flat-memory
+property under test.
 
 ## Known limits
 
 - Everything depends on the installed Wireshark version; field names follow `tshark` 4.x.
-- Files over a few hundred thousand packets load quickly but `tshark` itself uses a lot of
-  memory on them.
+- Reading a file natively keeps memory flat (15 MiB for 3 million packets, against about 2 GiB for
+  `tshark` on the same file, see [docs/native-backend.md](docs/native-backend.md)), but the
+  packet table still holds one row per packet in the app, about 235 bytes each, and anything that
+  needs `tshark` (deep dissection, streams, HTTP and TLS details) pays its memory cost on large files.
+- The native decoder labels the common protocols (ARP, ICMP, TCP, UDP, DNS, TLS, HTTP, DHCP, NTP,
+  mDNS, SSDP, QUIC) and shows other application protocols as TCP or UDP. It does not mark
+  retransmissions or number fragmented datagrams like Wireshark. Times in file properties are local by default, and UTC can be chosen in Settings.
+- Native display filters cover addresses, ports, stream and frame numbers, TCP flags, TTL and the
+  protocol names above; any other filter is evaluated by `tshark`.
 - Name suggestions in the filter (DNS log, SNI, HTTP Host) appear once the background scan of an
   opened file has finished, and only for the names the capture itself contains; there is no
   reverse lookup.

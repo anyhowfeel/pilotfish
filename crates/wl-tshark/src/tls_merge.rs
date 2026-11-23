@@ -6,9 +6,9 @@ use std::sync::Arc;
 
 use wl_model::TlsSession;
 
-use crate::interner::Interner;
 use crate::tls_names::{cipher_label, version_label};
 use crate::tsv_pass::{columns, opt};
+use wl_model::Interner;
 
 pub const FIELDS: [&str; 18] = [
     "frame.number",

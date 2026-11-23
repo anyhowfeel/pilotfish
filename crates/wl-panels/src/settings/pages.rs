@@ -1,6 +1,7 @@
 //! Appearance, Capture and Display category bodies (pure form code over `Settings`).
 use wl_kit::egui::Ui;
 use wl_kit::widgets::{choice_row, number_row, settings_card, slider_row, text_row, toggle_row};
+use wl_model::ClockZone;
 
 use super::model::{Density, PillLook, Settings, ThemeChoice};
 
@@ -104,6 +105,16 @@ pub fn display(ui: &mut Ui, s: &mut Settings) {
             &mut s.max_rows,
             10_000..=20_000_000,
             "",
+        );
+    });
+    settings_card(ui, "Capture file", |ui| {
+        choice_row(
+            ui,
+            true,
+            "Time zone",
+            "Times in the file properties.",
+            &mut s.clock_zone,
+            &[(ClockZone::Local, "Local"), (ClockZone::Utc, "UTC")],
         );
     });
 }

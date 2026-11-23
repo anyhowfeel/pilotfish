@@ -7,6 +7,7 @@ pub mod features;
 pub mod flows;
 pub mod graphs;
 pub mod insights;
+mod needs;
 pub mod overview;
 pub mod packets;
 pub mod properties;

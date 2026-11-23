@@ -5,6 +5,24 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **A time zone setting for the file properties.** Times show in local time by default and in UTC when
+  chosen in Settings, on both the native and the tshark path.
+- **Capture files open without Wireshark.** A pure-Rust reader and decoder (`wl-native`) read pcap and pcapng
+  files and feed the Overview, Hosts, Map, Packets, Graphs and Properties pages, a layer summary in the packet
+  detail pane, a subset of the display filter language, I/O graphs and file properties. `wl-hybrid` sends
+  every other request (HTTP and TLS details, streams, objects, Decode As, export, live capture) to tshark, which
+  now starts on first use instead of at launch. The missing-Wireshark banner is gone; a feature that needs
+  Wireshark says so when it is used. The native rows, filters, series, properties and frame layers are checked
+  against tshark on every fixture capture. On a synthetic 3 million packet capture the native read peaks at 15 MiB
+  and takes 3.3 s, where tshark peaks at 2059 MiB and takes 67 s.
+
+### Fixed
+- **Insights no longer reports a clean capture when an analysis failed or has not run.** A failed expert info,
+  protocol hierarchy, behavior or credential scan now shows "Analysis failed" with the reason and a way to
+  retry, the summary reads "Analysis incomplete", and exported reports leave out the all-clear card unless
+  every analysis finished. Before, the failure was dropped and the page said "Nothing looks wrong".
+
 ### Changed
 - **Private and public hosts use blue and magenta** instead of green and orange, which are the colours of the ok
   and warning states. Public addresses no longer look like a warning.

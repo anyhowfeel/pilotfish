@@ -2,16 +2,15 @@
 //! reloading the capture, and saving a copy of the capture with the keys embedded.
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use eframe::egui;
 use wl_model::CaptureSource;
 use wl_panels::web::KeysInfo;
-use wl_tshark::TsharkBackend;
 
 use crate::app::App;
 use crate::dispatch::Command;
+use crate::wireshark::{self, LazyTshark};
 
 enum Msg {
     Picked(PathBuf),
@@ -20,19 +19,19 @@ enum Msg {
 }
 
 pub struct KeysLink {
-    tshark: Option<Arc<TsharkBackend>>,
+    tshark: LazyTshark,
     tx: Sender<Msg>,
     rx: Receiver<Msg>,
 }
 
 impl KeysLink {
-    pub fn new(tshark: Option<Arc<TsharkBackend>>) -> Self {
+    pub fn new(tshark: LazyTshark) -> Self {
         let (tx, rx) = unbounded();
         Self { tshark, tx, rx }
     }
 
     pub fn info(&self) -> KeysInfo {
-        let Some(b) = &self.tshark else {
+        let Some(b) = self.tshark.built() else {
             return KeysInfo::default();
         };
         KeysInfo {
@@ -66,9 +65,16 @@ impl KeysLink {
     }
 
     pub fn embed(&self, source: PathBuf, ctx: &egui::Context) {
-        let Some(b) = self.tshark.clone() else { return };
-        let (tx, ctx) = (self.tx.clone(), ctx.clone());
+        let (tshark, tx, ctx) = (self.tshark.clone(), self.tx.clone(), ctx.clone());
         std::thread::spawn(move || {
+            let b = match wireshark::require(&tshark, "Embedding TLS keys") {
+                Ok(b) => b,
+                Err(e) => {
+                    let _ = tx.send(Msg::Embedded(Err(e)));
+                    ctx.request_repaint();
+                    return;
+                }
+            };
             let Some(dest) = rfd::FileDialog::new()
                 .set_file_name(embed_name(&source))
                 .add_filter("pcapng", &["pcapng"])
@@ -104,8 +110,13 @@ fn embed_name(source: &Path) -> String {
 impl App {
     /// Applies a key log (or clears it) and re-dissects what is on screen.
     pub(crate) fn set_keylog(&mut self, path: Option<PathBuf>, ctx: &egui::Context) {
-        let Some(b) = &self.keys.tshark else { return };
-        b.set_tls_keylog(path);
+        match wireshark::require(&self.keys.tshark, "Loading a TLS key log") {
+            Ok(b) => b.set_tls_keylog(path),
+            Err(e) => {
+                self.hub.notice = Some(e);
+                return;
+            }
+        }
         match self.ctrl.source().cloned() {
             Some(CaptureSource::File(p)) => self.reload_file(p, ctx),
             _ => self.web_link.clear(),

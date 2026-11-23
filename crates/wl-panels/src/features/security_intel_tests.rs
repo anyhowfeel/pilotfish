@@ -127,6 +127,7 @@ fn synthesis_includes_security_cards_and_honours_mutes() {
             security: Some(&sec),
             intel: &i,
             rules,
+            wireshark: Default::default(),
         };
         synthesize_insights(None, None, Some(&behavior), &stats, &cx)
             .into_iter()

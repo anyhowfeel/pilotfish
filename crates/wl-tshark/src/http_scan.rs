@@ -7,9 +7,9 @@ use wl_model::{CaptureError, HttpExchange};
 
 use crate::http_pair::{MAX_EXCHANGES, Pairer};
 use crate::http_row::{FIELDS, parse};
-use crate::interner::Interner;
 use crate::process::Tools;
 use crate::tsv_pass::{Pass, run_pass};
+use wl_model::Interner;
 
 pub fn http_exchanges(
     tools: &Tools,

@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use wl_kit::format;
 use wl_model::{
     BehaviorData, ExpertReport, ExpertSeverity, HealthInsight, InsightSeverity, ProtocolHierarchy,
-    SecurityData, StatsSnapshot, ThreatIntel,
+    SecurityData, StatsSnapshot, ThreatIntel, Wireshark,
 };
 
 use crate::insights::InsightRules;
@@ -275,6 +275,7 @@ pub struct InsightContext<'a> {
     pub security: Option<&'a SecurityData>,
     pub intel: &'a ThreatIntel,
     pub rules: &'a InsightRules,
+    pub wireshark: Wireshark,
 }
 
 /// Synthesizes prioritized plain-language diagnostic cards with one-click Wireshark filters.

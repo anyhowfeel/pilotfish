@@ -12,9 +12,10 @@ use wl_kit::egui::{RichText, ScrollArea, Ui};
 use wl_kit::format;
 use wl_kit::theme::{Palette, mono, spacing};
 use wl_kit::widgets::{empty_state, segmented, stat_card};
-use wl_model::Rcode;
+use wl_model::{Rcode, Wireshark};
 use wl_stats::{CaptureDiff, Micros, Traffic};
 
+use crate::needs::needs_wireshark;
 use section::{MIN_WIDTH, Show, section};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,6 +36,7 @@ pub struct DiffData<'a> {
     pub state: &'a DiffState,
     pub base: &'a str,
     pub other: Option<&'a str>,
+    pub wireshark: Wireshark,
 }
 
 #[derive(Default)]
@@ -68,6 +70,11 @@ fn rcode(n: &u64) -> String {
 impl DiffPanel {
     pub fn ui(&mut self, ui: &mut Ui, data: &DiffData) -> Vec<DiffAction> {
         let mut out = Vec::new();
+        // Latencies and web names come from tshark passes, so a diff without them would mislead.
+        if data.wireshark.is_missing() {
+            needs_wireshark(ui, "Capture diff");
+            return out;
+        }
         self.toolbar(ui, data, &mut out);
         ui.add_space(spacing::SM);
         match data.state {

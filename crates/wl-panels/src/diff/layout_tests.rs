@@ -49,6 +49,7 @@ fn report_stays_inside_its_area_at_tiled_and_full_widths() {
         state: &state,
         base: "before.pcapng",
         other: Some("after.pcapng"),
+        wireshark: Wireshark::Available,
     };
     for mode in [Mode::Dark, Mode::Light] {
         for width in [390.0_f32, 700.0, 1230.0] {
@@ -64,6 +65,21 @@ fn report_stays_inside_its_area_at_tiled_and_full_widths() {
             });
         }
     }
+}
+
+#[test]
+fn no_wireshark_offers_no_comparison() {
+    let state = DiffState::Idle;
+    let data = DiffData {
+        state: &state,
+        base: "before.pcapng",
+        other: None,
+        wireshark: Wireshark::Missing,
+    };
+    let mut panel = DiffPanel::default();
+    run(900.0, 640.0, 1.0, Mode::Dark, |ui| {
+        assert!(panel.ui(ui, &data).is_empty());
+    });
 }
 
 #[test]

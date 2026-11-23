@@ -10,8 +10,8 @@ use std::time::{Duration, Instant};
 use crossbeam_channel::{RecvTimeoutError, SendTimeoutError, Sender, bounded};
 use wl_model::{CaptureError, CaptureEvent, PacketRow};
 
-use crate::interner::Interner;
 use crate::row_parser::parse_line;
+use wl_model::Interner;
 
 pub const BATCH_ROWS: usize = 500;
 pub const FLUSH_EVERY: Duration = Duration::from_millis(50);

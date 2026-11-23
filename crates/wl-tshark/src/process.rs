@@ -53,9 +53,23 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
+    run_with_env(tool, args, &[])
+}
+
+/// `run` with extra environment variables for the child.
+pub fn run_with_env<I, S>(
+    tool: &Path,
+    args: I,
+    envs: &[(&str, &str)],
+) -> Result<Output, CaptureError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
     SPAWNED.fetch_add(1, Ordering::Relaxed);
     Command::new(tool)
         .args(args)
+        .envs(envs.iter().copied())
         .stdin(Stdio::null())
         .output()
         .map_err(|e| spawn_error(&tool.to_string_lossy(), &e))

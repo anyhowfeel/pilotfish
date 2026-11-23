@@ -1,6 +1,6 @@
 //! Inputs and outputs of the Flows page.
 
-use wl_model::{FlowEvents, FlowSel, StatsSnapshot, TcpSamples};
+use wl_model::{FlowEvents, FlowSel, StatsSnapshot, TcpSamples, Wireshark};
 
 /// What the Flows page asks the host app to do.
 #[derive(Debug, Clone, PartialEq)]
@@ -25,6 +25,7 @@ pub struct FlowsData<'a> {
     pub rev: u64,
     pub flow_error: Option<&'a str>,
     pub tcp_error: Option<&'a str>,
+    pub wireshark: Wireshark,
 }
 
 impl<'a> FlowsData<'a> {
@@ -36,6 +37,7 @@ impl<'a> FlowsData<'a> {
             rev: 0,
             flow_error: None,
             tcp_error: None,
+            wireshark: Wireshark::Available,
         }
     }
 }

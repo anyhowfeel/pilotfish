@@ -11,6 +11,7 @@ path = "src/main.rs"
 [dependencies]
 wl-model.workspace = true
 wl-tshark.workspace = true
+wl-hybrid.workspace = true
 wl-stats.workspace = true
 wl-kit.workspace = true
 wl-panels.workspace = true

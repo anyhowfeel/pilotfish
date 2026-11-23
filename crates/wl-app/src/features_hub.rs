@@ -5,9 +5,9 @@ use std::sync::Arc;
 use crossbeam_channel::{Receiver, Sender, bounded};
 use eframe::egui;
 use wl_model::{
-    BehaviorData, CaptureBackend, CaptureError, ExpertReport, PacketBookmark, PacketRow,
-    ProtocolHierarchy, SecurityData, StatsSnapshot, StreamConversation, StreamFormat,
-    StreamProtocol, ThreatIntel,
+    Analyses, Analysis, BehaviorData, CaptureBackend, CaptureError, ExpertReport, PacketBookmark,
+    PacketRow, ProtocolHierarchy, SecurityData, StatsSnapshot, StreamConversation, StreamFormat,
+    StreamProtocol, ThreatIntel, Wireshark, needs_message,
 };
 use wl_panels::features::{
     BookmarkStore, CommandPalette, FieldCatalog, InsightsPanel, NameBook, PaletteAction,
@@ -17,6 +17,7 @@ use wl_panels::insights::InsightRules;
 
 use crate::export_data::{write_html_report, write_packets_csv, write_stats_json};
 use crate::page::Page;
+use crate::wireshark::LazyTshark;
 
 /// Results of scans that belong to one capture carry its generation: `None` means valid for any.
 type Tagged = (Option<u64>, Msg);
@@ -24,9 +25,11 @@ type Tagged = (Option<u64>, Msg);
 enum Msg {
     Fields(Arc<FieldCatalog>),
     Stream(Result<StreamConversation, CaptureError>),
-    Insights(Option<ExpertReport>, Option<ProtocolHierarchy>),
-    Behavior(BehaviorData, NameBook),
-    Security(SecurityData),
+    Insights(Analysis<ExpertReport>, Analysis<ProtocolHierarchy>),
+    Behavior(Analysis<BehaviorData>, NameBook),
+    Security(Analysis<SecurityData>),
+    /// tshark could not be started for a reason other than being absent.
+    Unavailable(String),
     Comments(Vec<PacketBookmark>),
     ExportDone(Result<String, String>),
 }
@@ -53,19 +56,19 @@ pub enum HubCommand {
 mod export;
 #[path = "features_hub_insights.rs"]
 mod insights_job;
+#[path = "features_hub_jobs.rs"]
+mod jobs;
 
 pub struct FeaturesHub {
-    tshark: Option<Arc<wl_tshark::TsharkBackend>>,
+    pub(crate) tshark: LazyTshark,
+    pub(crate) wireshark: Wireshark,
     pub palette: CommandPalette,
     pub stream_view: StreamView,
     pub insights: InsightsPanel,
     pub bookmarks: BookmarkStore,
     pub bookmark_comment: String,
     pub bookmark_frame: Option<u64>,
-    pub expert: Option<ExpertReport>,
-    pub phs: Option<ProtocolHierarchy>,
-    pub behavior: Option<BehaviorData>,
-    pub security: Option<SecurityData>,
+    pub analyses: Analyses,
     pub intel: Arc<ThreatIntel>,
     pub rules: InsightRules,
     /// Names for the filter suggestions and how many times they were rebuilt.
@@ -78,11 +81,12 @@ pub struct FeaturesHub {
 }
 
 impl FeaturesHub {
-    pub fn new(tshark: Option<Arc<wl_tshark::TsharkBackend>>, ctx: egui::Context) -> Self {
+    pub fn new(tshark: LazyTshark, wireshark: Wireshark, ctx: egui::Context) -> Self {
         let (tx, rx) = bounded(16);
-        if let Some(b) = tshark.clone() {
-            let tx2 = tx.clone();
+        {
+            let (tx2, tshark) = (tx.clone(), tshark.clone());
             std::thread::spawn(move || {
+                let Ok(b) = tshark.get() else { return };
                 if let Ok(fields) = b.filter_fields(None) {
                     let catalog = Arc::new(FieldCatalog::from_fields(fields));
                     let _ = tx2.try_send((None, Msg::Fields(catalog)));
@@ -92,16 +96,14 @@ impl FeaturesHub {
         }
         Self {
             tshark,
+            wireshark,
             palette: CommandPalette::default(),
             stream_view: StreamView::default(),
             insights: InsightsPanel::default(),
             bookmarks: BookmarkStore::default(),
             bookmark_comment: String::new(),
             bookmark_frame: None,
-            expert: None,
-            phs: None,
-            behavior: None,
-            security: None,
+            analyses: Analyses::default(),
             intel: Arc::default(),
             rules: InsightRules::default(),
             names: (Arc::default(), 0),
@@ -114,10 +116,7 @@ impl FeaturesHub {
     }
 
     pub fn clear_capture(&mut self) {
-        self.expert = None;
-        self.phs = None;
-        self.behavior = None;
-        self.security = None;
+        self.analyses = Analyses::default();
         self.names = (Arc::default(), self.names.1 + 1);
         self.bookmarks.clear();
         self.bookmark_comment.clear();
@@ -130,11 +129,21 @@ impl FeaturesHub {
     where
         F: FnOnce(&wl_tshark::TsharkBackend, &Path) -> Msg + Send + 'static,
     {
-        let Some(b) = self.tshark.clone() else { return };
-        let (file, tx, ctx) = (file.clone(), self.tx.clone(), ctx.clone());
+        let (tshark, file, tx, ctx) = (
+            self.tshark.clone(),
+            file.clone(),
+            self.tx.clone(),
+            ctx.clone(),
+        );
         let generation = Some(self.generation);
         std::thread::spawn(move || {
-            let _ = tx.try_send((generation, job(&b, &file)));
+            // Without Wireshark the pages say so themselves, so there is nothing to report.
+            let msg = match tshark.get() {
+                Ok(b) => job(&b, &file),
+                Err(e) if e.is_tool_missing() => return,
+                Err(e) => Msg::Unavailable(e.to_string()),
+            };
+            let _ = tx.try_send((generation, msg));
             ctx.request_repaint();
         });
     }
@@ -143,30 +152,21 @@ impl FeaturesHub {
     /// result is delivered as soon as it is ready.
     pub fn refresh_insights(&mut self, file: PathBuf, ctx: egui::Context) {
         let file = Arc::new(file);
+        self.analyses.start();
         self.spawn_job(&file, &ctx, |b, f| {
-            Msg::Insights(
-                b.expert_info(f, None).ok(),
-                b.protocol_hierarchy(f, None).ok(),
-            )
+            jobs::insights(b.expert_info(f, None), b.protocol_hierarchy(f, None))
         });
         self.spawn_job(&file, &ctx, |b, f| {
             Msg::Comments(b.packet_comments(f).unwrap_or_default())
         });
         self.spawn_job(&file, &ctx, |b, f| {
-            let (channels, dns, tls, http) = std::thread::scope(|s| {
-                let c = s.spawn(|| b.behavior_channels(f).unwrap_or_default());
-                let t = s.spawn(|| b.tls_sessions(f).unwrap_or_default());
-                let h = s.spawn(|| b.http_exchanges(f).unwrap_or_default());
-                let d = b.dns_queries(f).unwrap_or_default();
-                (
-                    c.join().unwrap_or_default(),
-                    d,
-                    t.join().unwrap_or_default(),
-                    h.join().unwrap_or_default(),
-                )
-            });
-            let names = NameBook::build(&dns, &tls, &http);
-            Msg::Behavior(BehaviorData { channels, dns }, names)
+            std::thread::scope(|s| {
+                let channels = s.spawn(|| b.behavior_channels(f));
+                let tls = s.spawn(|| b.tls_sessions(f));
+                let http = s.spawn(|| b.http_exchanges(f));
+                let dns = b.dns_queries(f);
+                jobs::behavior(jobs::join(channels), dns, jobs::join(tls), jobs::join(http))
+            })
         });
         self.spawn_security(&file, &ctx);
     }
@@ -180,17 +180,14 @@ impl FeaturesHub {
         ctx: egui::Context,
     ) {
         self.stream_view.begin_load(protocol, stream_id, format);
-        let Some(b) = self.tshark.clone() else {
-            self.stream_view
-                .set_error("tshark backend unavailable".into());
-            return;
-        };
-        let (tx, generation) = (self.tx.clone(), Some(self.generation));
+        let (tshark, tx, generation) =
+            (self.tshark.clone(), self.tx.clone(), Some(self.generation));
         std::thread::spawn(move || {
-            let _ = tx.try_send((
-                generation,
-                Msg::Stream(b.follow_stream(&file, protocol, stream_id, format)),
-            ));
+            let stream = match tshark.get() {
+                Ok(b) => b.follow_stream(&file, protocol, stream_id, format),
+                Err(_) => Err(CaptureError::Other(needs_message("Follow stream"))),
+            };
+            let _ = tx.try_send((generation, Msg::Stream(stream)));
             ctx.request_repaint();
         });
     }
@@ -207,14 +204,15 @@ impl FeaturesHub {
                 Msg::Stream(Ok(c)) => self.stream_view.set_conversation(c),
                 Msg::Stream(Err(e)) => self.stream_view.set_error(e.to_string()),
                 Msg::Insights(e, p) => {
-                    self.expert = e;
-                    self.phs = p;
+                    self.analyses.expert = e;
+                    self.analyses.hierarchy = p;
                 }
-                Msg::Security(s) => self.security = Some(s),
+                Msg::Security(s) => self.analyses.security = s,
                 Msg::Behavior(b, names) => {
-                    self.behavior = Some(b);
+                    self.analyses.behavior = b;
                     self.names = (Arc::new(names), self.names.1 + 1);
                 }
+                Msg::Unavailable(reason) => self.analyses.fail_pending(&reason),
                 Msg::Comments(list) => {
                     for c in list {
                         if self.bookmarks.comment(c.frame_no).is_none_or(str::is_empty) {

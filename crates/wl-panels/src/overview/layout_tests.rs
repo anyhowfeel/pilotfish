@@ -173,6 +173,7 @@ fn panels_run_without_overflow_in_dark_and_light() {
                             filter_status: None,
                             running: false,
                             paused: false,
+                            wireshark: Default::default(),
                         },
                     );
                     dash.ui(ui, &StatsSnapshot::default());

@@ -5,7 +5,6 @@ use wl_kit::theme::{Palette, RADIUS, spacing};
 use wl_kit::widgets::{Severity, chip_dot, severity_dot};
 
 use super::actions::InsightsAction;
-use super::logic::HealthState;
 
 const BTN_H: f32 = 30.0;
 
@@ -58,12 +57,12 @@ fn buttons(ui: &mut Ui, actions: &mut Vec<InsightsAction>, rtl: bool) {
 
 /// Counts shown in the summary strip.
 pub struct Summary {
-    pub state: HealthState,
+    pub label: &'static str,
+    pub severity: Severity,
     pub critical: usize,
     pub warning: usize,
     pub info: usize,
     pub packets: u64,
-    pub analysing: bool,
 }
 
 pub fn summary_strip(ui: &mut Ui, s: &Summary) {
@@ -77,13 +76,8 @@ pub fn summary_strip(ui: &mut Ui, s: &Summary) {
             let narrow = ui.available_width() < NARROW;
             let body = |ui: &mut Ui| {
                 ui.spacing_mut().item_spacing = egui::vec2(spacing::SM, spacing::SM);
-                severity_dot(ui, s.state.severity(), 12.0);
-                let label = if s.analysing {
-                    "Analysing..."
-                } else {
-                    s.state.label()
-                };
-                ui.label(RichText::new(label).strong().size(16.0));
+                severity_dot(ui, s.severity, 12.0);
+                ui.label(RichText::new(s.label).strong().size(16.0));
                 for (sev, n) in [
                     (Severity::Critical, s.critical),
                     (Severity::Warning, s.warning),

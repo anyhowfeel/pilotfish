@@ -11,6 +11,8 @@ license = "GPL-3.0-or-later"
 wl-model = { path = "crates/wl-model" }
 rayon = "1"
 wl-tshark = { path = "crates/wl-tshark" }
+wl-native = { path = "crates/wl-native" }
+wl-hybrid = { path = "crates/wl-hybrid" }
 wl-stats = { path = "crates/wl-stats" }
 wl-kit = { path = "crates/wl-kit" }
 wl-panels = { path = "crates/wl-panels" }

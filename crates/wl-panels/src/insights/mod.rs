@@ -8,21 +8,21 @@ mod layout_tests;
 mod logic;
 mod rules;
 mod secondary;
+mod state;
 
 pub use actions::InsightsAction;
 pub use category::Category;
-pub use logic::{HealthState, findings, group, health_state};
+pub use logic::{HealthState, View, findings, group, health_state, view};
 pub use rules::{InsightRules, MuteChoice, Thresholds, mute_choices};
 
 use wl_kit::egui::{self, Align, Key, Layout, Rect, RichText, ScrollArea, Ui, vec2};
 use wl_kit::theme::{Palette, spacing};
 use wl_kit::widgets::{chip, empty_state, segmented_w};
-use wl_model::{
-    BehaviorData, ExpertReport, ExpertSeverity, InsightSeverity, ProtocolHierarchy, StatsSnapshot,
-};
+use wl_model::{Analyses, ExpertSeverity, InsightSeverity, StatsSnapshot, Wireshark};
 
 use crate::dns::{DnsAction, DnsPanel};
 use crate::features::{InsightContext, synthesize_insights};
+use crate::needs::needs_wireshark;
 use finding_card::finding_card;
 use header::{Summary, header, summary_strip};
 
@@ -62,15 +62,23 @@ impl InsightsPanel {
         &mut self,
         ui: &mut Ui,
         stats: &StatsSnapshot,
-        expert: Option<&ExpertReport>,
-        phs: Option<&ProtocolHierarchy>,
-        behavior: Option<&BehaviorData>,
+        analyses: &Analyses,
         cx: &InsightContext,
     ) -> Vec<InsightsAction> {
         let mut actions = Vec::new();
-        let all = synthesize_insights(expert, phs, behavior, stats, cx);
+        let all = synthesize_insights(
+            analyses.expert.ready(),
+            analyses.hierarchy.ready(),
+            analyses.behavior.ready(),
+            stats,
+            cx,
+        );
         let found = findings(&all);
         let total = stats.total_packets;
+        if view(cx.wireshark, total, found.len(), analyses) == View::NeedsWireshark {
+            centered(ui, |ui| needs_wireshark(ui, "Network health"));
+            return actions;
+        }
         centered(ui, |ui| {
             header(ui, &mut actions);
             ui.add_space(spacing::MD);
@@ -83,14 +91,15 @@ impl InsightsPanel {
             let w = ui.available_width().min(560.0);
             segmented_w(ui, &mut self.tab, &tabs, w);
             ui.add_space(spacing::MD);
-            if self.tab == Tab::Findings {
+            if self.tab == Tab::Findings && total > 0 {
+                let (label, severity) = logic::strip(health_state(&found), analyses);
                 let sum = Summary {
-                    state: health_state(&found),
+                    label,
+                    severity,
                     critical: logic::count(&found, InsightSeverity::Critical),
                     warning: logic::count(&found, InsightSeverity::Warning),
                     info: logic::count(&found, InsightSeverity::Info),
                     packets: total,
-                    analysing: total > 0 && expert.is_none(),
                 };
                 summary_strip(ui, &sum);
                 ui.add_space(spacing::MD);
@@ -109,11 +118,17 @@ impl InsightsPanel {
                 .id_salt("wl_insights_scroll")
                 .auto_shrink([false, false])
                 .show(ui, |ui| match self.tab {
-                    Tab::Findings => self.findings_ui(ui, &found, total, &mut actions),
-                    Tab::Expert => {
-                        secondary::expert_view(ui, &mut self.severity_filter, expert, &mut actions)
+                    Tab::Findings => {
+                        let shown = (total, cx.wireshark, analyses);
+                        self.findings_ui(ui, &found, shown, &mut actions)
                     }
-                    Tab::Hierarchy => secondary::phs_view(ui, phs, &mut actions),
+                    Tab::Expert => secondary::expert_view(
+                        ui,
+                        &mut self.severity_filter,
+                        &analyses.expert,
+                        &mut actions,
+                    ),
+                    Tab::Hierarchy => secondary::phs_view(ui, &analyses.hierarchy, &mut actions),
                     Tab::Dns => {}
                 });
         });
@@ -124,26 +139,56 @@ impl InsightsPanel {
         &mut self,
         ui: &mut Ui,
         found: &[&wl_model::HealthInsight],
-        total: u64,
+        (total, wireshark, analyses): (u64, Wireshark, &Analyses),
         actions: &mut Vec<InsightsAction>,
     ) {
-        if found.is_empty() {
-            if total == 0 {
+        match view(wireshark, total, found.len(), analyses) {
+            View::NoCapture => {
                 empty_state(
                     ui,
                     "i",
                     "No capture loaded",
                     "Open a pcapng file or start a capture to see network health findings.",
                 );
-            } else {
+                return;
+            }
+            View::AllClear => {
                 empty_state(
                     ui,
                     "ok",
                     "Nothing looks wrong",
                     "No retransmissions, resets, DNS failures or malformed frames were found.",
                 );
+                return;
             }
-            return;
+            View::NotRun => {
+                empty_state(
+                    ui,
+                    "i",
+                    "Analysis has not run",
+                    "Use Re-analyse to check this capture.",
+                );
+                return;
+            }
+            View::Analysing => {
+                empty_state(
+                    ui,
+                    "i",
+                    "Analysing the capture",
+                    "Findings appear when the analysis finishes.",
+                );
+                return;
+            }
+            View::Failed => {
+                empty_state(ui, "!", "Analysis failed", &logic::failure_text(analyses));
+                return;
+            }
+            View::NeedsWireshark => return,
+            View::Findings => {}
+        }
+        if !analyses.failures().is_empty() {
+            ui.label(RichText::new(logic::failure_text(analyses)).color(Palette::warn()));
+            ui.add_space(spacing::SM);
         }
         self.keyboard(ui, found, actions);
         let mut idx = 0;

@@ -7,7 +7,7 @@ use std::sync::Arc;
 use crossbeam_channel::{Receiver, unbounded};
 use eframe::egui;
 use wl_kit::scale;
-use wl_model::{CaptureBackend, FlowKey, Interface};
+use wl_model::{CaptureBackend, FlowKey, Interface, Wireshark};
 use wl_panels::flows::{FlowsPanel, Tab as FlowTab};
 use wl_panels::overview::{CaptureSetup, ConversationsPanel, Dashboard, HostsPanel};
 use wl_panels::packets::{Layout, PacketsView};
@@ -25,17 +25,19 @@ use crate::features_hub::FeaturesHub;
 use crate::flows_link::FlowsLink;
 use crate::graphs_hub::GraphsHub;
 use crate::keys_link::KeysLink;
-use crate::missing::Missing;
 use crate::page::Page;
 use crate::prefs::Prefs;
 use crate::props_hub::PropsHub;
 use crate::setup_io::SetupIo;
 use crate::shot::Shot;
 use crate::web_link::WebLink;
+use crate::wireshark;
 use crate::worker::Controller;
 
 pub struct App {
     pub(crate) page: Page,
+    /// Whether Wireshark is installed, decided once at start.
+    pub(crate) wireshark: Wireshark,
     pub(crate) prefs: Prefs,
     pub(crate) ctrl: Controller,
     pub(crate) packets: PacketsView,
@@ -92,14 +94,9 @@ impl App {
         let scale = scale::ui_scale(&cc.egui_ctx);
         crate::tools_info::warm();
         send_min_size(&cc.egui_ctx, scale);
-        let (backend, tshark, startup_error): (Arc<dyn CaptureBackend>, _, _) =
-            match wl_tshark::TsharkBackend::new() {
-                Ok(b) => {
-                    let arc = Arc::new(b);
-                    (arc.clone(), Some(arc), None)
-                }
-                Err(e) => (Arc::new(Missing(e.clone())), None, Some(e.to_string())),
-            };
+        let tshark = wireshark::lazy_tshark();
+        let wireshark = wireshark::availability(&tshark);
+        let backend: Arc<dyn CaptureBackend> = Arc::new(wireshark::hybrid(&tshark));
         let (itx, iface_rx) = unbounded();
         let (b, ctx) = (backend.clone(), cc.egui_ctx.clone());
         std::thread::spawn(move || {
@@ -145,7 +142,8 @@ impl App {
             flows_link: FlowsLink::new(backend.clone(), cc.egui_ctx.clone()),
             setup: CaptureSetup::default(),
             setup_io,
-            hub: FeaturesHub::new(tshark, cc.egui_ctx.clone()),
+            hub: FeaturesHub::new(tshark, wireshark, cc.egui_ctx.clone()),
+            wireshark,
             extras,
             settings: SettingsDialog::default(),
             interfaces: Vec::new(),
@@ -154,7 +152,7 @@ impl App {
             resolver,
             geo_store: Default::default(),
             intel_store,
-            startup_error,
+            startup_error: None,
             shot: cli.screenshot.clone().map(|p| Shot::new(p, cli.wait_ms)),
             last_scale: scale,
             was_running: false,

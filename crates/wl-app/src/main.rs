@@ -38,7 +38,6 @@ mod icons;
 mod intel_store;
 mod keys_link;
 mod metrics;
-mod missing;
 mod page;
 mod prefs;
 mod proc_scan;
@@ -56,6 +55,7 @@ mod tools_info;
 mod web_jobs;
 mod web_link;
 mod window_job;
+mod wireshark;
 mod worker;
 
 /// mimalloc: faster for millions of small `Arc<str>` rows and returns memory after Clear/reopen

@@ -7,7 +7,7 @@ use wl_model::CaptureOptions;
 
 use super::actions::OverviewAction;
 use super::setup_bar::{BarData, Verdict};
-use super::setup_logic::normalize_filter;
+use super::setup_logic::{normalize_filter, start_blocker};
 
 pub(super) fn action_row(
     ui: &mut Ui,
@@ -30,7 +30,7 @@ pub(super) fn action_row(
                 if d.running {
                     running_buttons(ui, d.paused, out);
                 } else {
-                    start_buttons(ui, o, v, out);
+                    start_buttons(ui, o, d, v, out);
                 }
             });
         });
@@ -62,7 +62,13 @@ fn running_buttons(ui: &mut Ui, paused: bool, out: &mut Vec<OverviewAction>) {
     }
 }
 
-fn start_buttons(ui: &mut Ui, o: &CaptureOptions, v: &Verdict, out: &mut Vec<OverviewAction>) {
+fn start_buttons(
+    ui: &mut Ui,
+    o: &CaptureOptions,
+    d: &BarData<'_>,
+    v: &Verdict,
+    out: &mut Vec<OverviewAction>,
+) {
     let txt = RichText::new("Start capture")
         .strong()
         .size(15.0)
@@ -70,7 +76,7 @@ fn start_buttons(ui: &mut Ui, o: &CaptureOptions, v: &Verdict, out: &mut Vec<Ove
     let start = Button::new(txt)
         .fill(Palette::accent())
         .min_size(vec2(170.0, 38.0));
-    let problem = o.problem();
+    let problem = start_blocker(d.wireshark, o.problem());
     let enabled = problem.is_none() && v.ok != Some(false);
     let resp = ui.add_enabled(enabled, start);
     if enabled && resp.on_hover_cursor(CursorIcon::PointingHand).clicked() {

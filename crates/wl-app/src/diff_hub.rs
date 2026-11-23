@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use eframe::egui;
-use wl_model::CaptureBackend;
+use wl_model::{CaptureBackend, Wireshark};
 use wl_panels::diff::{DiffAction, DiffData, DiffPanel, DiffState};
 use wl_stats::CaptureDiff;
 
@@ -84,9 +84,10 @@ impl DiffHub {
     }
 
     /// `base` is the open capture's file and display name.
-    pub fn ui(&mut self, ui: &mut egui::Ui, base: Option<(PathBuf, String)>) {
+    pub fn ui(&mut self, ui: &mut egui::Ui, base: Option<(PathBuf, String)>, wireshark: Wireshark) {
         self.poll();
-        if let (Some((file, _)), Some(other)) = (&base, &self.other) {
+        if let (Some((file, _)), Some(other), false) = (&base, &self.other, wireshark.is_missing())
+        {
             let pair = (file.clone(), other.clone());
             if self.started.as_ref() != Some(&pair) {
                 self.start(pair, ui.ctx());
@@ -98,6 +99,7 @@ impl DiffHub {
             state: &self.state,
             base: base.as_ref().map_or("", |(_, n)| n),
             other: other.as_deref(),
+            wireshark,
         };
         for DiffAction::PickFile in self.panel.ui(ui, &data) {
             self.picker = Some(pick_capture(ui.ctx().clone()));

@@ -56,13 +56,14 @@ impl App {
         }
     }
 
-    /// Settings that act on running services rather than on the look: name resolution and the
-    /// statistics refresh rate.
+    /// Settings that act on running services rather than on the look: name resolution, the
+    /// statistics refresh rate, the insight rules and the zone of file times.
     pub(crate) fn apply_runtime_settings(&mut self) {
         let s = &self.prefs.settings;
         self.resolver.set_enabled(s.resolve_dns);
         self.ctrl.set_stats_hz(s.stats_hz);
         self.hub.rules = s.insights.clone();
+        self.props.set_clock_zone(s.clock_zone);
     }
 
     /// Pushes the saved Capture > Options into the Setup page.
