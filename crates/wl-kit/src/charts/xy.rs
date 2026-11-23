@@ -70,6 +70,16 @@ impl XySeries {
     }
 }
 
+/// Label of a mark of the vertical axis. The margin under zero has marks too, and a second "0" there
+/// would only repeat the first, so it stays blank.
+fn y_label(value: f64, y_fmt: &dyn Fn(f64) -> String) -> String {
+    if value < -1e-9 {
+        String::new()
+    } else {
+        y_fmt(value)
+    }
+}
+
 /// Draws the series. `id` must change with the data set (it keys the zoom state); drag a box to
 /// zoom in, double-click to reset. `y_fmt` formats the Y axis and the tooltip value.
 pub fn xy_chart(
@@ -115,7 +125,7 @@ pub fn xy_chart_with_reset(
         .include_y(0.0)
         .show_grid([false, true])
         .y_axis_min_width(76.0)
-        .y_axis_formatter(|m, _| y_fmt(m.value))
+        .y_axis_formatter(|m, _| y_label(m.value, y_fmt))
         .x_grid_spacer(time_ticks)
         .x_axis_formatter(|m, _| label(m))
         .label_formatter(tip)
@@ -144,4 +154,17 @@ pub fn xy_chart_with_reset(
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_margin_under_zero_has_no_label_of_its_own() {
+        let fmt = |v: f64| format!("{v:.0} B");
+        assert_eq!(y_label(0.0, &fmt), "0 B");
+        assert_eq!(y_label(-40.0, &fmt), "");
+        assert_eq!(y_label(793.0, &fmt), "793 B");
+    }
 }

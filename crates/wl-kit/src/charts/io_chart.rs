@@ -54,6 +54,16 @@ fn y_max(series: &[PlotSeries<'_>]) -> f64 {
         .fold(0.0, f64::max)
 }
 
+/// Label of a mark of the vertical axis. The margin under zero has marks too, and a second "0" there
+/// would only repeat the first, so it stays blank.
+fn y_label(value: f64, log: bool, unit: Option<Unit>) -> String {
+    if value < -1e-9 {
+        return String::new();
+    }
+    let v = from_plot(value, log).max(0.0);
+    unit.map_or_else(|| compact(v), |u| u.format(v))
+}
+
 fn log_marks(input: GridInput) -> Vec<GridMark> {
     let top = from_plot(input.bounds.1, true);
     log_ticks(top)
@@ -182,10 +192,7 @@ pub fn io_chart(
         .include_y(0.0)
         .include_y(top)
         .y_axis_min_width(76.0)
-        .y_axis_formatter(move |m, _| {
-            let v = from_plot(m.value, log).max(0.0);
-            unit.map_or_else(|| compact(v), |u| u.format(v))
-        })
+        .y_axis_formatter(move |m, _| y_label(m.value, log, unit))
         .x_grid_spacer(time_ticks)
         .x_axis_formatter(|m, _| label(m));
     if log {
@@ -273,6 +280,14 @@ mod tests {
                 ]
             })
             .collect()
+    }
+
+    #[test]
+    fn the_margin_under_zero_has_no_label_of_its_own() {
+        assert_eq!(y_label(0.0, false, Some(Unit::BytesPerSec)), "0 B/s");
+        assert_eq!(y_label(-100.0, false, Some(Unit::BytesPerSec)), "");
+        assert_eq!(y_label(-100.0, true, None), "");
+        assert_eq!(y_label(2000.0, false, Some(Unit::BytesPerSec)), "2.0 KiB/s");
     }
 
     #[test]
