@@ -128,20 +128,20 @@ fn builtin_entries() -> Vec<PaletteEntry> {
     vec![
         entry(
             "Page",
-            "Go to Capture Setup",
+            "Go to capture setup",
             "Setup",
             A::GoToPage(P::Setup),
         ),
         entry(
             "Page",
-            "Go to Overview Dashboard",
+            "Go to overview dashboard",
             "Overview",
             A::GoToPage(P::Overview),
         ),
-        entry("Page", "Go to I/O Graphs", "Graphs", A::GoToPage(P::Graphs)),
+        entry("Page", "Go to I/O graphs", "Graphs", A::GoToPage(P::Graphs)),
         entry(
             "File",
-            "Capture File Properties",
+            "Capture file properties",
             "capinfos",
             A::FileProperties,
         ),
@@ -161,7 +161,7 @@ fn builtin_entries() -> Vec<PaletteEntry> {
         ),
         entry(
             "Page",
-            "Go to Network Health Insights",
+            "Go to network health insights",
             "Insights",
             A::GoToPage(P::Insights),
         ),
@@ -201,32 +201,37 @@ fn builtin_entries() -> Vec<PaletteEntry> {
             "reset",
             A::ApplyFilter(String::new()),
         ),
-        entry("View", "Toggle Dark / Light Theme", "Theme", A::ToggleTheme),
+        entry(
+            "View",
+            "Toggle dark or light theme",
+            "Theme",
+            A::ToggleTheme,
+        ),
         entry("View", "Open Settings", "Ctrl+,", A::OpenSettings),
-        entry("Export", "Export Packets as CSV", ".csv", A::ExportCsv),
+        entry("Export", "Export packets as CSV", ".csv", A::ExportCsv),
         entry("Export", "Export objects...", "Files", A::ExportObjects),
-        entry("Analyze", "Decode As...", "tcp.port", A::DecodeAs),
+        entry("Analyze", "Decode as...", "tcp.port", A::DecodeAs),
         entry("Analyze", "DNS query log", "DNS", A::DnsLog),
         entry(
             "Export",
-            "Export Stats & Insights as JSON",
+            "Export stats and insights as JSON",
             ".json",
             A::ExportStatsJson,
         ),
         entry(
             "Export",
-            "Export Self-Contained HTML Report",
+            "Export self-contained HTML report",
             ".html",
             A::ExportHtmlReport,
         ),
         entry("File", "Open pcap / pcapng file...", "Open", A::OpenPcap),
         entry(
             "Capture",
-            "Toggle Pause / Resume Capture",
+            "Pause or resume capture",
             "Pause",
             A::TogglePause,
         ),
-        entry("Capture", "Stop Active Capture", "Stop", A::StopCapture),
+        entry("Capture", "Stop capture", "Stop", A::StopCapture),
     ]
 }
 

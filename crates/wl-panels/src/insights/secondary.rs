@@ -113,7 +113,7 @@ pub fn phs_view(ui: &mut Ui, phs: Option<&ProtocolHierarchy>, actions: &mut Vec<
     section_header(
         ui,
         &format!(
-            "Protocol Hierarchy — {} frames • {}",
+            "Protocol hierarchy: {} frames, {}",
             format::count(tree.total_frames),
             format::bytes(tree.total_bytes)
         ),

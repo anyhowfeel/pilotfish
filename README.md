@@ -166,6 +166,9 @@ Environment variables:
 
 Shift+click on a sidebar entry opens that page in a separate window.
 
+On the throughput and I/O graphs, drag to select a time window. On the TCP graphs, drag a box to zoom and
+double-click to reset.
+
 ### Country and network of hosts
 
 Open Settings > Locations to download the free DB-IP Country and ASN databases (about 4 and 5 MB),

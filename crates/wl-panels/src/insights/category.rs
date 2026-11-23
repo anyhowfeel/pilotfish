@@ -57,7 +57,7 @@ impl Category {
                 "Cleartext logins, blocklist matches, handshake failures, old protocol versions and certificate problems show up here. Switch cleartext protocols to TLS, change exposed secrets, and check client and server TLS settings."
             }
             Category::Anomalies => {
-                "Dissectors flagged frames as malformed or unusual. They can be caused by capture truncation, offloading, or genuinely broken senders."
+                "Dissectors flagged frames as malformed or unusual. They can be caused by capture truncation, offloading, or broken senders."
             }
         }
     }

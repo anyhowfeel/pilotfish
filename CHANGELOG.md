@@ -6,6 +6,10 @@ and the project follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- **Private and public hosts use blue and magenta** instead of green and orange, which are the colours of the ok
+  and warning states. Public addresses no longer look like a warning.
+- **Less interface copy.** The Network health page lost its subtitle, the hints that explained how to drag a
+  chart selection or zoom were removed, and the command palette uses sentence case.
 - **The README screenshots show pilotfish 0.5.0**, in both themes, with three new views: the Capture Diff page, the
   Streams tab and the masked credentials of Insights. They are taken on invented captures only.
 

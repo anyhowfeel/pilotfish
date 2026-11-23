@@ -10,7 +10,7 @@ pub fn appearance(ui: &mut Ui, s: &mut Settings) {
             ui,
             true,
             "Theme",
-            "Dark, light, or follow the operating system.",
+            "",
             &mut s.theme,
             &[
                 (ThemeChoice::Dark, "Dark"),

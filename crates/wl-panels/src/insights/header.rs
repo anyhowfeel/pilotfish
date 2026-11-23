@@ -15,22 +15,12 @@ const NARROW: f32 = 680.0;
 pub fn header(ui: &mut Ui, actions: &mut Vec<InsightsAction>) {
     let narrow = ui.available_width() < NARROW;
     let titles = |ui: &mut Ui| {
-        ui.vertical(|ui| {
-            ui.spacing_mut().item_spacing.y = 2.0;
-            ui.label(
-                RichText::new("Network health")
-                    .strong()
-                    .size(26.0)
-                    .color(Palette::text()),
-            );
-            ui.add(
-                egui::Label::new(
-                    RichText::new("Why is my network slow? Plain-language findings.")
-                        .color(Palette::muted()),
-                )
-                .wrap(),
-            );
-        });
+        ui.label(
+            RichText::new("Network health")
+                .strong()
+                .size(26.0)
+                .color(Palette::text()),
+        );
     };
     if narrow {
         titles(ui);

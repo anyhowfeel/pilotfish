@@ -20,8 +20,6 @@ pub fn window_row(
         Layout::left_to_right(Align::Center),
         |ui| {
             let Some(sel) = *selection else {
-                let hint = "Drag on the chart to select a time window; totals above follow it";
-                ui.label(RichText::new(hint).color(Palette::muted()));
                 return;
             };
             let text = format!(
@@ -41,11 +39,7 @@ pub fn window_row(
                         .color(Palette::on_accent()),
                 )
                 .fill(Palette::accent());
-                if ui
-                    .add(show)
-                    .on_hover_text("Open these packets in the Packets page")
-                    .clicked()
-                {
+                if ui.add(show).clicked() {
                     actions.push(GraphsAction::ShowPackets(sel.filter_expr()));
                 }
             });
