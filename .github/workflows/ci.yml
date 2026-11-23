@@ -3,69 +3,21 @@ name: CI
 on:
   push:
     branches: [main]
-    tags: ["v*"]
+    paths: ["crates/**", "tests/**", "packaging/**", "tools/**", ".github/workflows/**", "Cargo.toml", "Cargo.lock"]
   pull_request:
+    paths: ["crates/**", "tests/**", "packaging/**", "tools/**", ".github/workflows/**", "Cargo.toml", "Cargo.lock"]
   workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  plan:
-    name: check scope
-    runs-on: ubuntu-latest
-    outputs:
-      run_code: ${{ steps.scope.outputs.run_code }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - name: Decide whether code checks and builds are needed
-        id: scope
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "run_code=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-              echo "Release $GITHUB_REF_NAME already exists; skipping rebuild."
-              echo "run_code=false" >> "$GITHUB_OUTPUT"
-            else
-              echo "run_code=true" >> "$GITHUB_OUTPUT"
-            fi
-            exit 0
-          fi
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base="${{ github.event.pull_request.base.sha }}"
-          else
-            base="${{ github.event.before }}"
-          fi
-          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
-            echo "run_code=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if git diff --name-only "$base" HEAD | grep -Eq '^(crates/|tests/|packaging/|\.github/workflows/|Cargo\.toml$|Cargo\.lock$)'; then
-            echo "run_code=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Docs/metadata-only change; skipping Rust builds and tests."
-            echo "run_code=false" >> "$GITHUB_OUTPUT"
-          fi
-
   check:
     name: fmt, clippy, tests
-    needs: plan
     runs-on: ubuntu-latest
     steps:
-      - name: Skip checks for docs-only or already-published release
-        if: needs.plan.outputs.run_code != 'true'
-        run: echo "No code changes; skipping Rust checks."
       - uses: actions/checkout@v7
-        if: needs.plan.outputs.run_code == 'true'
       - name: System packages
-        if: needs.plan.outputs.run_code == 'true'
         run: |
           echo "wireshark-common wireshark-common/install-setuid boolean false" | sudo debconf-set-selections
           sudo apt-get update
@@ -80,164 +32,7 @@ jobs:
             sudo apparmor_parser -R "$p" || true
           done
       - name: Rust toolchain
-        if: needs.plan.outputs.run_code == 'true'
         run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
       - uses: Swatinem/rust-cache@v2
-        if: needs.plan.outputs.run_code == 'true'
-      - if: needs.plan.outputs.run_code == 'true'
-        run: cargo fmt --all --check
-      - if: needs.plan.outputs.run_code == 'true'
-        run: cargo clippy --workspace --all-targets -- -D warnings
-      - if: needs.plan.outputs.run_code == 'true'
-        run: cargo test --workspace
-
-  build:
-    name: build ${{ matrix.name }}
-    needs: [plan, check]
-    if: needs.plan.outputs.run_code == 'true'
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: linux-x86_64
-            os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-          - name: linux-aarch64
-            os: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
-          - name: macos-arm64
-            os: macos-latest
-            target: aarch64-apple-darwin
-          - name: macos-x86_64
-            os: macos-latest
-            target: x86_64-apple-darwin
-          - name: windows-x86_64
-            os: windows-latest
-            target: x86_64-pc-windows-msvc
-    steps:
-      - uses: actions/checkout@v7
-      - name: Linux packages
-        if: startsWith(matrix.os, 'ubuntu')
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends pkg-config libxkbcommon-dev \
-            libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libgl1-mesa-dev
-      - name: Rust toolchain
-        shell: bash
-        run: rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.target }}
-      - name: Build
-        run: cargo build --release --locked --target ${{ matrix.target }}
-      - name: Package
-        shell: bash
-        run: |
-          name="pilotfish-${GITHUB_REF_NAME//\//-}-${{ matrix.name }}"
-          mkdir -p "dist/$name"
-          bin="target/${{ matrix.target }}/release/pilotfish"
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cp "$bin.exe" "dist/$name/"
-            cp README.md LICENSE CHANGELOG.md "dist/$name/"
-            (cd dist && 7z a -tzip "$name.zip" "$name" > /dev/null)
-          else
-            cp "$bin" "dist/$name/"
-            cp README.md LICENSE CHANGELOG.md "dist/$name/"
-            tar -C dist -czf "dist/$name.tar.gz" "$name"
-          fi
-          rm -rf "dist/$name"
-      - name: Debian package
-        if: startsWith(matrix.os, 'ubuntu')
-        run: |
-          cargo install cargo-deb --locked
-          cargo deb -p wl-app --no-build --target ${{ matrix.target }} --output dist/
-      - name: macOS disk image
-        if: startsWith(matrix.name, 'macos')
-        run: |
-          ver=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
-          app=dmg/pilotfish.app
-          mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-          cp assets/logo/pilotfish.icns "$app/Contents/Resources/pilotfish.icns"
-          cp "target/${{ matrix.target }}/release/pilotfish" "$app/Contents/MacOS/"
-          sed "s/@VERSION@/$ver/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
-          ln -s /Applications dmg/Applications
-          cp LICENSE dmg/
-          hdiutil create -volname pilotfish -srcfolder dmg -ov -format UDZO \
-            "dist/pilotfish-$ver-${{ matrix.name }}.dmg"
-      - name: Windows installer
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          choco install innosetup -y --no-progress
-          $ver = (Select-String -Path Cargo.toml -Pattern '^version' | Select-Object -First 1).Line.Split('"')[1]
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$ver" packaging\windows\pilotfish.iss
-      - uses: actions/upload-artifact@v7
-        with:
-          name: pilotfish-${{ matrix.name }}
-          path: dist/*
-
-  arch:
-    name: build linux-x86_64-arch
-    needs: [plan, check]
-    if: needs.plan.outputs.run_code == 'true'
-    runs-on: ubuntu-latest
-    container: archlinux:latest
-    steps:
-      - name: System packages
-        run: |
-          pacman -Syu --noconfirm --needed base-devel git rust pkgconf libxkbcommon wayland \
-            libx11 libxcursor libxrandr libxi mesa
-      - uses: actions/checkout@v7
-      - name: Build
-        run: cargo build --release --locked
-      - name: Package
-        run: |
-          name="pilotfish-${GITHUB_REF_NAME//\//-}-linux-x86_64-arch"
-          mkdir -p "dist/$name"
-          cp target/release/pilotfish README.md LICENSE CHANGELOG.md "dist/$name/"
-          tar -C dist -czf "dist/$name.tar.gz" "$name"
-          rm -rf "dist/$name"
-      - name: Arch package
-        run: |
-          ver=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
-          git config --global --add safe.directory "$PWD"
-          mkdir /build
-          git archive --prefix="pilotfish-$ver/" -o "/build/pilotfish-$ver.tar.gz" HEAD
-          cp packaging/arch/PKGBUILD /build/
-          useradd -m builder
-          chown -R builder /build
-          # makepkg finds the tarball next to the PKGBUILD and skips the download.
-          su builder -c 'cd /build && makepkg -f --nodeps --noconfirm'
-          cp /build/*.pkg.tar.zst dist/
-      - uses: actions/upload-artifact@v7
-        with:
-          name: pilotfish-linux-x86_64-arch
-          path: dist/*
-
-  release:
-    name: publish release
-    if: startsWith(github.ref, 'refs/tags/v') && needs.plan.outputs.run_code == 'true'
-    needs: [plan, build, arch]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v8
-        with:
-          path: dist
-          merge-multiple: true
-      - name: Checksums
-        run: cd dist && sha256sum * > SHA256SUMS
-      - name: Create release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          version="${GITHUB_REF_NAME#v}"
-          # The notes are the CHANGELOG.md section of this version.
-          awk -v v="$version" '$0 ~ "^## \\[" v "\\]" {on=1; next} /^## \[/ || /^\[[^]]+\]: / {on=0} on' CHANGELOG.md \
-            | sed '/./,$!d' > notes.md
-          [ -s notes.md ] || { echo "CHANGELOG.md has no entry for $version" >&2; exit 1; }
-          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
-            --title "pilotfish $version" --notes-file notes.md
+      - run: tools/check-version.sh
+      - run: tools/check.sh

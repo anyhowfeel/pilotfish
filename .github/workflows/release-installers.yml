@@ -1,0 +1,99 @@
+name: Release installers
+
+# Linux and Windows files are built in containers (docker/run.sh) and published with tools/release.sh.
+# This workflow runs once the release is published and adds what needs a macOS or Windows machine:
+# the two macOS disk images and the Windows installer, then refreshes SHA256SUMS over every asset.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.release.tag_name }}
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  dmg:
+    name: ${{ matrix.name }}
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-arm64
+            target: aarch64-apple-darwin
+          - name: macos-x86_64
+            target: x86_64-apple-darwin
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Rust toolchain
+        run: rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - run: tools/check-version.sh
+        env:
+          GITHUB_REF_NAME: ${{ github.event.release.tag_name }}
+          GITHUB_REF_TYPE: tag
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Disk image
+        run: |
+          ver=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml)
+          app=dmg/pilotfish.app
+          mkdir -p dist "$app/Contents/MacOS" "$app/Contents/Resources"
+          cp assets/logo/pilotfish.icns "$app/Contents/Resources/pilotfish.icns"
+          cp "target/${{ matrix.target }}/release/pilotfish" "$app/Contents/MacOS/"
+          sed "s/@VERSION@/$ver/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
+          ln -s /Applications dmg/Applications
+          cp LICENSE dmg/
+          hdiutil create -volname pilotfish -srcfolder dmg -ov -format UDZO \
+            "dist/pilotfish-$ver-${{ matrix.name }}.dmg"
+      - name: Attach to the release
+        run: gh release upload "$TAG" dist/*.dmg --clobber
+
+  windows-installer:
+    name: windows-installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      # The installer wraps the executable of the container build, so both ship the same binary.
+      - name: Fetch the executable from the release
+        shell: bash
+        run: |
+          for i in $(seq 1 30); do
+            gh release download "$TAG" --pattern "pilotfish-$TAG-windows-x86_64.zip" --dir work --clobber && break
+            echo "waiting for the zip to be attached ($i)"; sleep 20
+          done
+          test -f "work/pilotfish-$TAG-windows-x86_64.zip"
+          7z x -y "work/pilotfish-$TAG-windows-x86_64.zip" -owork > /dev/null
+      - name: Installer
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $ver = $env:TAG.TrimStart('v')
+          $exe = (Resolve-Path "work/pilotfish-$($env:TAG)-windows-x86_64/pilotfish.exe").Path
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$ver" "/DExePath=$exe" packaging\windows\pilotfish.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Attach to the release
+        shell: bash
+        run: gh release upload "$TAG" dist/*-setup.exe --clobber
+
+  checksums:
+    name: checksums
+    needs: [dmg, windows-installer]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Recompute SHA256SUMS over every asset
+        run: |
+          mkdir all && cd all
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*'
+          rm -f SHA256SUMS
+          sha256sum -- * > ../SHA256SUMS
+          cd .. && cat SHA256SUMS
+          gh release upload "$TAG" SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
