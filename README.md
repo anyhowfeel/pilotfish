@@ -210,6 +210,36 @@ Windows and macOS.
 
 ## Layout of the repository
 
+```mermaid
+flowchart TD
+    file[("pcap / pcapng file")]
+    tools[("Wireshark tools<br/>tshark, dumpcap")]
+
+    app["<b>wl-app</b><br/>window, state, background jobs"]
+    panels["<b>wl-panels</b><br/>the pages"]
+    kit["<b>wl-kit</b><br/>theme, widgets, charts"]
+    planar["<b>wl-planar</b><br/>planar map layout"]
+    stats["<b>wl-stats</b><br/>incremental statistics"]
+    hybrid["<b>wl-hybrid</b><br/>the CaptureBackend of the app"]
+    native["<b>wl-native</b><br/>pure-Rust reader and decoder"]
+    tshark["<b>wl-tshark</b><br/>drives tshark and dumpcap"]
+
+    app --> panels
+    app --> stats
+    app --> hybrid
+    panels --> kit
+    panels --> planar
+    panels --> stats
+    hybrid -->|"files, filters, graphs"| native
+    hybrid -->|"everything else, started on first use"| tshark
+    native --> file
+    tshark --> tools
+    tools --> file
+```
+
+Every other crate also depends on `wl-model`, which holds the plain data types and the `CaptureBackend`
+trait that `wl-tshark` and `wl-hybrid` implement. The arrows show the main flow, not every dependency.
+
 | Crate | Role |
 | --- | --- |
 | `wl-model` | Plain data types and the `CaptureBackend` trait. No I/O. |
@@ -217,6 +247,7 @@ Windows and macOS.
 | `wl-hybrid` | The `CaptureBackend` the app uses: answers from `wl-native` when it can and starts `wl-tshark` on first need. |
 | `wl-tshark` | `CaptureBackend` implementation on top of `tshark`, `dumpcap` and friends. |
 | `wl-stats` | Incremental statistics over the packet stream. |
+| `wl-planar` | Planarity test and straight-line planar drawing, used by the Planar layout of the map. No dependency on the other crates. |
 | `wl-kit` | Theme, widgets and charts shared by the UI. |
 | `wl-panels` | The pages (packets, overview, map, flows, web, settings, ...). |
 | `wl-app` | The `pilotfish` binary: window, state, background jobs. |
@@ -263,6 +294,11 @@ build, tshark 4.7.4, one run each:
 | 3 000 000 | tshark | 66.8 | 45 000 | 2059 MiB |
 | 1 000 000 | native | 3.3 | 300 000 | 15 MiB |
 | 1 000 000 | tshark | 22.0 | 45 000 | 889 MiB |
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/benchmark/benchmark-dark.svg">
+  <img src="assets/benchmark/benchmark-light.svg" alt="Time and peak memory to read a capture of 1 000 000 and of 3 000 000 packets: the native reader takes 3.3 s and 15 MiB in both cases, tshark takes 22.0 s and 889 MiB, then 66.8 s and 2059 MiB." width="840">
+</picture>
 
 Memory is the process's own peak for native and the `tshark` child's peak for tshark. Absolute
 times depend on the disk, the CPU and what else is running; the shape does not: native memory
