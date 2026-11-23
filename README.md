@@ -295,6 +295,11 @@ build, tshark 4.7.4, one run each:
 | 1 000 000 | native | 3.3 | 300 000 | 15 MiB |
 | 1 000 000 | tshark | 22.0 | 45 000 | 889 MiB |
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/benchmark/benchmark-dark.svg">
+  <img src="assets/benchmark/benchmark-light.svg" alt="Time and peak memory to read a capture of 1 000 000 and of 3 000 000 packets: the native reader takes 3.3 s and 15 MiB in both cases, tshark takes 22.0 s and 889 MiB, then 66.8 s and 2059 MiB." width="840">
+</picture>
+
 Memory is the process's own peak for native and the `tshark` child's peak for tshark. Absolute
 times depend on the disk, the CPU and what else is running; the shape does not: native memory
 stays flat while tshark's grows with the file. With `--keep`, both paths cost about 235 to 246
