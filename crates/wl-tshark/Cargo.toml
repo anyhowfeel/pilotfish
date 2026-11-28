@@ -6,7 +6,7 @@ edition.workspace = true
 [dependencies]
 wl-model.workspace = true
 crossbeam-channel.workspace = true
-base64 = "0.22"
+base64 = "0.23"
 quick-xml = "0.42"
 tempfile = "3"
 serde.workspace = true
